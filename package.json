@@ -12,9 +12,12 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "db:migrate": "node --env-file=.env scripts/migrate.mjs",
+    "db:seed": "node --env-file=.env scripts/seed.mjs"
   },
   "devDependencies": {
+    "postgres": "^3.4.4",
     "turbo": "^2.0.0",
     "typescript": "^5.4.0"
   }
