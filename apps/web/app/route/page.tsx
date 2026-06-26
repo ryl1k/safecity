@@ -26,6 +26,7 @@ function RouteInner() {
   const [line, setLine] = useState<[number, number][]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
   const [summary, setSummary] = useState<{ distance: number; duration: number } | null>(null);
+  const [fallback, setFallback] = useState(false);
 
   async function plan() {
     if (!to) {
@@ -55,6 +56,7 @@ function RouteInner() {
       setLine(data.coordinates);
       setSteps(data.steps);
       setSummary(data.summary);
+      setFallback(Boolean(data.fallback));
       setStatus('ready');
     } catch {
       setStatus('error');
@@ -90,6 +92,12 @@ function RouteInner() {
 
         {status === 'loading' && <LoadingState label="Прокладання маршруту" />}
         {status === 'error' && <ErrorState title="Не вдалося прокласти маршрут" onRetry={() => void plan()} />}
+
+        {status === 'ready' && fallback && (
+          <p role="status" style={{ margin: '0 0 1em', padding: '0.7em 1em', borderRadius: '0.7em', background: 'var(--sc-warn-bg)', color: 'var(--sc-warn)', border: 'var(--sc-bw) solid var(--sc-warn-line)', fontSize: '0.85em', fontWeight: 700 }}>
+            Пішохідний маршрут — детальних даних для крісла колісного на цьому відрізку бракує.
+          </p>
+        )}
 
         {status === 'ready' && (
           <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1.3fr) minmax(0,1fr)', gap: '1em', alignItems: 'start' }}>
