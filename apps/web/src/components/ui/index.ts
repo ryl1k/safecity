@@ -12,3 +12,5 @@ export { SearchBar } from './SearchBar';
 export type { SearchBarProps } from './SearchBar';
 export { RatingBadge, RatingDot } from './RatingBadge';
 export type { RatingBadgeProps, RatingDotProps } from './RatingBadge';
+export { MapPin, PinLegend } from './MapPin';
+export type { MapPinProps } from './MapPin';
