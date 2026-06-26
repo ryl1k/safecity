@@ -10,3 +10,5 @@ export { Switch } from './Switch';
 export type { SwitchProps } from './Switch';
 export { SearchBar } from './SearchBar';
 export type { SearchBarProps } from './SearchBar';
+export { RatingBadge, RatingDot } from './RatingBadge';
+export type { RatingBadgeProps, RatingDotProps } from './RatingBadge';
