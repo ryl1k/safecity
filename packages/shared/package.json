@@ -1,0 +1,14 @@
+{
+  "name": "@safecity/shared",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "lint": "echo \"(scaffold) lint shared\"",
+    "type-check": "tsc --noEmit",
+    "test": "echo \"(scaffold) test shared\"",
+    "build": "echo \"(scaffold) build shared\""
+  }
+}

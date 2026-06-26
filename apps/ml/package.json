@@ -1,0 +1,13 @@
+{
+  "name": "@safecity/ml",
+  "version": "0.0.0",
+  "private": true,
+  "description": "gRPC CV/AI microservices (server-side only). Language TBD: Node vs Python.",
+  "scripts": {
+    "dev": "echo \"(scaffold) run ml gRPC server\"",
+    "lint": "echo \"(scaffold) lint ml\"",
+    "type-check": "echo \"(scaffold) type-check ml\"",
+    "test": "echo \"(scaffold) test ml\"",
+    "build": "echo \"(scaffold) build ml\""
+  }
+}

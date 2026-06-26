@@ -1,0 +1,14 @@
+{
+  "name": "@safecity/design-tokens",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "lint": "echo \"(scaffold) lint design-tokens\"",
+    "type-check": "tsc --noEmit",
+    "test": "echo \"(scaffold) test design-tokens\"",
+    "build": "echo \"(scaffold) build design-tokens\""
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "name": "@safecity/web",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "echo \"(scaffold) next dev\"",
+    "lint": "echo \"(scaffold) lint web\"",
+    "type-check": "tsc --noEmit",
+    "test": "echo \"(scaffold) test web\"",
+    "build": "echo \"(scaffold) next build\""
+  },
+  "dependencies": {
+    "@safecity/shared": "workspace:*",
+    "@safecity/design-tokens": "workspace:*"
+  }
+}
