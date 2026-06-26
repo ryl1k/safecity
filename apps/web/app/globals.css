@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* Base font scale follows the active theme (--sc-scale) + 200% toggle (data-big). */
+    font-size: calc(16px * var(--sc-scale, 1));
+  }
+  html[data-big='1'] {
+    font-size: calc(16px * var(--sc-scale, 1) * 2);
+  }
+  body {
+    background: var(--sc-bg);
+    color: var(--sc-text);
+    -webkit-font-smoothing: antialiased;
+    margin: 0;
+  }
+  /* Global visible focus — never remove (KB 11). */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 3px solid var(--sc-focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+}

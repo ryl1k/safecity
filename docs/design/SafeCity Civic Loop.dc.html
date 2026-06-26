@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .scstage {
+    font-family: "Onest", system-ui, "Segoe UI", sans-serif;
+    --sc-bg:#f7f8f9; --sc-surface:#fff; --sc-surface-2:#f1f4f5; --sc-text:#16242b; --sc-muted:#6a787f;
+    --sc-border:#e9edef; --sc-border-strong:#d2d9dc; --sc-primary:#0d5b66; --sc-primary-strong:#093f47;
+    --sc-ok:#1f7a44; --sc-warn:#8a5a00; --sc-bad:#b3261e;
+    --sc-focus:#0a66ff;
+    --sc-shadow-3:0 18px 44px rgba(15,30,36,.2);
+    min-height:100vh; background:radial-gradient(120% 80% at 50% 0%, #dfe7e9 0%, #cdd8db 100%);
+    display:flex; align-items:flex-start; justify-content:center; padding:40px 24px;
+  }
+  .sc-foc:focus-visible { outline:3px solid var(--sc-focus); outline-offset:2px; border-radius:4px; }
+  .phone { width:390px; height:844px; background:var(--sc-surface); border-radius:46px; box-shadow:var(--sc-shadow-3), 0 0 0 12px #0c1417, 0 0 0 13px #2b3d44; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+  .statusbar { height:50px; flex-shrink:0; display:flex; align-items:flex-end; justify-content:space-between; padding:0 28px 6px; font-size:13px; font-weight:600; color:var(--sc-text); }
+  @keyframes sc-rise { from{opacity:0; transform:translateY(8px)} to{opacity:1; transform:none} }
+  @keyframes sc-pop { 0%{transform:scale(.85)} 60%{transform:scale(1.06)} 100%{transform:scale(1)} }
+</style>
+</helmet>
+
+<div class="scstage">
+  <div class="phone">
+    <div class="statusbar"><span>9:41</span><span aria-hidden="true">5G</span></div>
+
+    <div style="flex-shrink:0; display:flex; align-items:center; padding:6px 14px 12px;">
+      <button class="sc-foc" aria-label="Назад" onClick="{{ goBack }}" style="width:40px; height:40px; border-radius:50%; border:none; background:transparent; color:var(--sc-text); font-size:24px; cursor:pointer; display:grid; place-items:center;">‹</button>
+    </div>
+
+    <div style="flex:1; overflow-y:auto;">
+
+      <!-- ============ ПРОБЛЕМА ============ -->
+      <div style="display:{{ showProblem }}; padding:0 26px 30px; ">
+        <h1 style="margin:0 0 10px; font-size:27px; line-height:1.18; letter-spacing:-.02em; font-weight:800;">Зламаний пандус біля переходу</h1>
+        <p style="margin:0; font-size:14.5px; color:var(--sc-muted);">пл.&nbsp;Ринок · повідомив Андрій · 3&nbsp;дні&nbsp;тому</p>
+
+        <div style="height:154px; border-radius:16px; background:var(--sc-surface-2); display:grid; place-items:center; margin:20px 0 30px;">
+          <span style="font-family:ui-monospace,monospace; font-size:12px; color:var(--sc-muted);">фото перешкоди</span>
+        </div>
+
+        <!-- stepper -->
+        <div style="display:flex; flex-direction:column;">
+          <div style="display:flex; gap:16px;">
+            <div style="display:flex; flex-direction:column; align-items:center;"><span aria-hidden="true" style="{{ dotDone }}">✓</span><span style="width:1.5px; flex:1; background:var(--sc-primary); min-height:24px;"></span></div>
+            <div style="padding-bottom:20px;"><div style="font-weight:700; font-size:16px;">Повідомлено</div><div style="font-size:13.5px; color:var(--sc-muted); margin-top:1px;">3 дні тому, з фото</div></div>
+          </div>
+          <div style="display:flex; gap:16px;">
+            <div style="display:flex; flex-direction:column; align-items:center;"><span aria-hidden="true" style="{{ confirmDot }}">{{ confirmDotInner }}</span><span style="width:1.5px; flex:1; background:{{ escLineColor }}; min-height:24px;"></span></div>
+            <div style="padding-bottom:20px;"><div style="font-weight:700; font-size:16px; color:{{ confirmTextColor }};">Підтверджено спільнотою</div><div style="font-size:13.5px; color:var(--sc-muted); margin-top:1px;">{{ confirmSub }}</div></div>
+          </div>
+          <div style="display:flex; gap:16px;">
+            <div style="display:flex; flex-direction:column; align-items:center;"><span aria-hidden="true" style="{{ escDot }}"></span><span style="width:1.5px; flex:1; background:var(--sc-border); min-height:24px;"></span></div>
+            <div style="padding-bottom:20px;"><div style="font-weight:700; font-size:16px; color:{{ escTextColor }};">Передано місту</div><div style="font-size:13.5px; color:var(--sc-muted); margin-top:1px;">{{ escSub }}</div></div>
+          </div>
+          <div style="display:flex; gap:16px;">
+            <div style="display:flex; flex-direction:column; align-items:center;"><span aria-hidden="true" style="width:22px; height:22px; border-radius:50%; border:1.5px solid var(--sc-border-strong);"></span></div>
+            <div><div style="font-weight:700; font-size:16px; color:var(--sc-muted);">Вирішено</div><div style="font-size:13.5px; color:var(--sc-muted); margin-top:1px;">Очікує ремонту містом</div></div>
+          </div>
+        </div>
+
+        <div style="border-top:1px solid var(--sc-border); margin-top:28px; padding-top:24px;">
+          <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:18px;">
+            <span style="font-weight:800; font-size:32px; letter-spacing:-.02em;" aria-live="polite">{{ count }}</span>
+            <span style="font-size:15px; color:var(--sc-muted);">постраждалих</span>
+          </div>
+          <button class="sc-foc" disabled="{{ confirmedDisabled }}" onClick="{{ confirm }}" style="{{ confirmBtnStyle }}">{{ confirmBtnLabel }}</button>
+        </div>
+
+        <div style="display:{{ showEscalatePrompt }}; border-top:1px solid var(--sc-border); margin-top:26px; padding-top:24px;">
+          <h2 style="margin:0 0 8px; font-size:17px; font-weight:800;">Поріг досягнуто</h2>
+          <p style="margin:0 0 18px; font-size:14.5px; line-height:1.55; color:var(--sc-muted);">25 голосів — достатньо, щоб передати це місту. Перетворіть підтвердження на офіційну петицію.</p>
+          <button class="sc-foc" onClick="{{ toPetition }}" style="width:100%; min-height:52px; border:none; border-radius:13px; background:var(--sc-primary); color:#fff; font-weight:700; font-size:16px; font-family:inherit; cursor:pointer;">Створити петицію</button>
+        </div>
+      </div>
+
+      <!-- ============ ПЕТИЦІЯ ============ -->
+      <div style="display:{{ showPetition }}; padding:0 26px 30px; ">
+        <h1 style="margin:0 0 10px; font-size:27px; line-height:1.16; letter-spacing:-.02em; font-weight:800;">Відремонтувати пандус біля ратуші</h1>
+        <p style="margin:0 0 34px; font-size:15px; color:var(--sc-muted); line-height:1.55;">Збір голосів, щоб усунути перешкоду на ключовому безбар'єрному маршруті в центрі Львова.</p>
+
+        <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:16px;">
+          <span style="font-weight:800; font-size:44px; letter-spacing:-.03em; line-height:1;" aria-live="polite">{{ signatures }}</span>
+          <span style="font-size:16px; color:var(--sc-muted);">з {{ goal }} підписів</span>
+        </div>
+        <div role="progressbar" aria-valuenow="{{ signatures }}" aria-valuemax="{{ goal }}" aria-label="Підписи до мети" style="height:8px; border-radius:5px; background:var(--sc-surface-2); overflow:hidden;">
+          <div style="height:100%; width:{{ pct }}%; background:var(--sc-primary); border-radius:5px; transition:width .5s;"></div>
+        </div>
+        <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:13px; color:var(--sc-muted);"><span>{{ pct }}% зібрано</span><span>залишилось {{ remaining }}</span></div>
+
+        <div style="border-top:1px solid var(--sc-border); margin-top:30px; padding-top:24px;">
+          <h2 style="margin:0 0 18px; font-size:16px; font-weight:800;">Коли зберемо {{ goal }}</h2>
+          <div style="display:flex; gap:14px; margin-bottom:16px;"><span aria-hidden="true" style="font-weight:800; color:var(--sc-primary); font-size:15px; flex-shrink:0;">1</span><span style="font-size:14.5px; line-height:1.55;">SafeCity передає це у відділ доступності Львівської міськради.</span></div>
+          <div style="display:flex; gap:14px;"><span aria-hidden="true" style="font-weight:800; color:var(--sc-primary); font-size:15px; flex-shrink:0;">2</span><span style="font-size:14.5px; line-height:1.55;">Ми відкриваємо офіційну е-петицію міста й сповіщаємо кожного підписанта.</span></div>
+        </div>
+
+        <div style="border-top:1px solid var(--sc-border); margin-top:26px; padding-top:24px;">
+          <button class="sc-foc" disabled="{{ signedDisabled }}" onClick="{{ sign }}" style="{{ signBtnStyle }}">{{ signBtnLabel }}</button>
+          <a class="sc-foc" href="#" style="display:block; text-align:center; margin-top:16px; min-height:24px; color:var(--sc-primary); font-weight:700; font-size:14.5px; text-decoration:none;">Відкрити офіційну е-петицію міста →</a>
+          <p style="text-align:center; font-size:12.5px; color:var(--sc-muted); margin:16px 0 0; line-height:1.5;">Ваше ім'я бачить лише місто. SafeCity не продає ваші дані.</p>
+        </div>
+      </div>
+
+      <!-- ============ ПІДПИСАНО ============ -->
+      <div style="display:{{ showSigned }}; min-height:100%; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:30px 32px 60px; ">
+        <div style="width:72px; height:72px; border-radius:50%; border:2px solid var(--sc-primary); color:var(--sc-primary); display:grid; place-items:center; font-size:34px; margin-bottom:26px;">✓</div>
+        <h1 style="margin:0 0 12px; font-size:26px; letter-spacing:-.02em; font-weight:800;">Ви — голос №{{ signatures }}</h1>
+        <p style="margin:0 0 32px; font-size:15px; line-height:1.6; color:var(--sc-muted); max-width:26ch;">Дякуємо. Ми повідомимо, щойно це дійде до міста — і коли пандус відремонтують.</p>
+        <div style="width:100%; max-width:280px; margin-bottom:28px;">
+          <div role="progressbar" aria-valuenow="{{ signatures }}" aria-valuemax="{{ goal }}" style="height:8px; border-radius:5px; background:var(--sc-surface-2); overflow:hidden; margin-bottom:10px;"><div style="height:100%; width:{{ pct }}%; background:var(--sc-primary); border-radius:5px;"></div></div>
+          <div style="font-size:13px; color:var(--sc-muted);">{{ signatures }} / {{ goal }} · залишилось {{ remaining }} до передачі</div>
+        </div>
+        <button class="sc-foc" style="width:100%; max-width:280px; min-height:52px; border:none; border-radius:13px; background:var(--sc-primary); color:#fff; font-weight:700; font-size:16px; font-family:inherit; cursor:pointer;">Поділитися — знайти ще 5 голосів</button>
+        <button class="sc-foc" onClick="{{ restart }}" style="margin-top:10px; min-height:44px; padding:0 18px; border:none; background:none; color:var(--sc-muted); font-weight:600; font-size:14px; font-family:inherit; cursor:pointer;">Пройти ще раз</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:430,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = { screen: "problem", count: 24, confirmed: false, signatures: 182, signed: false };
+  GOAL = 250;
+  THRESHOLD = 25;
+
+  renderVals() {
+    const s = this.state;
+    const reached = s.count >= this.THRESHOLD;
+    const confirmDone = s.count >= this.THRESHOLD;
+    const escalated = s.screen === "petition" || s.screen === "signed";
+
+    const pct = Math.min(100, Math.round((s.signatures / this.GOAL) * 100));
+    const remaining = Math.max(0, this.GOAL - s.signatures);
+
+    const dotDone = "width:22px; height:22px; border-radius:50%; background:var(--sc-primary); color:#fff; display:grid; place-items:center; font-weight:800; font-size:11px;";
+    const dotActive = "width:22px; height:22px; border-radius:50%; background:var(--sc-surface); border:2px solid var(--sc-primary);";
+    const dotPending = "width:22px; height:22px; border-radius:50%; background:var(--sc-surface); border:1.5px solid var(--sc-border-strong);";
+
+    return {
+      goBack: () => {
+        if (s.screen === "signed") this.setState({ screen: "petition" });
+        else if (s.screen === "petition") this.setState({ screen: "problem" });
+      },
+      showProblem: s.screen === "problem" ? "block" : "none",
+      showPetition: s.screen === "petition" ? "block" : "none",
+      showSigned: s.screen === "signed" ? "flex" : "none",
+
+      dotDone,
+      confirmDot: confirmDone ? dotDone : dotActive,
+      confirmDotInner: confirmDone ? "✓" : "",
+      confirmTextColor: confirmDone ? "var(--sc-text)" : "var(--sc-primary)",
+      confirmSub: confirmDone ? s.count + " людей підтвердили" : "ще " + (this.THRESHOLD - s.count) + " для підтвердження",
+      escLineColor: escalated ? "var(--sc-primary)" : "var(--sc-border)",
+      escDot: escalated ? dotActive : dotPending,
+      escTextColor: escalated ? "var(--sc-text)" : "var(--sc-muted)",
+      escSub: escalated ? "Петицію відкрито · " + s.signatures + " підписів" : "Потрібна петиція",
+
+      count: s.count,
+      confirmedDisabled: s.confirmed ? true : false,
+      confirm: () => { if (!this.state.confirmed) this.setState(st => ({ confirmed: true, count: st.count + 1 })); },
+      confirmBtnLabel: s.confirmed ? "Ви підтвердили це" : "Я теж це бачу",
+      confirmBtnStyle: "width:100%; min-height:52px; border:1.5px solid " + (s.confirmed ? "var(--sc-border-strong)" : "var(--sc-primary)") + "; border-radius:13px; background:" + (s.confirmed ? "var(--sc-surface)" : "var(--sc-primary)") + "; color:" + (s.confirmed ? "var(--sc-muted)" : "#fff") + "; font-weight:700; font-size:16px; font-family:inherit; cursor:" + (s.confirmed ? "default" : "pointer") + ";",
+
+      showEscalatePrompt: (reached && s.confirmed) ? "block" : "none",
+      toPetition: () => this.setState({ screen: "petition" }),
+
+      signatures: s.signatures, goal: this.GOAL, pct, remaining,
+      signedDisabled: s.signed ? true : false,
+      sign: () => { if (!this.state.signed) this.setState(st => ({ signed: true, signatures: st.signatures + 1, screen: "signed" })); },
+      signBtnLabel: s.signed ? "Підписано" : "Додати свій голос",
+      signBtnStyle: "width:100%; min-height:54px; border:none; border-radius:13px; background:" + (s.signed ? "var(--sc-ok)" : "var(--sc-primary)") + "; color:#fff; font-weight:700; font-size:16px; font-family:inherit; cursor:pointer;",
+
+      restart: () => this.setState({ screen: "problem", count: 24, confirmed: false, signatures: 182, signed: false }),
+    };
+  }
+}
+</script>
+</body>
+</html>

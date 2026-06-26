@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .scstage {
+    font-family: "Onest", system-ui, "Segoe UI", sans-serif;
+    --sc-bg:#f7f8f9; --sc-surface:#fff; --sc-surface-2:#f1f4f5; --sc-text:#16242b; --sc-muted:#6a787f;
+    --sc-border:#e9edef; --sc-border-strong:#d2d9dc; --sc-primary:#0d5b66; --sc-primary-strong:#093f47;
+    --sc-primary-tint:#e6eff1; --sc-ok:#1f7a44; --sc-ok-bg:#e8f2ec; --sc-warn:#8a5a00; --sc-warn-bg:#f7eed8; --sc-bad:#b3261e; --sc-bad-bg:#f8e7e5; --sc-unk:#6a787f; --sc-unk-bg:#eef1f2;
+    --sc-focus:#0a66ff; --sc-shadow-3:0 18px 44px rgba(15,30,36,.2);
+    min-height:100vh; background:radial-gradient(120% 80% at 50% 0%, #dfe7e9 0%, #cdd8db 100%);
+    display:flex; align-items:flex-start; justify-content:center; padding:40px 24px;
+  }
+  .sc-foc:focus-visible { outline:3px solid var(--sc-focus); outline-offset:2px; border-radius:4px; }
+  .phone { width:390px; height:844px; background:var(--sc-surface); border-radius:46px; box-shadow:var(--sc-shadow-3), 0 0 0 12px #0c1417, 0 0 0 13px #2b3d44; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+</style>
+</helmet>
+
+<div class="scstage">
+  <div class="phone">
+
+    <!-- photo header -->
+    <div style="position:relative; height:220px; flex-shrink:0; background:var(--sc-surface-2);">
+      <div style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); font-family:ui-monospace,monospace; font-size:12px; color:var(--sc-muted);">фото закладу</div>
+      <div style="position:absolute; top:0; left:0; right:0; height:50px; display:flex; align-items:flex-end; justify-content:space-between; padding:0 26px 4px; font-size:13px; font-weight:600; color:var(--sc-text);"><span>9:41</span><span aria-hidden="true">5G</span></div>
+      <button class="sc-foc" aria-label="Назад" style="position:absolute; left:16px; top:54px; width:44px; height:44px; border-radius:50%; border:none; background:rgba(255,255,255,.92); color:var(--sc-text); font-size:24px; cursor:pointer; display:grid; place-items:center;">‹</button>
+      <button class="sc-foc" aria-label="Зберегти місце" style="position:absolute; right:16px; top:54px; min-height:44px; padding:0 16px; border-radius:22px; border:none; background:rgba(255,255,255,.92); color:var(--sc-primary); font-size:14px; font-weight:700; font-family:inherit; cursor:pointer;">Зберегти</button>
+      <div style="position:absolute; right:16px; bottom:14px; background:rgba(12,20,23,.55); color:#fff; font-size:12px; font-weight:600; padding:4px 10px; border-radius:8px;">8 фото</div>
+    </div>
+
+    <div style="flex:1; overflow-y:auto;">
+      <div style="padding:18px 24px 4px;">
+        <div style="display:flex; align-items:center; gap:10px; font-size:13.5px; font-weight:600; color:var(--sc-muted);">
+          <span>Кафе</span><span aria-hidden="true">·</span><span style="color:var(--sc-ok); font-weight:700;">Відкрито до 22:00</span>
+        </div>
+        <h1 style="margin:8px 0 4px; font-size:27px; letter-spacing:-.02em; font-weight:800;">Aroma Kava</h1>
+        <p style="margin:0; font-size:14.5px; color:var(--sc-muted);">вул. Ринок, 14 · 0.4 км · 4.6 (218)</p>
+      </div>
+
+      <!-- per-profile -->
+      <div style="padding:22px 24px 4px;">
+        <div style="font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--sc-muted); margin-bottom:12px;">Доступність · ваш профіль</div>
+        <div role="tablist" aria-label="Профіль доступності" style="display:flex; gap:8px; margin-bottom:16px;">
+          <button class="sc-foc" role="tab" aria-selected="{{ wcSel }}" onClick="{{ pickWc }}" style="{{ wcTab }}">Крісло колісне</button>
+          <button class="sc-foc" role="tab" aria-selected="{{ blSel }}" onClick="{{ pickBl }}" style="{{ blTab }}">Слабкий зір</button>
+        </div>
+
+        <div role="tabpanel" style="border:1.5px solid {{ ratingLine }}; background:{{ ratingBg }}; border-radius:16px; padding:16px;">
+          <div style="display:flex; align-items:center; gap:13px;">
+            <span aria-hidden="true" style="width:48px; height:48px; border-radius:50%; background:{{ ratingColor }}; color:#fff; display:grid; place-items:center; font-weight:800; font-size:24px; flex-shrink:0;">{{ ratingIcon }}</span>
+            <div><div role="img" aria-label="{{ ratingAria }}" style="font-weight:800; font-size:19px; color:{{ ratingColor }};">{{ ratingLabel }}</div><div style="font-size:13.5px; color:var(--sc-muted);">{{ ratingFor }}</div></div>
+          </div>
+          <p style="margin:13px 0 0; font-size:14.5px; line-height:1.5; color:var(--sc-text);">{{ ratingWhy }}</p>
+        </div>
+      </div>
+
+      <!-- features -->
+      <div style="padding:22px 24px 4px;">
+        <div style="font-weight:800; font-size:16px;">Що перевірено · {{ featCount }}</div>
+        <div style="font-size:13px; color:var(--sc-muted); margin:4px 0 14px;">Критичні для цього профілю. Повідомили {{ contributors }} учасників.</div>
+        <div style="display:flex; flex-direction:column;">
+          <sc-for list="{{ features }}" as="f" hint-placeholder-count="5">
+            <div style="display:flex; align-items:center; gap:13px; padding:14px 0; border-top:1px solid var(--sc-border);">
+              <span aria-hidden="true" style="{{ f.iconStyle }}">{{ f.icon }}</span>
+              <span style="flex:1; font-weight:600; font-size:15px;">{{ f.label }}</span>
+              <span style="font-size:13.5px; font-weight:700; color:{{ f.color }};">{{ f.value }}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+
+      <!-- reviews -->
+      <div style="padding:22px 24px 4px;">
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+          <span style="font-weight:800; font-size:16px;">Відгуки</span>
+          <button class="sc-foc" style="border:none; background:none; font-size:13px; color:var(--sc-primary); font-weight:700; font-family:inherit; cursor:pointer;">Усі 38 →</button>
+        </div>
+        <div style="display:flex; gap:12px;">
+          <span aria-hidden="true" style="width:40px; height:40px; border-radius:50%; background:var(--sc-primary-tint); color:var(--sc-primary); display:grid; place-items:center; font-weight:700; flex-shrink:0;">О</span>
+          <div style="flex:1;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;"><span style="font-weight:700; font-size:14.5px;">Олена</span><span style="font-size:11.5px; font-weight:700; color:var(--sc-ok); background:var(--sc-ok-bg); border-radius:10px; padding:2px 9px;">користувачка крісла</span></div>
+            <p style="margin:6px 0 0; font-size:14px; line-height:1.5;">Пандус біля бічного входу пологий, персонал відчинив двері. Двері туалету трохи вузькі, але прийнятно.</p>
+            <div style="font-size:12.5px; color:var(--sc-muted); margin-top:6px;">Корисно · 12 · 2 дні тому</div>
+          </div>
+        </div>
+      </div>
+
+      <div style="height:96px;"></div>
+    </div>
+
+    <!-- actions -->
+    <div style="flex-shrink:0; display:flex; gap:10px; padding:12px 16px 26px; background:var(--sc-surface); border-top:1px solid var(--sc-border);">
+      <button class="sc-foc" style="min-height:54px; padding:0 18px; border:1px solid var(--sc-bad); border-radius:14px; background:var(--sc-surface); color:var(--sc-bad); font-size:15px; font-weight:700; font-family:inherit; cursor:pointer;">Повідомити</button>
+      <button class="sc-foc" style="flex:1; min-height:54px; border:none; border-radius:14px; background:var(--sc-primary); color:#fff; font-size:16px; font-weight:700; font-family:inherit; cursor:pointer;">Маршрут</button>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:430,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = { profile: "wheelchair" };
+
+  _data() {
+    return {
+      wheelchair: {
+        rating: "partial", label: "Частково доступно", aria: "Частково доступно для людей у кріслі колісному",
+        for: "для людей у кріслі колісному",
+        why: "Бічний вхід без сходів із пологим пандусом, але двері доступного туалету вужчі за стандарт (76 см).",
+        contributors: 9,
+        features: [
+          { k: "yes", label: "Без сходів при вході" },
+          { k: "yes", label: "Широкі двері (головні)" },
+          { k: "no",  label: "Доступний туалет" },
+          { k: "yes", label: "Рівна підлога всередині" },
+          { k: "unk", label: "Паркування для інвалідів" },
+        ],
+      },
+      blind: {
+        rating: "full", label: "Доступно", aria: "Доступно для незрячих і людей зі слабким зором",
+        for: "для незрячих і слабкозорих",
+        why: "Тактильна плитка веде до входу, персонал навчений допомагати, меню є великим шрифтом і в застосунку.",
+        contributors: 6,
+        features: [
+          { k: "yes", label: "Тактильна плитка до дверей" },
+          { k: "yes", label: "Допомога персоналу" },
+          { k: "yes", label: "Меню великим шрифтом / у застосунку" },
+          { k: "yes", label: "Із собаками-поводирями можна" },
+          { k: "no",  label: "Звуковий маяк усередині" },
+        ],
+      },
+    };
+  }
+
+  renderVals() {
+    const p = this.state.profile;
+    const d = this._data()[p];
+    const colorMap = {
+      full: { c: "var(--sc-ok)", bg: "var(--sc-ok-bg)", line: "var(--sc-ok)", icon: "✓" },
+      partial: { c: "var(--sc-warn)", bg: "var(--sc-warn-bg)", line: "var(--sc-warn)", icon: "◑" },
+      none: { c: "var(--sc-bad)", bg: "var(--sc-bad-bg)", line: "var(--sc-bad)", icon: "✕" },
+      unknown: { c: "var(--sc-unk)", bg: "var(--sc-unk-bg)", line: "var(--sc-unk)", icon: "?" },
+    };
+    const cm = colorMap[d.rating];
+    const fi = { yes: { c: "var(--sc-ok)", i: "✓", t: "Так" }, no: { c: "var(--sc-bad)", i: "✕", t: "Ні" }, unk: { c: "var(--sc-unk)", i: "?", t: "Невідомо" } };
+    const features = d.features.map(f => {
+      const m = fi[f.k];
+      return { ...f, icon: m.i, value: m.t, color: m.c, iconStyle: "width:28px; height:28px; border-radius:8px; flex-shrink:0; display:grid; place-items:center; font-weight:800; font-size:14px; color:#fff; background:" + m.c + ";" };
+    });
+    const tab = (sel) => sel
+      ? "flex:1; min-height:46px; border:1.5px solid var(--sc-primary); border-radius:12px; background:var(--sc-primary); color:#fff; font-weight:700; font-size:14.5px; font-family:inherit; cursor:pointer;"
+      : "flex:1; min-height:46px; border:1.5px solid var(--sc-border-strong); border-radius:12px; background:var(--sc-surface); color:var(--sc-text); font-weight:600; font-size:14.5px; font-family:inherit; cursor:pointer;";
+    return {
+      wcSel: p === "wheelchair", blSel: p === "blind",
+      pickWc: () => this.setState({ profile: "wheelchair" }), pickBl: () => this.setState({ profile: "blind" }),
+      wcTab: tab(p === "wheelchair"), blTab: tab(p === "blind"),
+      ratingColor: cm.c, ratingBg: cm.bg, ratingLine: cm.line, ratingIcon: cm.icon,
+      ratingLabel: d.label, ratingAria: d.aria, ratingFor: d.for, ratingWhy: d.why,
+      features, featCount: features.length + " пунктів", contributors: d.contributors,
+    };
+  }
+}
+</script>
+</body>
+</html>
