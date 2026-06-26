@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .scadmin {
+    font-family: "Onest", system-ui, "Segoe UI", sans-serif;
+    --sc-bg:#f4f6f7; --sc-surface:#fff; --sc-surface-2:#f4f6f7; --sc-text:#16242b; --sc-muted:#6a787f;
+    --sc-border:#e9edef; --sc-border-strong:#d2d9dc; --sc-primary:#0d5b66; --sc-primary-strong:#093f47;
+    --sc-primary-tint:#e6eff1; --sc-accent:#b5512a;
+    --sc-ok:#1f7a44; --sc-ok-bg:#e8f2ec; --sc-warn:#8a5a00; --sc-warn-bg:#f7eed8; --sc-bad:#b3261e; --sc-bad-bg:#f8e7e5; --sc-unk:#6a787f; --sc-unk-bg:#eef1f2;
+    --sc-focus:#0a66ff; --sc-shadow-2:0 6px 18px rgba(15,30,36,.08);
+    min-height:100vh; background:#dde4e7; color:var(--sc-text); display:flex; justify-content:center; padding:28px;
+  }
+  .sc-foc:focus-visible { outline:3px solid var(--sc-focus); outline-offset:2px; border-radius:4px; }
+  .nav { display:flex; align-items:center; gap:10px; width:100%; padding:11px 14px; border:none; border-radius:10px; background:transparent; color:#cfe3e6; font-family:inherit; font-weight:600; font-size:14.5px; cursor:pointer; text-align:left; }
+  .nav.on { background:rgba(255,255,255,.12); color:#fff; font-weight:700; }
+  .stat { flex:1; background:var(--sc-surface); border:1px solid var(--sc-border); border-radius:14px; padding:16px 18px; }
+  .count { margin-left:auto; font-size:11px; font-weight:700; padding:1px 8px; border-radius:10px; }
+  .badge { display:inline-flex; align-items:center; gap:5px; font-size:12px; font-weight:700; padding:4px 9px; border-radius:14px; }
+</style>
+</helmet>
+
+<div class="scadmin">
+  <div style="width:1280px; height:820px; display:flex; background:var(--sc-surface); border-radius:18px; overflow:hidden; box-shadow:var(--sc-shadow-2); border:1px solid var(--sc-border);">
+
+    <aside style="width:236px; flex-shrink:0; background:var(--sc-primary-strong); color:#fff; display:flex; flex-direction:column; padding:18px 14px;">
+      <div style="display:flex; align-items:center; gap:10px; padding:6px 8px 20px;">
+        <span style="width:32px; height:32px; border-radius:9px; background:#fff; color:var(--sc-primary); display:grid; place-items:center; font-weight:800; font-size:17px;">◍</span>
+        <div style="line-height:1.1;"><div style="font-weight:800; font-size:15px;">SafeCity</div><div style="font-size:11.5px; color:#9fc3c8;">Модерація</div></div>
+      </div>
+      <nav style="display:flex; flex-direction:column; gap:3px;" aria-label="Розділи">
+        <button class="nav sc-foc">Огляд</button>
+        <button class="nav on sc-foc" aria-current="page">Черга місць <span class="count" style="background:var(--sc-accent); color:#fff;">23</span></button>
+        <button class="nav sc-foc">Проблеми <span class="count" style="background:rgba(255,255,255,.18);">11</span></button>
+        <button class="nav sc-foc">Відгуки й фото <span class="count" style="background:rgba(255,255,255,.18);">7</span></button>
+        <button class="nav sc-foc">Користувачі</button>
+        <button class="nav sc-foc">Звіти</button>
+      </nav>
+      <div style="margin-top:auto; display:flex; align-items:center; gap:10px; padding:12px 8px 4px; border-top:1px solid rgba(255,255,255,.12);">
+        <span style="width:34px; height:34px; border-radius:50%; background:rgba(255,255,255,.18); display:grid; place-items:center; font-weight:700;">М</span>
+        <div style="line-height:1.15;"><div style="font-weight:700; font-size:13.5px;">Максим Г.</div><div style="font-size:11.5px; color:#9fc3c8;">Модератор міста</div></div>
+      </div>
+    </aside>
+
+    <div style="flex:1; display:flex; flex-direction:column; min-width:0;">
+      <header style="flex-shrink:0; display:flex; align-items:center; gap:16px; padding:18px 24px; border-bottom:1px solid var(--sc-border);">
+        <div><h1 style="margin:0; font-size:20px; letter-spacing:-.01em; font-weight:800;">Черга місць</h1><div style="font-size:13px; color:var(--sc-muted);">23 заявки спільноти очікують перевірки</div></div>
+        <div style="margin-left:auto; display:flex; align-items:center; gap:9px; background:var(--sc-surface-2); border:1px solid var(--sc-border-strong); border-radius:11px; padding:0 13px; min-height:42px; width:240px;">
+          <span aria-hidden="true" style="color:var(--sc-muted);">⌕</span><span style="color:var(--sc-muted); font-size:14px;">Пошук заявок</span>
+        </div>
+        <button class="sc-foc" style="min-height:42px; padding:0 16px; border:1px solid var(--sc-border-strong); border-radius:11px; background:var(--sc-surface); font-weight:600; font-family:inherit; font-size:14px; cursor:pointer;">Фільтр ▾</button>
+      </header>
+
+      <div style="flex-shrink:0; display:flex; gap:14px; padding:18px 24px 6px;">
+        <div class="stat"><div style="font-size:12px; color:var(--sc-muted); font-weight:700; text-transform:uppercase; letter-spacing:.04em;">Місць у черзі</div><div style="font-size:28px; font-weight:800; margin-top:4px;">23</div><div style="font-size:12px; color:var(--sc-accent); font-weight:700;">+6 сьогодні</div></div>
+        <div class="stat"><div style="font-size:12px; color:var(--sc-muted); font-weight:700; text-transform:uppercase; letter-spacing:.04em;">Відкриті проблеми</div><div style="font-size:28px; font-weight:800; margin-top:4px;">11</div><div style="font-size:12px; color:var(--sc-warn); font-weight:700;">3 передано місту</div></div>
+        <div class="stat"><div style="font-size:12px; color:var(--sc-muted); font-weight:700; text-transform:uppercase; letter-spacing:.04em;">Скарги на відгуки</div><div style="font-size:28px; font-weight:800; margin-top:4px;">7</div><div style="font-size:12px; color:var(--sc-muted); font-weight:700;">2 фото</div></div>
+        <div class="stat"><div style="font-size:12px; color:var(--sc-muted); font-weight:700; text-transform:uppercase; letter-spacing:.04em;">Учасники</div><div style="font-size:28px; font-weight:800; margin-top:4px;">1 284</div><div style="font-size:12px; color:var(--sc-ok); font-weight:700;">+41 за тиждень</div></div>
+      </div>
+
+      <div style="flex:1; display:flex; min-height:0; padding:14px 24px 22px;">
+        <div style="width:420px; flex-shrink:0; border:1px solid var(--sc-border); border-radius:14px 0 0 14px; border-right:none; overflow-y:auto; background:var(--sc-surface-2);">
+          <div style="display:flex; gap:12px; padding:15px; background:var(--sc-surface); border-left:3px solid var(--sc-primary); border-bottom:1px solid var(--sc-border);">
+            <span aria-hidden="true" style="width:40px; height:40px; border-radius:50%; background:var(--sc-warn); color:#fff; display:grid; place-items:center; font-weight:800; flex-shrink:0;">◑</span>
+            <div style="flex:1; min-width:0;"><div style="font-weight:700; font-size:15px;">Книгарня «Є»</div><div style="font-size:12.5px; color:var(--sc-muted);">Заклад · нова заявка · Олена К.</div><div style="margin-top:6px; display:flex; gap:6px;"><span class="badge" style="background:var(--sc-warn-bg); color:var(--sc-warn);">◑ Частково</span><span class="badge" style="background:var(--sc-unk-bg); color:var(--sc-unk);">2 год тому</span></div></div>
+          </div>
+          <div style="display:flex; gap:12px; padding:15px; border-bottom:1px solid var(--sc-border);">
+            <span aria-hidden="true" style="width:40px; height:40px; border-radius:50%; background:var(--sc-ok); color:#fff; display:grid; place-items:center; font-weight:800; flex-shrink:0;">✓</span>
+            <div style="flex:1; min-width:0;"><div style="font-weight:700; font-size:15px;">Зупинка · Дорошенка</div><div style="font-size:12.5px; color:var(--sc-muted);">Транспорт · редагування · Андрій М.</div><div style="margin-top:6px; display:flex; gap:6px;"><span class="badge" style="background:var(--sc-ok-bg); color:var(--sc-ok);">✓ Доступно</span><span class="badge" style="background:var(--sc-unk-bg); color:var(--sc-unk);">5 год тому</span></div></div>
+          </div>
+          <div style="display:flex; gap:12px; padding:15px; border-bottom:1px solid var(--sc-border);">
+            <span aria-hidden="true" style="width:40px; height:40px; border-radius:50%; background:var(--sc-bad); color:#fff; display:grid; place-items:center; font-weight:800; flex-shrink:0;">✕</span>
+            <div style="flex:1; min-width:0;"><div style="font-weight:700; font-size:15px;">Перехід · пр. Свободи</div><div style="font-size:12.5px; color:var(--sc-muted);">Перехід · нова · guest_447</div><div style="margin-top:6px; display:flex; gap:6px;"><span class="badge" style="background:var(--sc-bad-bg); color:var(--sc-bad);">✕ Недоступно</span><span class="badge" style="background:var(--sc-warn-bg); color:var(--sc-warn);">можливий дубль</span></div></div>
+          </div>
+          <div style="display:flex; gap:12px; padding:15px; border-bottom:1px solid var(--sc-border);">
+            <span aria-hidden="true" style="width:40px; height:40px; border-radius:50%; background:var(--sc-unk); color:#fff; display:grid; place-items:center; font-weight:800; flex-shrink:0;">?</span>
+            <div style="flex:1; min-width:0;"><div style="font-weight:700; font-size:15px;">Туалет · Парк</div><div style="font-size:12.5px; color:var(--sc-muted);">Туалет · нова · Ірина С.</div><div style="margin-top:6px; display:flex; gap:6px;"><span class="badge" style="background:var(--sc-unk-bg); color:var(--sc-unk);">? Невідомо</span><span class="badge" style="background:var(--sc-unk-bg); color:var(--sc-unk);">1 день тому</span></div></div>
+          </div>
+        </div>
+
+        <div style="flex:1; min-width:0; border:1px solid var(--sc-border); border-radius:0 14px 14px 0; padding:22px 24px; overflow-y:auto; background:var(--sc-surface);">
+          <div style="display:flex; align-items:flex-start; gap:14px;">
+            <span aria-hidden="true" style="width:50px; height:50px; border-radius:50%; background:var(--sc-warn); color:#fff; display:grid; place-items:center; font-weight:800; font-size:22px; flex-shrink:0;">◑</span>
+            <div style="flex:1;"><h2 style="margin:0 0 3px; font-size:21px; letter-spacing:-.01em; font-weight:800;">Книгарня «Є»</h2><div style="font-size:13.5px; color:var(--sc-muted);">Заклад · вул. Просвіти, 6 · подала Олена К. · 2 години тому</div></div>
+            <span class="badge" style="background:var(--sc-warn-bg); color:var(--sc-warn); font-size:13px; padding:6px 12px;">◑ Частково доступно</span>
+          </div>
+
+          <div style="display:flex; gap:10px; margin:18px 0;">
+            <div style="width:130px; height:96px; border-radius:11px; background:var(--sc-surface-2); position:relative;"><span style="position:absolute; left:8px; bottom:8px; font-size:10.5px; font-family:ui-monospace,monospace; color:var(--sc-muted);">вхід</span></div>
+            <div style="width:130px; height:96px; border-radius:11px; background:var(--sc-surface-2); position:relative;"><span style="position:absolute; left:8px; bottom:8px; font-size:10.5px; font-family:ui-monospace,monospace; color:var(--sc-muted);">всередині</span></div>
+            <div style="width:130px; height:96px; border-radius:11px; border:1px dashed var(--sc-border-strong); display:grid; place-items:center; color:var(--sc-muted); font-size:12px; font-weight:600;">Поскаржитись</div>
+          </div>
+
+          <div style="font-weight:700; font-size:12px; color:var(--sc-muted); text-transform:uppercase; letter-spacing:.04em; margin-bottom:10px;">Подані дані доступності · перевірте кожен</div>
+          <div style="border:1px solid var(--sc-border); border-radius:12px; overflow:hidden; margin-bottom:22px;">
+            <div style="display:flex; align-items:center; gap:12px; padding:13px 15px; border-bottom:1px solid var(--sc-border);"><span aria-hidden="true" style="width:26px; height:26px; border-radius:7px; background:var(--sc-ok); color:#fff; display:grid; place-items:center; font-weight:800; font-size:13px;">✓</span><span style="flex:1; font-weight:600; font-size:14.5px;">Без сходів при вході</span><span style="font-size:13px; color:var(--sc-ok); font-weight:700;">Так</span><span style="display:flex; gap:6px;"><button class="sc-foc" style="min-height:34px; padding:0 13px; border:1px solid var(--sc-ok); border-radius:9px; background:var(--sc-ok-bg); color:var(--sc-ok); font-weight:700; font-size:12.5px; font-family:inherit; cursor:pointer;">Підтвердити</button><button class="sc-foc" style="min-height:34px; padding:0 13px; border:1px solid var(--sc-border-strong); border-radius:9px; background:var(--sc-surface); font-weight:600; font-size:12.5px; font-family:inherit; cursor:pointer;">Змінити</button></span></div>
+            <div style="display:flex; align-items:center; gap:12px; padding:13px 15px; border-bottom:1px solid var(--sc-border);"><span aria-hidden="true" style="width:26px; height:26px; border-radius:7px; background:var(--sc-bad); color:#fff; display:grid; place-items:center; font-weight:800; font-size:13px;">✕</span><span style="flex:1; font-weight:600; font-size:14.5px;">Доступний туалет</span><span style="font-size:13px; color:var(--sc-bad); font-weight:700;">Ні</span><span style="display:flex; gap:6px;"><button class="sc-foc" style="min-height:34px; padding:0 13px; border:1px solid var(--sc-ok); border-radius:9px; background:var(--sc-surface); color:var(--sc-ok); font-weight:700; font-size:12.5px; font-family:inherit; cursor:pointer;">Підтвердити</button><button class="sc-foc" style="min-height:34px; padding:0 13px; border:1px solid var(--sc-border-strong); border-radius:9px; background:var(--sc-surface); font-weight:600; font-size:12.5px; font-family:inherit; cursor:pointer;">Змінити</button></span></div>
+            <div style="display:flex; align-items:center; gap:12px; padding:13px 15px;"><span aria-hidden="true" style="width:26px; height:26px; border-radius:7px; background:var(--sc-unk); color:#fff; display:grid; place-items:center; font-weight:800; font-size:13px;">?</span><span style="flex:1; font-weight:600; font-size:14.5px;">Тактильна плитка до входу</span><span style="font-size:13px; color:var(--sc-unk); font-weight:700;">Невідомо</span><span style="display:flex; gap:6px;"><button class="sc-foc" style="min-height:34px; padding:0 13px; border:1px solid var(--sc-border-strong); border-radius:9px; background:var(--sc-surface); font-weight:600; font-size:12.5px; font-family:inherit; cursor:pointer;">Вказати</button></span></div>
+          </div>
+
+          <div style="display:flex; gap:10px; align-items:center;">
+            <button class="sc-foc" style="min-height:48px; padding:0 22px; border:none; border-radius:12px; background:var(--sc-ok); color:#fff; font-weight:700; font-size:15px; font-family:inherit; cursor:pointer;">Схвалити й опублікувати</button>
+            <button class="sc-foc" style="min-height:48px; padding:0 18px; border:1px solid var(--sc-border-strong); border-radius:12px; background:var(--sc-surface); color:var(--sc-text); font-weight:600; font-size:15px; font-family:inherit; cursor:pointer;">Об'єднати дубль</button>
+            <button class="sc-foc" style="min-height:48px; padding:0 18px; border:1px solid var(--sc-bad); border-radius:12px; background:var(--sc-surface); color:var(--sc-bad); font-weight:700; font-size:15px; font-family:inherit; cursor:pointer; margin-left:auto;">Відхилити</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1336,&quot;height&quot;:876}}"></script>
+</body>
+</html>

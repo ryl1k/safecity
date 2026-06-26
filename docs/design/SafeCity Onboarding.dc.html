@@ -1,0 +1,384 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .scstage {
+    font-family: "Onest", system-ui, "Segoe UI", sans-serif;
+    --sc-bg:#f7f8f9; --sc-surface:#fff; --sc-surface-2:#f1f4f5; --sc-text:#16242b; --sc-muted:#6a787f;
+    --sc-border:#e9edef; --sc-border-strong:#d2d9dc; --sc-primary:#0d5b66; --sc-primary-strong:#093f47;
+    --sc-primary-tint:#e6eff1; --sc-accent:#b5512a; --sc-ok:#1f7a44; --sc-warn:#8a5a00; --sc-bad:#b3261e;
+    --sc-focus:#0a66ff; --sc-shadow-3:0 18px 44px rgba(15,30,36,.2);
+    min-height:100vh; background:radial-gradient(120% 80% at 50% 0%, #dfe7e9 0%, #cdd8db 100%);
+    display:flex; align-items:center; justify-content:center; padding:28px 16px;
+  }
+  .sc-foc:focus-visible { outline:3px solid var(--sc-focus); outline-offset:2px; border-radius:4px; }
+  .phone { width:390px; height:844px; background:var(--sc-surface); border-radius:46px; box-shadow:var(--sc-shadow-3), 0 0 0 12px #0c1417, 0 0 0 13px #2b3d44; position:relative; overflow:hidden; display:flex; flex-direction:column; }
+  .statusbar { height:50px; flex-shrink:0; display:flex; align-items:flex-end; justify-content:space-between; padding:0 28px 6px; font-size:13px; font-weight:600; color:var(--sc-text); }
+</style>
+</helmet>
+
+<div class="scstage">
+  <div class="phone">
+    <div class="statusbar"><span>9:41</span><span aria-hidden="true">5G</span></div>
+
+    <!-- progress -->
+    <div style="flex-shrink:0; padding:8px 24px 14px; display:flex; align-items:center; gap:14px;">
+      <button class="sc-foc" aria-label="Назад" onClick="{{ back }}" style="{{ backStyle }}">‹</button>
+      <div role="progressbar" aria-label="Прогрес" style="flex:1; display:flex; gap:5px;">
+        <span style="{{ dot0 }}"></span><span style="{{ dot1 }}"></span><span style="{{ dot2 }}"></span><span style="{{ dot3 }}"></span><span style="{{ dot4 }}"></span>
+      </div>
+      <span style="font-size:13px; font-weight:700; color:var(--sc-muted); min-width:32px; text-align:right;">{{ stepLabel }}</span>
+    </div>
+
+    <div style="flex:1; overflow-y:auto;">
+
+      <!-- ===== 0 WELCOME ===== -->
+      <div style="display:{{ show0 }}; min-height:100%; flex-direction:column; padding:24px 28px 30px;">
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
+          <div style="font-size:12px; font-weight:700; letter-spacing:.14em; text-transform:uppercase; color:var(--sc-primary); margin-bottom:14px;">SafeCity · Львів</div>
+          <h1 style="margin:0 0 14px; font-size:33px; line-height:1.12; letter-spacing:-.025em; font-weight:800;">Доступно за замовчуванням</h1>
+          <p style="margin:0; font-size:16.5px; line-height:1.55; color:var(--sc-muted); max-width:30ch;">Налаштуймо застосунок під вас. Близько двох хвилин — і все можна змінити пізніше.</p>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:12px;">
+          <div style="font-size:13px; color:var(--sc-muted); padding-bottom:4px;">Працює з VoiceOver, клавіатурою та великим текстом.</div>
+          <button class="sc-foc" onClick="{{ next }}" style="min-height:56px; border:none; border-radius:14px; background:var(--sc-primary); color:#fff; font-family:inherit; font-weight:700; font-size:17px; cursor:pointer;">Почати</button>
+          <button class="sc-foc" onClick="{{ skipAll }}" style="min-height:48px; border:none; border-radius:12px; background:transparent; color:var(--sc-muted); font-family:inherit; font-weight:600; font-size:15px; cursor:pointer;">Пропустити — типові налаштування</button>
+        </div>
+      </div>
+
+      <!-- ===== 1 NEEDS ===== -->
+      <div style="display:{{ show1 }}; padding:6px 24px 30px;">
+        <h1 style="margin:0 0 8px; font-size:26px; line-height:1.18; letter-spacing:-.02em; font-weight:800;">Що вам найбільше допомагає?</h1>
+        <p style="margin:0 0 22px; font-size:15px; line-height:1.5; color:var(--sc-muted);">Оберіть усе, що стосується вас. Позначте зірочкою головне — воно формує весь застосунок.</p>
+
+        <div role="group" aria-label="Ваші потреби" style="display:flex; flex-direction:column; gap:10px;">
+          <div style="{{ cardWheelchair }}">
+            <button class="sc-foc" aria-pressed="{{ selWheelchair }}" onClick="{{ toggleWheelchair }}" style="display:flex; align-items:center; gap:13px; flex:1; background:transparent; border:none; font-family:inherit; text-align:left; cursor:pointer; padding:16px 6px 16px 16px; color:var(--sc-text); min-height:62px;">
+              <span aria-hidden="true" style="{{ checkWheelchair }}">✓</span>
+              <span style="font-weight:700; font-size:16px;">Крісло колісне та мобільність</span>
+            </button>
+            <button class="sc-foc" aria-label="Зробити головною потребою" aria-pressed="{{ primWheelchair }}" onClick="{{ starWheelchair }}" style="{{ starWheelchairStyle }}">★</button>
+          </div>
+          <div style="{{ cardBlind }}">
+            <button class="sc-foc" aria-pressed="{{ selBlind }}" onClick="{{ toggleBlind }}" style="display:flex; align-items:center; gap:13px; flex:1; background:transparent; border:none; font-family:inherit; text-align:left; cursor:pointer; padding:16px 6px 16px 16px; color:var(--sc-text); min-height:62px;">
+              <span aria-hidden="true" style="{{ checkBlind }}">✓</span>
+              <span style="font-weight:700; font-size:16px;">Незрячість і слабкий зір</span>
+            </button>
+            <button class="sc-foc" aria-label="Зробити головною потребою" aria-pressed="{{ primBlind }}" onClick="{{ starBlind }}" style="{{ starBlindStyle }}">★</button>
+          </div>
+          <div style="{{ cardDeaf }}">
+            <button class="sc-foc" aria-pressed="{{ selDeaf }}" onClick="{{ toggleDeaf }}" style="display:flex; align-items:center; gap:13px; flex:1; background:transparent; border:none; font-family:inherit; text-align:left; cursor:pointer; padding:16px 6px 16px 16px; color:var(--sc-text); min-height:62px;">
+              <span aria-hidden="true" style="{{ checkDeaf }}">✓</span>
+              <span style="font-weight:700; font-size:16px;">Глухота та поганий слух</span>
+            </button>
+            <button class="sc-foc" aria-label="Зробити головною потребою" aria-pressed="{{ primDeaf }}" onClick="{{ starDeaf }}" style="{{ starDeafStyle }}">★</button>
+          </div>
+          <div style="{{ cardCog }}">
+            <button class="sc-foc" aria-pressed="{{ selCog }}" onClick="{{ toggleCog }}" style="display:flex; align-items:center; gap:13px; flex:1; background:transparent; border:none; font-family:inherit; text-align:left; cursor:pointer; padding:16px 6px 16px 16px; color:var(--sc-text); min-height:62px;">
+              <span aria-hidden="true" style="{{ checkCog }}">✓</span>
+              <span style="font-weight:700; font-size:16px;">Когнітивні особливості</span>
+            </button>
+            <button class="sc-foc" aria-label="Зробити головною потребою" aria-pressed="{{ primCog }}" onClick="{{ starCog }}" style="{{ starCogStyle }}">★</button>
+          </div>
+        </div>
+
+        <div role="status" style="font-size:13.5px; color:var(--sc-muted); margin-top:16px; min-height:18px;">{{ pickHint }}</div>
+        <button class="sc-foc" disabled="{{ contDisabled }}" onClick="{{ next }}" style="{{ continueStyle }}">Далі</button>
+      </div>
+
+      <!-- ===== 2 SUB-NEEDS ===== -->
+      <div style="display:{{ show2 }}; padding:6px 24px 30px;">
+        <div style="font-size:12px; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--sc-primary); margin-bottom:12px;">{{ branchTag }}</div>
+        <h1 style="margin:0 0 8px; font-size:24px; line-height:1.2; letter-spacing:-.02em; font-weight:800;">{{ subTitle }}</h1>
+        <p style="margin:0 0 22px; font-size:15px; line-height:1.5; color:var(--sc-muted);">{{ subDesc }}</p>
+
+        <div role="group" aria-label="Налаштування" style="display:flex; flex-direction:column; gap:10px;">
+          <sc-for list="{{ subOptions }}" as="opt" hint-placeholder-count="4">
+            <button class="sc-foc" aria-pressed="{{ opt.on }}" onClick="{{ opt.toggle }}" style="{{ opt.style }}">
+              <span aria-hidden="true" style="{{ opt.check }}">✓</span>
+              <span style="flex:1; font-weight:700; font-size:15.5px;">{{ opt.ua }}</span>
+            </button>
+          </sc-for>
+        </div>
+
+        <button class="sc-foc" onClick="{{ next }}" style="margin-top:22px; width:100%; min-height:54px; border:none; border-radius:14px; background:var(--sc-primary); color:#fff; font-family:inherit; font-weight:700; font-size:16px; cursor:pointer;">Переглянути застосунок</button>
+      </div>
+
+      <!-- ===== 3 UI PREVIEW ===== -->
+      <div style="display:{{ show3 }}; padding:6px 24px 30px;">
+        <h1 style="margin:0 0 8px; font-size:26px; line-height:1.16; letter-spacing:-.02em; font-weight:800;">Ось ваш SafeCity</h1>
+        <p style="margin:0 0 20px; font-size:15px; line-height:1.5; color:var(--sc-muted);">Той самий застосунок, два досвіди. Перемкніть, щоб побачити, як змінюється головний екран.</p>
+
+        <div role="radiogroup" aria-label="Режим перегляду" style="display:flex; background:var(--sc-surface-2); border-radius:12px; padding:4px; margin-bottom:18px;">
+          <button class="sc-foc" role="radio" aria-checked="{{ pvStandardOn }}" onClick="{{ pvStandard }}" style="{{ pvStandardStyle }}">Стандарт</button>
+          <button class="sc-foc" role="radio" aria-checked="{{ pvAdaptedOn }}" onClick="{{ pvAdapted }}" style="{{ pvAdaptedStyle }}">{{ adaptedTabLabel }}</button>
+        </div>
+
+        <div style="border:1px solid var(--sc-border); border-radius:18px; overflow:hidden; background:var(--sc-surface);">
+          <!-- standard -->
+          <div style="display:{{ pvShowStandard }}; padding:16px;">
+            <div style="height:90px; border-radius:11px; background:var(--sc-surface-2); display:grid; place-items:center; color:var(--sc-muted); font-size:12px; font-family:ui-monospace,monospace; margin-bottom:14px;">мапа</div>
+            <div style="font-weight:700; font-size:14px; margin-bottom:10px;">Місця поруч</div>
+            <div style="display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--sc-border);"><span style="width:28px; height:28px; border-radius:50%; background:var(--sc-surface-2);"></span><span style="font-size:13px;">Кафе · 40 м</span></div>
+            <div style="display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--sc-border);"><span style="width:28px; height:28px; border-radius:50%; background:var(--sc-surface-2);"></span><span style="font-size:13px;">Аптека · 120 м</span></div>
+            <div style="font-size:12px; color:var(--sc-muted); margin-top:10px;">Типовий вигляд — профіль не застосовано</div>
+          </div>
+          <!-- visual -->
+          <div style="display:{{ pvShowVisual }}; padding:16px;">
+            <div style="display:flex; gap:6px; margin-bottom:12px;">
+              <span style="background:var(--sc-primary); color:#fff; border-radius:16px; padding:6px 11px; font-size:12px; font-weight:700; white-space:nowrap;">✓ Доступно</span>
+              <span style="background:var(--sc-surface); border:1px solid var(--sc-border-strong); border-radius:16px; padding:6px 11px; font-size:12px; font-weight:600; white-space:nowrap;">Без сходів</span>
+              <span style="background:var(--sc-surface); border:1px solid var(--sc-border-strong); border-radius:16px; padding:6px 11px; font-size:12px; font-weight:600; white-space:nowrap;">Туалет</span>
+            </div>
+            <div style="position:relative; height:140px; border-radius:11px; background:var(--sc-surface-2); overflow:hidden;">
+              <span style="position:absolute; left:28%; top:42%; width:24px; height:24px; border-radius:50%; background:var(--sc-ok); color:#fff; display:grid; place-items:center; font-weight:800; font-size:12px; border:2px solid #fff;">✓</span>
+              <span style="position:absolute; left:62%; top:30%; width:22px; height:22px; border-radius:5px; background:var(--sc-warn); color:#fff; display:grid; place-items:center; font-weight:800; font-size:11px; border:2px solid #fff;">◑</span>
+              <span style="position:absolute; left:48%; top:64%; width:22px; height:22px; background:var(--sc-bad); color:#fff; display:grid; place-items:center; font-weight:800; font-size:10px; border:2px solid #fff; transform:rotate(45deg);"><span style="transform:rotate(-45deg);">✕</span></span>
+            </div>
+            <div style="font-weight:700; font-size:13px; color:var(--sc-primary); margin-top:10px;">Візуальна мапа · колір + форма</div>
+          </div>
+          <!-- audio -->
+          <div style="display:{{ pvShowAudio }}; padding:16px;">
+            <div style="background:var(--sc-primary); color:#fff; border-radius:11px; padding:11px 13px; margin-bottom:12px; font-weight:700; font-size:13.5px;">«Аптека, 40 метрів, на 2 годині, доступно»</div>
+            <div style="display:flex; align-items:center; gap:11px; padding:12px 2px; border-bottom:1px solid var(--sc-border);">
+              <span style="width:34px; height:34px; border-radius:50%; background:var(--sc-ok); color:#fff; display:grid; place-items:center; font-weight:800;">✓</span>
+              <span style="flex:1;"><span style="display:block; font-weight:700; font-size:17px;">Аптека</span><span style="display:block; font-size:14px; color:var(--sc-muted);">40 м · на 2 годині · доступно</span></span>
+            </div>
+            <div style="display:flex; align-items:center; gap:11px; padding:12px 2px;">
+              <span style="width:34px; height:34px; border-radius:50%; background:var(--sc-warn); color:#fff; display:grid; place-items:center; font-weight:800;">◑</span>
+              <span style="flex:1;"><span style="display:block; font-weight:700; font-size:17px;">Кафе</span><span style="display:block; font-size:14px; color:var(--sc-muted);">85 м · на 11 годині · частково</span></span>
+            </div>
+            <div style="font-weight:700; font-size:13px; color:var(--sc-primary); margin-top:10px;">Аудіо-перший · великий текст</div>
+          </div>
+        </div>
+
+        <p style="font-size:13px; color:var(--sc-muted); line-height:1.45; margin:16px 2px;">Режим і будь-які деталі можна змінити пізніше: Налаштування → Профіль доступності.</p>
+
+        <button class="sc-foc" onClick="{{ next }}" style="width:100%; min-height:54px; border:none; border-radius:14px; background:var(--sc-primary); color:#fff; font-family:inherit; font-weight:700; font-size:16px; cursor:pointer;">Застосувати цей режим</button>
+      </div>
+
+      <!-- ===== 4 PERMISSIONS ===== -->
+      <div style="display:{{ show4 }}; padding:6px 24px 30px;">
+        <h1 style="margin:0 0 8px; font-size:26px; line-height:1.16; letter-spacing:-.02em; font-weight:800;">Кілька дозволів</h1>
+        <p style="margin:0 0 22px; font-size:15px; line-height:1.5; color:var(--sc-muted);">Вони допомагають застосунку працювати. Кожен пояснюємо — відмовте будь-де, і він усе одно працюватиме.</p>
+
+        <div style="display:flex; flex-direction:column;">
+          <!-- location -->
+          <div style="border-top:1px solid var(--sc-border); padding:18px 0;">
+            <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:6px;"><span style="font-weight:700; font-size:17px;">Локація</span><span style="{{ locBadge }}">{{ locBadgeText }}</span></div>
+            <p style="margin:0 0 14px; font-size:14px; color:var(--sc-muted); line-height:1.5;">Щоб сортувати місця поруч за відстанню та напрямком. Лише поки застосунок відкрито. Не передаємо нікому.</p>
+            <div style="display:flex; gap:10px;">
+              <button class="sc-foc" onClick="{{ allowLoc }}" style="{{ locAllowStyle }}">Дозволити</button>
+              <button class="sc-foc" onClick="{{ denyLoc }}" style="min-height:46px; padding:0 18px; border:1px solid var(--sc-border-strong); border-radius:12px; background:var(--sc-surface); color:var(--sc-text); font-family:inherit; font-weight:600; cursor:pointer;">Не зараз</button>
+            </div>
+          </div>
+          <!-- notifications -->
+          <div style="border-top:1px solid var(--sc-border); padding:18px 0;">
+            <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:6px;"><span style="font-weight:700; font-size:17px;">Сповіщення</span><span style="{{ notBadge }}">{{ notBadgeText }}</span></div>
+            <p style="margin:0 0 14px; font-size:14px; color:var(--sc-muted); line-height:1.5;">Коли бар'єр, який ви повідомили, підтверджують, передають місту або усувають.</p>
+            <div style="display:flex; gap:10px;">
+              <button class="sc-foc" onClick="{{ allowNot }}" style="{{ notAllowStyle }}">Дозволити</button>
+              <button class="sc-foc" onClick="{{ denyNot }}" style="min-height:46px; padding:0 18px; border:1px solid var(--sc-border-strong); border-radius:12px; background:var(--sc-surface); color:var(--sc-text); font-family:inherit; font-weight:600; cursor:pointer;">Не зараз</button>
+            </div>
+          </div>
+          <!-- camera -->
+          <div style="border-top:1px solid var(--sc-border); border-bottom:1px solid var(--sc-border); padding:18px 0;">
+            <div style="display:flex; align-items:baseline; gap:8px; margin-bottom:6px;"><span style="font-weight:700; font-size:17px;">Камера</span><span style="{{ camBadge }}">{{ camBadgeText }}</span></div>
+            <p style="margin:0 0 14px; font-size:14px; color:var(--sc-muted); line-height:1.5;">Режим ходьби попереджає про перешкоди та сходинки. Відео не залишає ваш телефон.</p>
+            <div style="display:flex; gap:10px;">
+              <button class="sc-foc" onClick="{{ allowCam }}" style="{{ camAllowStyle }}">Дозволити</button>
+              <button class="sc-foc" onClick="{{ denyCam }}" style="min-height:46px; padding:0 18px; border:1px solid var(--sc-border-strong); border-radius:12px; background:var(--sc-surface); color:var(--sc-text); font-family:inherit; font-weight:600; cursor:pointer;">Не зараз</button>
+            </div>
+          </div>
+        </div>
+
+        <button class="sc-foc" onClick="{{ finish }}" style="margin-top:22px; width:100%; min-height:54px; border:none; border-radius:14px; background:var(--sc-primary); color:#fff; font-family:inherit; font-weight:700; font-size:16px; cursor:pointer;">Відкрити SafeCity</button>
+      </div>
+
+      <!-- ===== DONE ===== -->
+      <div style="display:{{ show5 }}; min-height:100%; flex-direction:column; align-items:center; justify-content:center; text-align:center; padding:30px;">
+        <div style="width:72px; height:72px; border-radius:50%; border:2px solid var(--sc-primary); color:var(--sc-primary); display:grid; place-items:center; font-size:34px; margin-bottom:24px;">✓</div>
+        <h1 style="margin:0 0 10px; font-size:26px; letter-spacing:-.02em; font-weight:800;">Готово, {{ profileName }}</h1>
+        <p style="margin:0 0 26px; font-size:15.5px; line-height:1.6; color:var(--sc-muted); max-width:28ch;">Ваш застосунок у режимі «{{ profileModeLabel }}». Вітаємо в доступнішому Львові.</p>
+        <button class="sc-foc" onClick="{{ restart }}" style="min-height:48px; padding:0 22px; border:1px solid var(--sc-border-strong); border-radius:13px; background:var(--sc-surface); color:var(--sc-text); font-family:inherit; font-weight:600; font-size:15px; cursor:pointer;">Пройти ще раз</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:430,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = {
+    step: 0,
+    needs: { wheelchair: false, blind: false, deaf: false, cog: false },
+    primary: null,
+    sub: {},
+    preview: "adapted",
+    perms: { loc: null, not: null, cam: null },
+  };
+
+  _subSets() {
+    return {
+      wheelchair: {
+        tag: "Мобільність", title: "Налаштування маршрутів",
+        desc: "Будемо планувати маршрути й оцінювати місця з огляду на це.",
+        opts: [
+          { id: "stepfree", ua: "Маршрути без сходів" },
+          { id: "wc", ua: "Важливий доступний туалет" },
+          { id: "ramp", ua: "Уникати крутих підйомів" },
+          { id: "parking", ua: "Показувати паркування для людей з інвалідністю" },
+        ],
+      },
+      blind: {
+        tag: "Слабкий зір", title: "Як застосунку говорити з вами?",
+        desc: "Вестимемо аудіо першими та великим контрастним текстом.",
+        opts: [
+          { id: "audio", ua: "Аудіо-перший список поруч" },
+          { id: "haptic", ua: "Вібро-підказки на маршруті" },
+          { id: "large", ua: "Великий шрифт і контраст" },
+          { id: "walk", ua: "Режим ходьби — попередження про перешкоди" },
+        ],
+      },
+      deaf: {
+        tag: "Слух", title: "Візуальні сповіщення",
+        desc: "Замінимо звуки чіткими візуальними підказками й субтитрами.",
+        opts: [
+          { id: "flash", ua: "Візуальні сповіщення" },
+          { id: "caption", ua: "Субтитри у відео-відгуках" },
+          { id: "text", ua: "Текстова підтримка замість дзвінків" },
+        ],
+      },
+      cog: {
+        tag: "Когнітивне", title: "Простіше та спокійніше",
+        desc: "Зменшимо безлад і лишимо одну чітку дію на екран.",
+        opts: [
+          { id: "simple", ua: "Спрощений спокійний інтерфейс" },
+          { id: "steps", ua: "Один крок за раз" },
+          { id: "reduce", ua: "Менше анімації" },
+        ],
+      },
+    };
+  }
+
+  _branch() {
+    return this.state.primary || Object.keys(this.state.needs).find(k => this.state.needs[k]) || "wheelchair";
+  }
+
+  renderVals() {
+    const s = this.state;
+    const stepFlex = (n) => s.step === n ? "flex" : "none";
+    const stepBlock = (n) => s.step === n ? "block" : "none";
+    const dot = (n) => {
+      const active = n === s.step, done = n < s.step;
+      const bg = (done || active) ? "var(--sc-primary)" : "var(--sc-border)";
+      return "flex:" + (active ? "2" : "1") + "; height:5px; border-radius:3px; background:" + bg + "; transition:all .3s;";
+    };
+
+    const card = (sel, prim) => "display:flex; align-items:stretch; border:1.5px solid " + (prim ? "var(--sc-primary)" : sel ? "var(--sc-primary)" : "var(--sc-border)") + "; border-radius:14px; background:" + (sel ? "var(--sc-primary-tint)" : "var(--sc-surface)") + "; overflow:hidden;";
+    const check = (sel) => "width:24px; height:24px; border-radius:50%; flex-shrink:0; display:grid; place-items:center; font-size:12px; font-weight:800; background:" + (sel ? "var(--sc-primary)" : "transparent") + "; color:" + (sel ? "#fff" : "transparent") + "; border:" + (sel ? "none" : "2px solid var(--sc-border-strong)") + ";";
+    const star = (prim) => "flex:0 0 auto; width:50px; border:none; border-left:1px solid " + (prim ? "var(--sc-primary)" : "var(--sc-border)") + "; background:" + (prim ? "var(--sc-primary)" : "transparent") + "; color:" + (prim ? "#fff" : "var(--sc-border-strong)") + "; font-size:19px; cursor:pointer; font-family:inherit;";
+
+    const anySel = Object.values(s.needs).some(Boolean);
+    const hasPrimary = !!s.primary;
+    const contOk = anySel && hasPrimary;
+    let pickHint = "";
+    if (!anySel) pickHint = "Оберіть принаймні одне, щоб продовжити.";
+    else if (!hasPrimary) pickHint = "Торкніться зірочки, щоб обрати головне.";
+    else pickHint = "Чудово — це формує ваш головний екран.";
+
+    const branch = this._branch();
+    const set = this._subSets()[branch];
+    const subOptStyle = (on) => "display:flex; align-items:center; gap:12px; width:100%; text-align:left; min-height:58px; padding:14px; border:1.5px solid " + (on ? "var(--sc-primary)" : "var(--sc-border)") + "; border-radius:13px; background:" + (on ? "var(--sc-primary-tint)" : "var(--sc-surface)") + "; font-family:inherit; color:var(--sc-text); cursor:pointer;";
+    const subCheck = (on) => "width:24px; height:24px; border-radius:7px; flex-shrink:0; display:grid; place-items:center; font-size:12px; font-weight:800; background:" + (on ? "var(--sc-primary)" : "transparent") + "; color:" + (on ? "#fff" : "transparent") + "; border:" + (on ? "none" : "2px solid var(--sc-border-strong)") + ";";
+    const subOptions = set.opts.map(o => {
+      const on = !!s.sub[o.id];
+      return { ...o, on, style: subOptStyle(on), check: subCheck(on), toggle: () => this.setState(st => ({ sub: { ...st.sub, [o.id]: !st.sub[o.id] } })) };
+    });
+
+    const audioBranch = branch === "blind";
+    const isStd = s.preview === "standard";
+    const segStyle = (on) => "flex:1; min-height:42px; border:none; border-radius:9px; background:" + (on ? "var(--sc-surface)" : "transparent") + "; color:" + (on ? "var(--sc-primary)" : "var(--sc-muted)") + "; font-weight:700; font-family:inherit; font-size:14px; cursor:pointer; box-shadow:" + (on ? "0 1px 2px rgba(15,30,36,.1)" : "none") + ";";
+
+    const allowStyle = (st) => "min-height:46px; padding:0 22px; border:none; border-radius:12px; background:" + (st === true ? "var(--sc-ok)" : "var(--sc-primary)") + "; color:#fff; font-family:inherit; font-weight:700; cursor:pointer;";
+    const badge = (st) => st === null ? "display:none;" : "font-size:12px; font-weight:700; color:" + (st ? "var(--sc-ok)" : "var(--sc-muted)") + ";";
+    const badgeText = (st) => st === null ? "" : (st ? "· дозволено" : "· пропущено");
+    const setPerm = (k, v) => this.setState(st => ({ perms: { ...st.perms, [k]: v } }));
+
+    const branchNames = { wheelchair: "крісло колісне", blind: "слабкий зір", deaf: "слух", cog: "когнітивне" };
+    const modeLabel = audioBranch ? "Аудіо-перший" : "Візуальна мапа";
+
+    return {
+      back: () => this.setState(st => ({ step: Math.max(0, st.step - 1) })),
+      next: () => this.setState(st => ({ step: Math.min(5, st.step + 1) })),
+      skipAll: () => this.setState({ step: 5, primary: "wheelchair" }),
+      finish: () => this.setState({ step: 5 }),
+      restart: () => this.setState({ step: 0, needs: { wheelchair: false, blind: false, deaf: false, cog: false }, primary: null, sub: {}, preview: "adapted", perms: { loc: null, not: null, cam: null } }),
+      backStyle: "width:34px; height:34px; border-radius:50%; border:none; background:transparent; color:var(--sc-text); font-size:24px; cursor:pointer; font-family:inherit; display:grid; place-items:center; visibility:" + (s.step > 0 && s.step < 5 ? "visible" : "hidden") + ";",
+
+      dot0: dot(0), dot1: dot(1), dot2: dot(2), dot3: dot(3), dot4: dot(4),
+      stepLabel: s.step < 5 ? (Math.min(s.step + 1, 5)) + "/5" : "✓",
+
+      show0: stepFlex(0), show1: stepBlock(1), show2: stepBlock(2), show3: stepBlock(3), show4: stepBlock(4), show5: stepFlex(5),
+
+      selWheelchair: s.needs.wheelchair, selBlind: s.needs.blind, selDeaf: s.needs.deaf, selCog: s.needs.cog,
+      primWheelchair: s.primary === "wheelchair", primBlind: s.primary === "blind", primDeaf: s.primary === "deaf", primCog: s.primary === "cog",
+      cardWheelchair: card(s.needs.wheelchair, s.primary === "wheelchair"),
+      cardBlind: card(s.needs.blind, s.primary === "blind"),
+      cardDeaf: card(s.needs.deaf, s.primary === "deaf"),
+      cardCog: card(s.needs.cog, s.primary === "cog"),
+      checkWheelchair: check(s.needs.wheelchair), checkBlind: check(s.needs.blind), checkDeaf: check(s.needs.deaf), checkCog: check(s.needs.cog),
+      starWheelchairStyle: star(s.primary === "wheelchair"), starBlindStyle: star(s.primary === "blind"), starDeafStyle: star(s.primary === "deaf"), starCogStyle: star(s.primary === "cog"),
+      toggleWheelchair: () => this._toggleNeed("wheelchair"), toggleBlind: () => this._toggleNeed("blind"), toggleDeaf: () => this._toggleNeed("deaf"), toggleCog: () => this._toggleNeed("cog"),
+      starWheelchair: () => this._setPrimary("wheelchair"), starBlind: () => this._setPrimary("blind"), starDeaf: () => this._setPrimary("deaf"), starCog: () => this._setPrimary("cog"),
+      pickHint,
+      contDisabled: contOk ? false : true,
+      continueStyle: "margin-top:8px; width:100%; min-height:54px; border:none; border-radius:14px; background:" + (contOk ? "var(--sc-primary)" : "var(--sc-border)") + "; color:" + (contOk ? "#fff" : "var(--sc-muted)") + "; font-family:inherit; font-weight:700; font-size:16px; cursor:" + (contOk ? "pointer" : "not-allowed") + ";",
+
+      branchTag: set.tag, subTitle: set.title, subDesc: set.desc, subOptions,
+
+      adaptedTabLabel: audioBranch ? "Аудіо-режим" : "Ваш режим",
+      pvStandardOn: isStd, pvAdaptedOn: !isStd,
+      pvStandard: () => this.setState({ preview: "standard" }), pvAdapted: () => this.setState({ preview: "adapted" }),
+      pvStandardStyle: segStyle(isStd), pvAdaptedStyle: segStyle(!isStd),
+      pvShowStandard: isStd ? "block" : "none",
+      pvShowVisual: (!isStd && !audioBranch) ? "block" : "none",
+      pvShowAudio: (!isStd && audioBranch) ? "block" : "none",
+
+      locBadge: badge(s.perms.loc), locBadgeText: badgeText(s.perms.loc), locAllowStyle: allowStyle(s.perms.loc), allowLoc: () => setPerm("loc", true), denyLoc: () => setPerm("loc", false),
+      notBadge: badge(s.perms.not), notBadgeText: badgeText(s.perms.not), notAllowStyle: allowStyle(s.perms.not), allowNot: () => setPerm("not", true), denyNot: () => setPerm("not", false),
+      camBadge: badge(s.perms.cam), camBadgeText: badgeText(s.perms.cam), camAllowStyle: allowStyle(s.perms.cam), allowCam: () => setPerm("cam", true), denyCam: () => setPerm("cam", false),
+
+      profileName: branchNames[branch] || "друже",
+      profileModeLabel: modeLabel,
+    };
+  }
+
+  _toggleNeed(k) {
+    this.setState(st => {
+      const needs = { ...st.needs, [k]: !st.needs[k] };
+      let primary = st.primary;
+      if (needs[k] && !primary) primary = k;
+      if (!needs[k] && primary === k) primary = Object.keys(needs).find(x => needs[x]) || null;
+      return { needs, primary };
+    });
+  }
+  _setPrimary(k) {
+    this.setState(st => ({ needs: { ...st.needs, [k]: true }, primary: k }));
+  }
+}
+</script>
+</body>
+</html>

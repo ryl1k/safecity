@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .scstage {
+    font-family: "Onest", system-ui, "Segoe UI", sans-serif;
+    --sc-bg:#f7f8f9; --sc-surface:#fff; --sc-surface-2:#f1f4f5; --sc-text:#16242b; --sc-muted:#6a787f;
+    --sc-border:#e9edef; --sc-border-strong:#d2d9dc; --sc-primary:#0d5b66; --sc-primary-strong:#093f47;
+    --sc-ok:#1f7a44; --sc-warn:#8a5a00; --sc-bad:#b3261e;
+    --sc-focus:#0a66ff; --sc-shadow-1:0 1px 2px rgba(15,30,36,.06); --sc-shadow-2:0 6px 18px rgba(15,30,36,.12); --sc-shadow-3:0 18px 44px rgba(15,30,36,.2);
+    min-height:100vh; background:radial-gradient(120% 80% at 50% 0%, #dfe7e9 0%, #cdd8db 100%);
+    display:flex; align-items:flex-start; justify-content:center; gap:40px; padding:48px 24px; flex-wrap:wrap;
+  }
+  .sc-foc:focus-visible { outline:3px solid var(--sc-focus); outline-offset:2px; border-radius:4px; }
+  .phone { width:390px; height:844px; border-radius:46px; box-shadow:var(--sc-shadow-3), 0 0 0 12px #0c1417, 0 0 0 13px #2b3d44; position:relative; overflow:hidden; display:flex; flex-direction:column; flex-shrink:0; }
+  .statusbar { height:50px; flex-shrink:0; display:flex; align-items:flex-end; justify-content:space-between; padding:0 28px 6px; font-size:13px; font-weight:600; }
+  .cap { display:flex; align-items:center; gap:8px; font-weight:700; color:#3a4a51; font-size:12.5px; letter-spacing:.04em; }
+  .eq { display:flex; gap:3px; align-items:flex-end; height:16px; } .eq span { width:3px; background:currentColor; border-radius:2px; }
+  @keyframes sc-scan { 0%{top:10%} 100%{top:74%} }
+</style>
+</helmet>
+
+<div class="scstage">
+
+  <!-- ===================== ROUTE ===================== -->
+  <div style="display:flex; flex-direction:column; align-items:center; gap:14px;">
+    <div class="cap">Маршрут · без сходів</div>
+    <div class="phone" style="background:var(--sc-bg);">
+      <div class="statusbar" style="color:#14242b;"><span>9:41</span><span aria-hidden="true">5G</span></div>
+
+      <div style="flex-shrink:0; padding:2px 16px 10px;">
+        <div style="display:flex; align-items:center; gap:10px; background:var(--sc-surface); border:1px solid var(--sc-border); border-radius:14px; padding:12px 14px;">
+          <div style="flex:1;">
+            <div style="display:flex; align-items:center; gap:8px; font-size:13px; color:var(--sc-muted); font-weight:600;"><span aria-hidden="true" style="width:9px; height:9px; border-radius:50%; background:var(--sc-focus);"></span> Ваше місцезнаходження</div>
+            <div style="display:flex; align-items:center; gap:8px; font-size:13.5px; color:var(--sc-text); font-weight:700; margin-top:5px;"><span aria-hidden="true" style="width:9px; height:9px; border-radius:2px; background:var(--sc-accent);"></span> Aroma Kava · вул. Ринок</div>
+          </div>
+          <span style="background:var(--sc-surface-2); color:var(--sc-ok); border:1px solid var(--sc-border-strong); border-radius:20px; padding:5px 11px; font-size:12px; font-weight:700;">Без сходів</span>
+        </div>
+      </div>
+
+      <div style="flex:1; position:relative; overflow:hidden; background:var(--sc-surface-2);">
+        <div aria-hidden="true" style="position:absolute; inset:0; background-image:linear-gradient(var(--sc-border) 1px, transparent 1px), linear-gradient(90deg, var(--sc-border) 1px, transparent 1px); background-size:46px 46px; opacity:.7;"></div>
+        <svg viewBox="0 0 390 400" preserveAspectRatio="none" style="position:absolute; inset:0; width:100%; height:100%;" aria-hidden="true">
+          <polyline points="90,360 90,250 200,250 200,150 300,150 300,70" fill="none" stroke="#0d5b66" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div aria-hidden="true" style="position:absolute; left:90px; top:360px; transform:translate(-50%,-50%); width:18px; height:18px; border-radius:50%; background:var(--sc-focus); border:3px solid #fff; box-shadow:0 0 0 5px rgba(10,102,255,.16);"></div>
+        <div aria-hidden="true" style="position:absolute; left:300px; top:70px; transform:translate(-50%,-100%); width:28px; height:28px; border-radius:7px; background:var(--sc-accent); color:#fff; display:grid; place-items:center; font-weight:800; border:3px solid #fff;">✓</div>
+        <div aria-hidden="true" style="position:absolute; left:200px; top:250px; transform:translate(-50%,-50%); width:32px; height:32px; border-radius:50%; background:#fff; border:3px solid var(--sc-primary); color:var(--sc-primary); display:grid; place-items:center; font-weight:800;">↱</div>
+      </div>
+
+      <div style="flex-shrink:0; background:var(--sc-primary); color:#fff; padding:18px 18px 14px; margin-top:-18px; border-radius:24px 24px 0 0; position:relative; z-index:3;">
+        <div style="display:flex; align-items:center; gap:14px;">
+          <span aria-hidden="true" style="width:54px; height:54px; border-radius:15px; background:rgba(255,255,255,.16); display:grid; place-items:center; font-size:30px;">↱</span>
+          <div style="flex:1;"><div style="font-size:14px; opacity:.85;">Через 20 м</div><div style="font-size:20px; font-weight:800; line-height:1.15;">Поверніть праворуч на<br>вул. Краківську</div></div>
+        </div>
+        <div style="display:flex; align-items:center; gap:10px; margin-top:14px; background:rgba(255,255,255,.12); border-radius:12px; padding:11px 14px;">
+          <span style="flex:1; font-size:13.5px; font-weight:600;">«Поверніть праворуч через 20 метрів»</span>
+          <span aria-hidden="true" class="eq" style="color:#fff;"><span style="height:7px;"></span><span style="height:15px;"></span><span style="height:10px;"></span></span>
+          <span aria-hidden="true" style="font-size:11px; font-weight:700; border:1.5px solid rgba(255,255,255,.6); border-radius:8px; padding:3px 7px;">вібро</span>
+        </div>
+      </div>
+
+      <div style="flex-shrink:0; background:var(--sc-surface); padding:12px 18px 24px;">
+        <div style="display:flex; align-items:center; gap:12px; padding-bottom:11px; border-bottom:1px solid var(--sc-border);">
+          <span aria-hidden="true" style="font-size:18px; color:var(--sc-muted); width:22px; text-align:center;">↑</span>
+          <span style="flex:1; font-size:14px; font-weight:600;">Прямо 120 м · рівний тротуар</span>
+          <span style="font-size:13px; color:var(--sc-muted);">3 хв</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; padding:11px 0 14px;">
+          <span aria-hidden="true" style="font-size:16px; color:var(--sc-ok); width:22px; text-align:center; font-weight:800;">✓</span>
+          <span style="flex:1; font-size:14px; font-weight:600;">Пандус до входу кафе</span>
+          <span style="font-size:13px; color:var(--sc-muted);">прибуття</span>
+        </div>
+        <button class="sc-foc" style="width:100%; min-height:54px; border:1px solid var(--sc-bad); border-radius:14px; background:var(--sc-surface); color:var(--sc-bad); font-weight:700; font-size:16px; font-family:inherit; cursor:pointer;">Завершити маршрут</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== WALK MODE ===================== -->
+  <div style="display:flex; flex-direction:column; align-items:center; gap:14px;">
+    <div class="cap">Режим ходьби · виявлення перешкод</div>
+    <div class="phone" style="background:#0c1417;">
+      <div style="position:absolute; inset:0; background:linear-gradient(180deg,#1a2630,#0c1417 70%); overflow:hidden;">
+        <div aria-hidden="true" style="position:absolute; left:50%; bottom:0; transform:translateX(-50%); width:60%; height:55%; background:linear-gradient(180deg, rgba(120,140,150,.16), rgba(120,140,150,.04)); clip-path:polygon(35% 0,65% 0,100% 100%,0 100%);"></div>
+        <div aria-hidden="true" style="position:absolute; left:8%; right:8%; height:2px; background:linear-gradient(90deg,transparent,var(--sc-warn),transparent); animation:sc-scan 2.6s ease-in-out infinite alternate;"></div>
+        <div aria-hidden="true" style="position:absolute; left:26%; top:46%; width:115px; height:125px; border:3px solid var(--sc-warn); border-radius:8px;"><span style="position:absolute; top:-25px; left:0; background:var(--sc-warn); color:#fff; font-size:11px; font-weight:700; padding:3px 7px; border-radius:6px;">перешкода 2 м</span></div>
+      </div>
+
+      <div class="statusbar" style="color:#fff; z-index:5;"><span>9:41</span><span aria-hidden="true">● запис</span></div>
+
+      <div role="alert" style="position:absolute; top:54px; left:14px; right:14px; z-index:6; display:flex; align-items:center; gap:13px; background:var(--sc-warn); color:#1a1200; border-radius:16px; padding:15px 16px; box-shadow:var(--sc-shadow-2);">
+        <span aria-hidden="true" style="width:44px; height:44px; border-radius:50%; background:rgba(0,0,0,.14); display:grid; place-items:center; font-size:26px; font-weight:800;">!</span>
+        <div style="flex:1; line-height:1.2;"><div style="font-weight:800; font-size:18px;">Перешкода попереду</div><div style="font-size:14px; font-weight:600;">Близько 2 метрів · тримайтесь лівіше</div></div>
+        <span aria-hidden="true" style="font-size:10.5px; font-weight:800; border:1.5px solid #1a1200; border-radius:7px; padding:3px 6px;">вібро</span>
+      </div>
+
+      <div style="position:absolute; top:150px; left:14px; right:14px; z-index:6; display:flex; align-items:center; gap:12px; background:rgba(255,255,255,.96); border-radius:13px; padding:12px 15px; box-shadow:var(--sc-shadow-1);">
+        <span aria-hidden="true" style="width:34px; height:34px; border-radius:50%; background:var(--sc-bad); color:#fff; display:grid; place-items:center; font-weight:800; font-size:16px;">↓</span>
+        <div style="flex:1; line-height:1.2;"><div style="font-weight:800; font-size:15px; color:var(--sc-text);">Сходинка вниз попереду</div><div style="font-size:13px; color:var(--sc-muted); font-weight:600;">~4 метри · край бордюру</div></div>
+      </div>
+
+      <div style="position:absolute; left:0; right:0; bottom:0; z-index:6; padding:18px 18px 30px; background:linear-gradient(0deg, rgba(12,20,23,.92), rgba(12,20,23,0));">
+        <div style="display:flex; align-items:center; gap:12px; background:rgba(255,255,255,.12); border-radius:13px; padding:13px 15px; margin-bottom:14px;">
+          <span style="flex:1; color:#fff; font-size:14px; font-weight:600;">«Перешкода попереду, близько двох метрів. Тримайтесь трохи лівіше.»</span>
+          <span aria-hidden="true" class="eq" style="color:#fff;"><span style="height:8px;"></span><span style="height:16px;"></span><span style="height:11px;"></span></span>
+        </div>
+        <button class="sc-foc" aria-label="Зупинити режим ходьби" style="width:100%; min-height:66px; border:none; border-radius:18px; background:var(--sc-bad); color:#fff; font-weight:800; font-size:20px; font-family:inherit; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:12px;"><span aria-hidden="true" style="width:22px; height:22px; border-radius:5px; background:#fff;"></span> СТОП</button>
+      </div>
+
+      <!-- disclaimer -->
+      <div role="dialog" aria-label="Безпека режиму ходьби" style="display:{{ showDisclaimer }}; position:absolute; inset:0; z-index:10; background:rgba(8,14,16,.86); padding:24px; flex-direction:column; justify-content:center;">
+        <div style="background:var(--sc-surface); border-radius:22px; padding:24px;">
+          <div style="width:56px; height:56px; margin:0 auto 16px; border-radius:50%; border:2px solid var(--sc-warn); color:var(--sc-warn); display:grid; place-items:center; font-size:28px; font-weight:800;">!</div>
+          <h2 style="margin:0 0 10px; font-size:22px; text-align:center; letter-spacing:-.02em; font-weight:800;">Помічник, а не заміна</h2>
+          <p style="margin:0 0 16px; font-size:15px; line-height:1.5; color:var(--sc-text); text-align:center;">Режим ходьби допомагає помічати деякі перешкоди камерою. Він може щось пропустити й помилятися.</p>
+          <div style="border-top:1px solid var(--sc-border); border-bottom:1px solid var(--sc-border); padding:14px 0; margin-bottom:18px;">
+            <div style="display:flex; gap:10px; align-items:flex-start; margin-bottom:10px;"><span aria-hidden="true" style="color:var(--sc-ok); font-weight:800;">✓</span><span style="font-size:14px; line-height:1.45;">Продовжуйте користуватися білою тростиною або собакою-поводирем.</span></div>
+            <div style="display:flex; gap:10px; align-items:flex-start;"><span aria-hidden="true" style="color:var(--sc-ok); font-weight:800;">✓</span><span style="font-size:14px; line-height:1.45;">Будьте уважні до транспорту й оточення.</span></div>
+          </div>
+          <button class="sc-foc" role="checkbox" aria-checked="{{ ack }}" onClick="{{ toggleAck }}" style="display:flex; align-items:center; gap:12px; width:100%; background:none; border:none; font-family:inherit; cursor:pointer; margin-bottom:18px; text-align:left;">
+            <span aria-hidden="true" style="{{ checkboxStyle }}">{{ checkMark }}</span>
+            <span style="font-size:14px; font-weight:600; color:var(--sc-text);">Я розумію</span>
+          </button>
+          <button class="sc-foc" disabled="{{ startDisabled }}" onClick="{{ start }}" style="{{ startStyle }}">Почати режим ходьби</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:920,&quot;height&quot;:960}}">
+class Component extends DCLogic {
+  state = { disclaimer: true, ack: false };
+  renderVals() {
+    const s = this.state;
+    return {
+      showDisclaimer: s.disclaimer ? "flex" : "none",
+      ack: s.ack,
+      toggleAck: () => this.setState(st => ({ ack: !st.ack })),
+      checkMark: s.ack ? "✓" : "",
+      checkboxStyle: "width:28px; height:28px; flex-shrink:0; border-radius:8px; border:2px solid " + (s.ack ? "var(--sc-primary)" : "var(--sc-border-strong)") + "; background:" + (s.ack ? "var(--sc-primary)" : "var(--sc-surface)") + "; color:#fff; font-weight:800; font-size:15px; display:grid; place-items:center;",
+      startDisabled: s.ack ? false : true,
+      start: () => { if (this.state.ack) this.setState({ disclaimer: false }); },
+      startStyle: "width:100%; min-height:54px; border:none; border-radius:13px; background:" + (s.ack ? "var(--sc-primary)" : "var(--sc-border)") + "; color:" + (s.ack ? "#fff" : "var(--sc-muted)") + "; font-weight:700; font-size:16px; font-family:inherit; cursor:" + (s.ack ? "pointer" : "not-allowed") + ";",
+    };
+  }
+}
+</script>
+</body>
+</html>
