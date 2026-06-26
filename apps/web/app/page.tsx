@@ -1,59 +1,124 @@
 import Link from 'next/link';
-import { ThemeSwitcher } from '@/theme/ThemeSwitcher';
+import { AppHeader } from '@/components/AppHeader';
+
+const STEPS = [
+  { n: '1', title: 'Налаштуйте під себе', body: 'Оберіть свої потреби — застосунок адаптує інтерфейс, шари мапи й маршрути саме під вас.' },
+  { n: '2', title: 'Знайдіть доступні місця', body: 'Кожне місце має оцінку доступності окремо для крісла колісного й для незрячих — колір, іконка та підпис.' },
+  { n: '3', title: 'Змінюйте місто', body: 'Повідомляйте про бар’єри, підтримуйте петиції до міста — і стежте, як їх усувають.' },
+];
+
+const PROFILES = [
+  {
+    title: 'Крісло колісне та мобільність',
+    body: 'Візуальна мапа з пін-ами за кольором і формою, маршрути без сходів і з пологими ділянками, доступні туалети й паркування.',
+    icon: '♿',
+  },
+  {
+    title: 'Незрячі та слабкозорі',
+    body: 'Аудіо-перший список місць поруч із напрямком за годинником, висока контрастність, великий шрифт, озвучення та вібрація.',
+    icon: '👁',
+  },
+];
 
 export default function HomePage() {
   return (
-    <div className="min-h-screen">
-      <header className="sticky top-0 z-20 border-b border-border bg-surface">
-        <div className="mx-auto flex max-w-[1080px] flex-wrap items-center gap-4 px-5 py-3">
-          <div className="mr-auto flex items-center gap-2">
-            <span
-              aria-hidden
-              className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-lg font-extrabold text-primary-on"
-            >
-              ◍
-            </span>
-            <div className="leading-tight">
-              <div className="font-extrabold">SafeCity</div>
-              <div className="text-xs font-semibold text-muted">Львів</div>
-            </div>
+    <div style={{ minHeight: '100vh' }}>
+      <AppHeader />
+
+      <main style={{ maxWidth: 1080, margin: '0 auto', padding: '2.4em 1.25em 5em' }}>
+        {/* Hero */}
+        <section style={{ marginBottom: '3em' }}>
+          <p style={{ fontSize: '0.75em', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--sc-primary)', margin: 0 }}>
+            Інклюзивна мапа · Львів
+          </p>
+          <h1 style={{ margin: '0.3em 0', fontSize: '2.6em', lineHeight: 1.1, letterSpacing: '-0.025em', fontWeight: 800, maxWidth: '16ch' }}>
+            Один застосунок, що адаптується під вас
+          </h1>
+          <p style={{ margin: 0, maxWidth: '60ch', fontSize: '1.05em', lineHeight: 1.6, color: 'var(--sc-muted)' }}>
+            SafeCity допомагає людям з інвалідністю орієнтуватися в місті: знайте заздалегідь,
+            чи підходить вам місце, прокладайте маршрут під свої потреби, а коли щось не так —
+            повідомте й домагайтеся змін.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8em', marginTop: '1.6em' }}>
+            <Link href="/onboarding" className="sc-foc" style={cta('primary')}>Почати</Link>
+            <Link href="/map" className="sc-foc" style={cta('secondary')}>Відкрити мапу</Link>
           </div>
-          <ThemeSwitcher />
-        </div>
-      </header>
+        </section>
 
-      <main className="mx-auto max-w-[1080px] px-5 py-10">
-        <p className="text-xs font-bold uppercase tracking-[0.12em] text-primary">
-          Доступність — це продукт
-        </p>
-        <h1 className="mt-2 max-w-[20ch] text-4xl font-extrabold leading-[1.1] tracking-tight">
-          Один застосунок, що адаптується під вас
-        </h1>
-        <p className="mt-3 max-w-[62ch] leading-relaxed text-muted">
-          Інклюзивна мапа Львова для людей з інвалідністю. Візуальна мапа для тих, хто
-          користується кріслом колісним, та аудіо-перший список для незрячих. WCAG 2.2 AA як
-          мінімум — статус завжди передається кольором, іконкою та підписом.
-        </p>
+        {/* How it works */}
+        <section style={{ marginBottom: '3em' }}>
+          <h2 style={{ fontSize: '1.4em', fontWeight: 800, margin: '0 0 1em' }}>Як це працює</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1em' }}>
+            {STEPS.map((s) => (
+              <div key={s.n} style={cardStyle}>
+                <span aria-hidden style={stepDot}>{s.n}</span>
+                <h3 style={{ margin: '0.6em 0 0.3em', fontSize: '1.1em', fontWeight: 800 }}>{s.title}</h3>
+                <p style={{ margin: 0, fontSize: '0.92em', lineHeight: 1.5, color: 'var(--sc-muted)' }}>{s.body}</p>
+              </div>
+            ))}
+          </div>
+        </section>
 
-        <div className="mt-6 flex flex-wrap gap-3">
-          <Link
-            href="/map"
-            className="grid min-h-[2.75em] place-items-center rounded-lg bg-primary px-6 font-bold text-primary-on"
-          >
-            Відкрити мапу
-          </Link>
-          <Link
-            href="/onboarding"
-            className="grid min-h-[2.75em] place-items-center rounded-lg border border-primary bg-surface px-6 font-bold text-primary"
-          >
-            Налаштувати під себе
-          </Link>
-        </div>
+        {/* Two profiles */}
+        <section style={{ marginBottom: '3em' }}>
+          <h2 style={{ fontSize: '1.4em', fontWeight: 800, margin: '0 0 1em' }}>Два досвіди, один застосунок</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1em' }}>
+            {PROFILES.map((p) => (
+              <div key={p.title} style={{ ...cardStyle, display: 'flex', gap: '0.9em' }}>
+                <span aria-hidden style={{ fontSize: '1.8em', lineHeight: 1 }}>{p.icon}</span>
+                <div>
+                  <h3 style={{ margin: '0 0 0.3em', fontSize: '1.1em', fontWeight: 800 }}>{p.title}</h3>
+                  <p style={{ margin: 0, fontSize: '0.92em', lineHeight: 1.5, color: 'var(--sc-muted)' }}>{p.body}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
 
-        <p className="mt-10 text-sm text-muted">
-          Каркас веб-застосунку. Екрани додаються по черзі — див. дошку (epic:design-system).
-        </p>
+        {/* CTA band */}
+        <section style={{ ...cardStyle, textAlign: 'center', background: 'var(--sc-primary-tint)', borderColor: 'var(--sc-primary)' }}>
+          <h2 style={{ margin: '0 0 0.3em', fontSize: '1.3em', fontWeight: 800 }}>Зробимо Львів доступним разом</h2>
+          <p style={{ margin: '0 0 1em', color: 'var(--sc-muted)' }}>Доступність — це продукт, а не доповнення. WCAG 2.2 AA на кожному екрані.</p>
+          <Link href="/onboarding" className="sc-foc" style={cta('primary')}>Налаштувати під себе</Link>
+        </section>
       </main>
+
+      <footer style={{ borderTop: 'var(--sc-bw) solid var(--sc-border)', padding: '1.5em 1.25em', textAlign: 'center', color: 'var(--sc-muted)', fontSize: '0.85em' }}>
+        SafeCity · Львів, Україна · дані © OpenStreetMap
+      </footer>
     </div>
   );
+}
+
+const cardStyle = {
+  background: 'var(--sc-surface)',
+  border: 'var(--sc-bw) solid var(--sc-border)',
+  borderRadius: '1em',
+  padding: '1.3em',
+} as const;
+
+const stepDot = {
+  display: 'grid',
+  placeItems: 'center',
+  width: '2em',
+  height: '2em',
+  borderRadius: '0.6em',
+  background: 'var(--sc-primary)',
+  color: 'var(--sc-on-primary)',
+  fontWeight: 800,
+} as const;
+
+function cta(kind: 'primary' | 'secondary') {
+  const base = {
+    display: 'grid',
+    placeItems: 'center',
+    minHeight: '2.75em',
+    padding: '0 1.5em',
+    borderRadius: '0.7em',
+    fontWeight: 700,
+    textDecoration: 'none',
+  } as const;
+  return kind === 'primary'
+    ? { ...base, background: 'var(--sc-primary)', color: 'var(--sc-on-primary)' }
+    : { ...base, background: 'var(--sc-surface)', color: 'var(--sc-primary)', border: 'var(--sc-bw) solid var(--sc-primary)' };
 }

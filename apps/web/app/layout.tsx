@@ -3,6 +3,7 @@ import { Onest } from 'next/font/google';
 import '@safecity/design-tokens/src/themes.css';
 import './globals.css';
 import { ThemeProvider } from '@/theme/ThemeProvider';
+import { ProfileProvider } from '@/profile/ProfileProvider';
 
 const onest = Onest({
   subsets: ['latin', 'cyrillic'],
@@ -38,7 +39,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: noFlash }} />
       </head>
       <body>
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <ProfileProvider>{children}</ProfileProvider>
+        </ThemeProvider>
       </body>
     </html>
   );
