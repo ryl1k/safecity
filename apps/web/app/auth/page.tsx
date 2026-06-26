@@ -24,10 +24,16 @@ function AuthInner() {
     setBusy(true);
     try {
       if (mode === 'up') {
-        const { data, error } = await supabase.auth.signUp({ email, password });
+        const res = await fetch('/api/signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password }),
+        });
+        const j = await res.json();
+        if (!res.ok) throw new Error(j.error || 'Не вдалося створити акаунт');
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        if (data.session) router.push(next);
-        else setInfo('Перевірте пошту, щоб підтвердити акаунт.');
+        router.push(next);
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
