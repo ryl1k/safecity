@@ -16,6 +16,15 @@ try {
   console.log('rpc      :', funcs.map((f) => f.routine_name).join(', ') || '(none)');
   console.log('features :', feat[0].c, `(${feat[0].crit} critical)`);
   console.log('postgis  :', postgis.length ? 'enabled' : 'MISSING');
+
+  // Exercise the geo RPC the web will call (Lviv centre, 2 km).
+  const near = await sql`select * from points_near(24.0316, 49.8419, 2000)`;
+  console.log('points_near:', near.length, 'points');
+  if (near[0]) {
+    const p = near[0];
+    console.log('  sample  :', p.name, '·', p.category, '·', Math.round(p.distance_m), 'm');
+    console.log('  features:', JSON.stringify(p.features));
+  }
 } catch (e) {
   console.error('check failed:', e.message);
   process.exitCode = 1;
