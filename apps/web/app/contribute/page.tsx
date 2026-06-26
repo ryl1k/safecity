@@ -1,0 +1,157 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import type { AccessibilityFeature, Category, FeatureValue } from '@safecity/shared';
+import { AppHeader } from '@/components/AppHeader';
+import { Button, Field, Segmented } from '@/components/ui';
+import { getCatalog } from '@/lib/catalog';
+import { supabase } from '@/lib/supabase';
+import { categoryLabel } from '@/lib/format';
+
+const LVIV: [number, number] = [24.0316, 49.8419];
+const CATEGORIES: Category[] = ['venue', 'transit', 'crossing', 'toilet', 'parking'];
+const VAL_OPTS: { value: FeatureValue; label: string }[] = [
+  { value: 'yes', label: 'Так' },
+  { value: 'no', label: 'Ні' },
+  { value: 'unknown', label: '?' },
+];
+
+export default function ContributePage() {
+  const router = useRouter();
+  const [ready, setReady] = useState(false);
+  const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
+  const [name, setName] = useState('');
+  const [address, setAddress] = useState('');
+  const [category, setCategory] = useState<Category>('venue');
+  const [loc, setLoc] = useState<[number, number] | null>(null);
+  const [values, setValues] = useState<Record<string, FeatureValue>>({});
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) {
+        router.replace('/auth?next=/contribute');
+        return;
+      }
+      setCatalog(await getCatalog());
+      setReady(true);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const features = useMemo(
+    () => catalog.filter((f) => f.categories.includes(category)),
+    [catalog, category],
+  );
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setBusy(true);
+    try {
+      const p = loc ?? LVIV;
+      const cleaned: Record<string, FeatureValue> = {};
+      for (const [k, v] of Object.entries(values)) if (v === 'yes' || v === 'no') cleaned[k] = v;
+      const { data, error } = await supabase.rpc('add_point', {
+        p_name: name,
+        p_category: category,
+        p_lng: p[0],
+        p_lat: p[1],
+        p_address: address || null,
+        p_features: cleaned,
+      });
+      if (error) throw error;
+      router.push(`/point/${data}`);
+    } catch (err: any) {
+      setError(err?.message ?? 'Не вдалося додати місце');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (!ready) return null;
+
+  return (
+    <div style={{ minHeight: '100vh' }}>
+      <AppHeader active="map" />
+      <main style={{ maxWidth: 620, margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
+        <h1 style={{ margin: '0 0 1em', fontSize: '1.7em', fontWeight: 800 }}>Додати місце</h1>
+
+        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1em' }}>
+          <Field label="Назва" required value={name} onChange={(e) => setName(e.target.value)} placeholder="напр. Кав'ярня «Кава»" />
+          <Field label="Адреса" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="вул. Прикладна, 1" />
+
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Категорія</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5em' }}>
+              {CATEGORIES.map((c) => (
+                <button
+                  key={c}
+                  type="button"
+                  className="sc-foc"
+                  aria-pressed={category === c}
+                  onClick={() => setCategory(c)}
+                  style={{
+                    minHeight: '2.6em', padding: '0 1em', borderRadius: '2em', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700,
+                    border: `var(--sc-bw) solid ${category === c ? 'var(--sc-primary)' : 'var(--sc-border-strong)'}`,
+                    background: category === c ? 'var(--sc-primary)' : 'var(--sc-surface)',
+                    color: category === c ? 'var(--sc-on-primary)' : 'var(--sc-text)',
+                  }}
+                >
+                  {categoryLabel[c]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Місцезнаходження</div>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() =>
+                navigator.geolocation?.getCurrentPosition(
+                  (pos) => setLoc([pos.coords.longitude, pos.coords.latitude]),
+                  () => setLoc(LVIV),
+                )
+              }
+            >
+              {loc ? '✓ Місце зафіксовано' : 'Моє місцезнаходження'}
+            </Button>
+            <p style={{ margin: '0.4em 0 0', color: 'var(--sc-muted)', fontSize: '0.8em' }}>
+              Без вибору буде використано центр Львова.
+            </p>
+          </div>
+
+          <fieldset style={{ border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', padding: '1em' }}>
+            <legend style={{ fontWeight: 700, fontSize: '0.9em', padding: '0 0.4em' }}>Зручності доступності</legend>
+            {features.map((f) => (
+              <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '0.8em', padding: '0.5em 0' }}>
+                <span style={{ flex: 1, fontSize: '0.9em', fontWeight: 600 }}>
+                  {f.label}
+                  {f.critical ? <span style={{ color: 'var(--sc-accent)' }}> ★</span> : null}
+                </span>
+                <div style={{ width: 180 }}>
+                  <Segmented
+                    ariaLabel={f.label}
+                    value={values[f.key] ?? 'unknown'}
+                    onChange={(v) => setValues((s) => ({ ...s, [f.key]: v }))}
+                    options={VAL_OPTS}
+                  />
+                </div>
+              </div>
+            ))}
+          </fieldset>
+
+          {error ? <div role="alert" style={{ color: 'var(--sc-bad)', fontWeight: 700, fontSize: '0.85em' }}>{error}</div> : null}
+          <Button type="submit" disabled={busy || !name.trim()} block>
+            {busy ? 'Збереження…' : 'Додати місце'}
+          </Button>
+        </form>
+      </main>
+    </div>
+  );
+}

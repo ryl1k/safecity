@@ -46,6 +46,8 @@ export function AppHeader({ active }: { active?: 'map' | 'civic' }) {
         <nav aria-label="Розділи" style={{ display: 'flex', gap: '0.3em' }}>
           <HeaderLink href="/map" current={active === 'map'}>Мапа</HeaderLink>
           <HeaderLink href="/civic" current={active === 'civic'}>Громада</HeaderLink>
+          <HeaderLink href="/contribute">Додати</HeaderLink>
+          <HeaderLink href="/settings">Налаштування</HeaderLink>
         </nav>
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>
