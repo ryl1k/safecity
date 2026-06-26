@@ -15,7 +15,8 @@
     "test": "turbo run test",
     "db:migrate": "node --env-file=.env scripts/migrate.mjs",
     "db:seed": "node --env-file=.env scripts/seed.mjs",
-    "db:make-admin": "node --env-file=.env scripts/make-admin.mjs"
+    "db:make-admin": "node --env-file=.env scripts/make-admin.mjs",
+    "db:seed-users": "node --env-file=.env apps/web/scripts/seed-users.mjs"
   },
   "devDependencies": {
     "postgres": "^3.4.4",
