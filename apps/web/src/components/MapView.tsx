@@ -44,10 +44,12 @@ export function MapView({
   points,
   center,
   onSelect,
+  line,
 }: {
   points: MapPointMarker[];
   center: [number, number];
   onSelect: (id: string) => void;
+  line?: [number, number][];
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -105,6 +107,30 @@ export function MapView({
       cancelled = true;
     };
   }, [points]);
+
+  // Draw / update the route line and fit it into view.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !line || line.length < 2) return;
+    const apply = () => {
+      const data = { type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: line } };
+      const src = map.getSource('route');
+      if (src) {
+        src.setData(data);
+      } else {
+        map.addSource('route', { type: 'geojson', data });
+        map.addLayer({ id: 'route', type: 'line', source: 'route', paint: { 'line-color': '#0d5b66', 'line-width': 5 } });
+      }
+      const lngs = line.map((c) => c[0]);
+      const lats = line.map((c) => c[1]);
+      map.fitBounds(
+        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
+        { padding: 50, duration: 600 },
+      );
+    };
+    if (map.isStyleLoaded()) apply();
+    else map.once('load', apply);
+  }, [line]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: 360, borderRadius: '1em', overflow: 'hidden' }} />;
 }

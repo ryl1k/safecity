@@ -38,25 +38,11 @@ export async function pointsNear(
   return ((data ?? []) as NearRow[]).map(mapRow);
 }
 
-/** A single point by id (with its feature values), or null. */
+/** A single point by id (coords + feature values), or null. */
 export async function pointById(id: string): Promise<PointSummary | null> {
-  const { data, error } = await supabase
-    .from('points')
-    .select('id, name, category, address, verify_status, point_feature_values(feature_key, value)')
-    .eq('id', id)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('point_detail', { p_id: id });
   if (error) throw error;
-  if (!data) return null;
-  const features: PointSummary['features'] = {};
-  for (const fv of (data as any).point_feature_values ?? []) features[fv.feature_key] = fv.value;
-  return {
-    id: data.id,
-    name: data.name,
-    category: data.category,
-    address: data.address,
-    lng: 0,
-    lat: 0,
-    verifyStatus: data.verify_status,
-    features,
-  };
+  const r = ((data ?? []) as NearRow[])[0];
+  if (!r) return null;
+  return mapRow({ ...r, distance_m: 0 });
 }
