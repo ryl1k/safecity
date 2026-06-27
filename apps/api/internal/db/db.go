@@ -4,6 +4,7 @@ package db
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/jackc/pgx/v5"
@@ -52,6 +53,23 @@ func (d *DB) WithUser(ctx context.Context, userID string, fn func(pgx.Tx) error)
 // WithAnon runs fn inside a transaction as the anon role (public reads under RLS).
 func (d *DB) WithAnon(ctx context.Context, fn func(pgx.Tx) error) error {
 	return d.inTx(ctx, "anon", "", fn)
+}
+
+// Role returns the user's application role from profiles (user/trusted/moderator).
+// It reads as the user so RLS allows self-reads; a missing profile row defaults to
+// "user". Satisfies auth.RoleResolver.
+func (d *DB) Role(ctx context.Context, userID string) (string, error) {
+	var role string
+	err := d.WithUser(ctx, userID, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, "select role from profiles where id = $1", userID).Scan(&role)
+	})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "user", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return role, nil
 }
 
 func (d *DB) inTx(ctx context.Context, role, claims string, fn func(pgx.Tx) error) (err error) {

@@ -16,6 +16,7 @@ type Config struct {
 	DatabaseURL       string // Supabase Postgres (session pooler URI)
 	SupabaseURL       string // project URL, e.g. https://<ref>.supabase.co
 	JWKSURL           string // derived: SupabaseURL + /auth/v1/.well-known/jwks.json
+	JWTIssuer         string // derived: SupabaseURL + /auth/v1 (expected `iss` claim)
 	SupabasePublicKey string // publishable key (apikey header for Supabase REST)
 	SupabaseSecretKey string // service key for admin ops (keep server-side only)
 
@@ -51,6 +52,7 @@ func Load() (Config, error) {
 	}
 
 	c.JWKSURL = c.SupabaseURL + "/auth/v1/.well-known/jwks.json"
+	c.JWTIssuer = c.SupabaseURL + "/auth/v1"
 	return c, nil
 }
 

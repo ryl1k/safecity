@@ -12,7 +12,7 @@ import (
 )
 
 func newTestServer(ready func(context.Context) error) *Server {
-	return New(slog.New(slog.NewTextHandler(io.Discard, nil)), ready)
+	return New(Deps{Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Ready: ready})
 }
 
 func TestHealthz(t *testing.T) {

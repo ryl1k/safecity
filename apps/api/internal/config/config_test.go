@@ -23,4 +23,7 @@ func TestLoadDerivesJWKSURL(t *testing.T) {
 	if c.JWKSURL != "https://ref.supabase.co/auth/v1/.well-known/jwks.json" {
 		t.Fatalf("JWKSURL = %q", c.JWKSURL)
 	}
+	if c.JWTIssuer != "https://ref.supabase.co/auth/v1" {
+		t.Fatalf("JWTIssuer = %q", c.JWTIssuer)
+	}
 }

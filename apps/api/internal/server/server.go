@@ -10,26 +10,43 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+
+	"github.com/safecity/api/internal/auth"
 )
+
+// Deps are the dependencies wired into the server. Log is required; the rest are
+// optional so tests can construct a minimal server.
+type Deps struct {
+	Log      *slog.Logger
+	Ready    func(context.Context) error // readiness check (e.g. DB ping); nil = always ready
+	Verifier *auth.Verifier              // JWT verifier; nil disables auth (public routes only)
+	Roles    auth.RoleResolver           // resolves application role for RequireRole
+}
 
 // Server holds the router and dependencies shared by handlers.
 type Server struct {
-	router chi.Router
-	log    *slog.Logger
-	ready  func(context.Context) error // readiness check (e.g. DB ping); may be nil
+	router   chi.Router
+	log      *slog.Logger
+	ready    func(context.Context) error
+	verifier *auth.Verifier
+	roles    auth.RoleResolver
 }
 
-// New builds a Server with base middleware and routes registered. ready is called
-// by /readyz (pass the DB ping); nil means "always ready".
-func New(log *slog.Logger, ready func(context.Context) error) *Server {
+// New builds a Server with base middleware and routes registered.
+func New(d Deps) *Server {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(requestLogger(log))
+	r.Use(requestLogger(d.Log))
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))
+	if d.Verifier != nil {
+		// Guest-friendly: attaches a principal when a valid bearer is present,
+		// rejects an invalid one, and lets anonymous reads through.
+		r.Use(auth.Authenticate(d.Verifier))
+	}
 
-	s := &Server{router: r, log: log, ready: ready}
+	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles}
 	s.routes()
 	return s
 }
@@ -40,6 +57,28 @@ func (s *Server) Handler() http.Handler { return s.router }
 func (s *Server) routes() {
 	s.router.Get("/healthz", s.handleHealth)
 	s.router.Get("/readyz", s.handleReady)
+
+	// Authenticated surface.
+	s.router.Group(func(r chi.Router) {
+		r.Use(auth.RequireUser)
+		r.Get("/me", s.handleMe)
+	})
+}
+
+// handleMe returns the caller's identity (and application role, if resolvable).
+func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
+	p, ok := auth.PrincipalFrom(r.Context())
+	if !ok { // RequireUser guarantees this, but stay defensive.
+		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+		return
+	}
+	resp := map[string]any{"user_id": p.UserID, "email": p.Email}
+	if s.roles != nil {
+		if role, err := s.roles(r.Context(), p.UserID); err == nil {
+			resp["role"] = role
+		}
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // handleHealth is a liveness probe — the process is up.
