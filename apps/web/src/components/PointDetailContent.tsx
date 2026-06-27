@@ -193,12 +193,8 @@ export function PointDetailContent({ id }: { id: string }) {
       </section>
 
       <div style={{ display: 'flex', gap: '0.8em', flexWrap: 'wrap', marginTop: '1.4em' }}>
-        <Link href={`/route?to=${point.id}`} className="sc-foc" style={{ textDecoration: 'none' }}>
-          <Button>Маршрут сюди</Button>
-        </Link>
-        <Link href={`/problem/new?point=${point.id}`} className="sc-foc" style={{ textDecoration: 'none' }}>
-          <Button variant="danger">Повідомити про проблему</Button>
-        </Link>
+        <Link href={`/route?to=${point.id}`} className="sc-foc" style={actionLink('primary')}>Маршрут сюди</Link>
+        <Link href={`/problem/new?point=${point.id}`} className="sc-foc" style={actionLink('danger')}>Повідомити про проблему</Link>
       </div>
     </>
   );
@@ -209,3 +205,14 @@ const card = {
   borderRadius: '1em', padding: '1.2em', marginTop: '1.2em',
 } as const;
 const cardTitle = { margin: '0 0 0.6em', fontSize: '1.05em', fontWeight: 800 } as const;
+
+// Button-styled navigation links (a real <a>, so screen readers announce one control).
+function actionLink(kind: 'primary' | 'danger'): React.CSSProperties {
+  const base: React.CSSProperties = {
+    display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em',
+    borderRadius: '0.7em', fontWeight: 800, textDecoration: 'none', fontFamily: 'inherit',
+  };
+  return kind === 'primary'
+    ? { ...base, background: 'var(--sc-primary)', color: 'var(--sc-on-primary)' }
+    : { ...base, background: 'var(--sc-surface)', color: 'var(--sc-bad)', border: 'var(--sc-bw) solid var(--sc-bad)' };
+}

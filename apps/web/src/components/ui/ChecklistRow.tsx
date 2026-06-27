@@ -25,8 +25,11 @@ export function ChecklistRow({ label, value, critical, last }: ChecklistRowProps
     padding: '0.6em 0',
     borderBottom: last ? 'none' : 'var(--sc-bw) solid var(--sc-border)',
   };
+  // One clean phrase for screen readers; the visual parts are decorative.
+  const phrase = `${label}: ${m.label}${critical ? '. Критична зручність' : ''}`;
   return (
     <div style={row}>
+      <span className="sc-sr">{phrase}</span>
       <span
         aria-hidden
         style={{
@@ -37,11 +40,11 @@ export function ChecklistRow({ label, value, critical, last }: ChecklistRowProps
       >
         {m.icon}
       </span>
-      <span style={{ flex: 1, fontWeight: 600, fontSize: '0.92em' }}>
+      <span aria-hidden style={{ flex: 1, fontWeight: 600, fontSize: '0.92em' }}>
         {label}
-        {critical ? <span aria-label="критична зручність" style={{ color: 'var(--sc-accent)' }}> ★</span> : null}
+        {critical ? <span style={{ color: 'var(--sc-accent)' }}> ★</span> : null}
       </span>
-      <span style={{ fontSize: '0.78em', color: `var(--sc-${m.key})`, fontWeight: 800 }}>{m.label}</span>
+      <span aria-hidden style={{ fontSize: '0.78em', color: `var(--sc-${m.key})`, fontWeight: 800 }}>{m.label}</span>
     </div>
   );
 }
