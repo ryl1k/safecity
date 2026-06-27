@@ -2,9 +2,10 @@ package auth
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"strings"
+
+	"github.com/safecity/api/internal/httpx"
 )
 
 type contextKey int
@@ -40,7 +41,7 @@ func Authenticate(v *Verifier) func(http.Handler) http.Handler {
 			}
 			p, err := v.Verify(raw)
 			if err != nil {
-				writeErr(w, http.StatusUnauthorized, "invalid or expired token")
+				httpx.Error(w, http.StatusUnauthorized, "unauthorized", "invalid or expired token")
 				return
 			}
 			next.ServeHTTP(w, r.WithContext(WithPrincipal(r.Context(), p)))
@@ -53,7 +54,7 @@ func Authenticate(v *Verifier) func(http.Handler) http.Handler {
 func RequireUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := PrincipalFrom(r.Context()); !ok {
-			writeErr(w, http.StatusUnauthorized, "authentication required")
+			httpx.Error(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 			return
 		}
 		next.ServeHTTP(w, r)
@@ -72,16 +73,16 @@ func RequireRole(resolve RoleResolver, allowed ...string) func(http.Handler) htt
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			p, ok := PrincipalFrom(r.Context())
 			if !ok {
-				writeErr(w, http.StatusUnauthorized, "authentication required")
+				httpx.Error(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 				return
 			}
 			role, err := resolve(r.Context(), p.UserID)
 			if err != nil {
-				writeErr(w, http.StatusInternalServerError, "could not resolve role")
+				httpx.Error(w, http.StatusInternalServerError, "internal", "could not resolve role")
 				return
 			}
 			if _, allowed := allow[role]; !allowed {
-				writeErr(w, http.StatusForbidden, "insufficient permissions")
+				httpx.Error(w, http.StatusForbidden, "forbidden", "insufficient permissions")
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -97,10 +98,4 @@ func bearer(r *http.Request) (string, bool) {
 	}
 	tok := strings.TrimSpace(h[len(prefix):])
 	return tok, tok != ""
-}
-
-func writeErr(w http.ResponseWriter, status int, msg string) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }

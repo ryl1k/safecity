@@ -4,6 +4,7 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 )
 
@@ -23,6 +24,9 @@ type Config struct {
 	ORSAPIKey  string // OpenRouteService key (routing proxy)
 	ORSBaseURL string
 	MLGRPCAddr string // Python ML gRPC service address
+
+	RateRPS   float64 // per-key sustained requests/second on throttled routes
+	RateBurst int     // per-key burst allowance
 }
 
 // Load reads config from the environment and fails fast on missing required vars.
@@ -38,6 +42,8 @@ func Load() (Config, error) {
 		ORSAPIKey:         os.Getenv("ORS_API_KEY"),
 		ORSBaseURL:        env("ORS_BASE_URL", "https://api.openrouteservice.org"),
 		MLGRPCAddr:        os.Getenv("ML_GRPC_URL"),
+		RateRPS:           envFloat("RATE_LIMIT_RPS", 10),
+		RateBurst:         envInt("RATE_LIMIT_BURST", 20),
 	}
 
 	var missing []string
@@ -62,6 +68,24 @@ func (c Config) IsDev() bool { return c.Env == "development" }
 func env(key, def string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
+	}
+	return def
+}
+
+func envFloat(key string, def float64) float64 {
+	if v := os.Getenv(key); v != "" {
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f
+		}
+	}
+	return def
+}
+
+func envInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			return n
+		}
 	}
 	return def
 }

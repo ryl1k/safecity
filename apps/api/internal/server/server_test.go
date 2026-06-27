@@ -39,6 +39,14 @@ func TestReadyzOK(t *testing.T) {
 	}
 }
 
+func TestMeRequiresAuth(t *testing.T) {
+	rec := httptest.NewRecorder()
+	newTestServer(nil).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/me", nil))
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("status = %d, want 401", rec.Code)
+	}
+}
+
 func TestReadyzUnavailable(t *testing.T) {
 	rec := httptest.NewRecorder()
 	ready := func(context.Context) error { return errors.New("db down") }

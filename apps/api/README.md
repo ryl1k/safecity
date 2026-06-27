@@ -9,7 +9,24 @@ directly. See board epic **M10 · Go API backend**.
 - `cmd/server` — entrypoint (HTTP server, graceful shutdown, structured logging)
 - `cmd/spike` — throwaway DB/auth probe used to de-risk pgx + pooler + RLS-via-claims
 - `internal/config` — typed env config
+- `internal/db` — pgx pool + RLS-via-claims tx helpers (`WithUser`/`WithAnon`)
+- `internal/auth` — Supabase JWT verification (JWKS) + auth/role middleware
+- `internal/httpx` — consistent JSON responses, error envelope, request decode + validation
+- `internal/ratelimit` — keyed token-bucket limiter + middleware
 - `internal/server` — chi router, middleware, handlers
+
+## Endpoints
+- `GET /healthz` — liveness (always 200 while the process is up)
+- `GET /readyz` — readiness; pings Postgres (503 if down)
+- `GET /me` — authenticated; returns `{user_id, email, role}`
+
+## Conventions
+- **Error shape:** every error is `{"error": {"code": "...", "message": "...", "fields": [...]}}`.
+  `fields` appears only on 422 validation failures (`{field, message}` per invalid field).
+- **Request bodies:** decoded via `httpx.Decode` — 1 MiB cap, unknown fields rejected,
+  validated against `validate` struct tags (go-playground/validator).
+- **Rate limiting:** throttled routes are keyed per user (or per IP for guests); over-limit
+  returns 429 + `Retry-After`. Tunable via `RATE_LIMIT_RPS` / `RATE_LIMIT_BURST`.
 
 ## Run (dev)
 ```

@@ -3,8 +3,8 @@ package server
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
+	"net"
 	"net/http"
 	"time"
 
@@ -12,6 +12,8 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/safecity/api/internal/auth"
+	"github.com/safecity/api/internal/httpx"
+	"github.com/safecity/api/internal/ratelimit"
 )
 
 // Deps are the dependencies wired into the server. Log is required; the rest are
@@ -21,6 +23,7 @@ type Deps struct {
 	Ready    func(context.Context) error // readiness check (e.g. DB ping); nil = always ready
 	Verifier *auth.Verifier              // JWT verifier; nil disables auth (public routes only)
 	Roles    auth.RoleResolver           // resolves application role for RequireRole
+	Limiter  *ratelimit.Limiter          // throttles writes/proxies; nil disables limiting
 }
 
 // Server holds the router and dependencies shared by handlers.
@@ -30,6 +33,7 @@ type Server struct {
 	ready    func(context.Context) error
 	verifier *auth.Verifier
 	roles    auth.RoleResolver
+	limiter  *ratelimit.Limiter
 }
 
 // New builds a Server with base middleware and routes registered.
@@ -46,7 +50,7 @@ func New(d Deps) *Server {
 		r.Use(auth.Authenticate(d.Verifier))
 	}
 
-	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles}
+	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles, limiter: d.Limiter}
 	s.routes()
 	return s
 }
@@ -55,21 +59,41 @@ func New(d Deps) *Server {
 func (s *Server) Handler() http.Handler { return s.router }
 
 func (s *Server) routes() {
+	// Probes are unauthenticated and unthrottled (orchestrators poll them often).
 	s.router.Get("/healthz", s.handleHealth)
 	s.router.Get("/readyz", s.handleReady)
 
-	// Authenticated surface.
+	// Authenticated surface — writes and the like get rate limited.
 	s.router.Group(func(r chi.Router) {
 		r.Use(auth.RequireUser)
+		if s.limiter != nil {
+			r.Use(s.limiter.Middleware(s.rateKey))
+		}
 		r.Get("/me", s.handleMe)
 	})
+}
+
+// rateKey throttles per authenticated user when known, else per client IP.
+func (s *Server) rateKey(r *http.Request) string {
+	if p, ok := auth.PrincipalFrom(r.Context()); ok {
+		return "user:" + p.UserID
+	}
+	return "ip:" + clientIP(r)
+}
+
+func clientIP(r *http.Request) string {
+	// chi's RealIP middleware has already normalized RemoteAddr from proxy headers.
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
 }
 
 // handleMe returns the caller's identity (and application role, if resolvable).
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 	p, ok := auth.PrincipalFrom(r.Context())
 	if !ok { // RequireUser guarantees this, but stay defensive.
-		writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "authentication required"})
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 		return
 	}
 	resp := map[string]any{"user_id": p.UserID, "email": p.Email}
@@ -78,12 +102,12 @@ func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
 			resp["role"] = role
 		}
 	}
-	writeJSON(w, http.StatusOK, resp)
+	httpx.JSON(w, http.StatusOK, resp)
 }
 
 // handleHealth is a liveness probe — the process is up.
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // handleReady is a readiness probe — runs the readiness check (DB ping) if set.
@@ -92,17 +116,11 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 		defer cancel()
 		if err := s.ready(ctx); err != nil {
-			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
+			httpx.JSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
 			return
 		}
 	}
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
-}
-
-func writeJSON(w http.ResponseWriter, status int, v any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(v)
+	httpx.JSON(w, http.StatusOK, map[string]string{"status": "ready"})
 }
 
 func requestLogger(log *slog.Logger) func(http.Handler) http.Handler {

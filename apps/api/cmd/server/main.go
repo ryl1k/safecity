@@ -16,6 +16,7 @@ import (
 	"github.com/safecity/api/internal/auth"
 	"github.com/safecity/api/internal/config"
 	"github.com/safecity/api/internal/db"
+	"github.com/safecity/api/internal/ratelimit"
 	"github.com/safecity/api/internal/server"
 )
 
@@ -46,11 +47,17 @@ func main() {
 	}
 	logger.Info("jwks loaded", "issuer", cfg.JWTIssuer)
 
+	limiter := ratelimit.New(cfg.RateRPS, cfg.RateBurst)
+	stopJanitor := make(chan struct{})
+	defer close(stopJanitor)
+	limiter.StartJanitor(stopJanitor)
+
 	srv := server.New(server.Deps{
 		Log:      logger,
 		Ready:    database.Ping,
 		Verifier: verifier,
 		Roles:    database.Role,
+		Limiter:  limiter,
 	})
 	httpSrv := &http.Server{
 		Addr:              ":" + cfg.Port,
