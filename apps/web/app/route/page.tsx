@@ -217,7 +217,7 @@ function RouteInner() {
                 <h2 style={{ margin: '0 0 0.5em', fontSize: '1em', fontWeight: 800 }}>Доступні місця поруч на маршруті</h2>
                 <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.4em' }}>
                   {nearby.map((n) => (
-                    <li key={n.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5em', fontSize: '0.9em' }}>
+                    <li key={n.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5em', flexWrap: 'wrap', fontSize: '0.9em' }}>
                       <span aria-hidden style={{ width: '0.7em', height: '0.7em', borderRadius: '50%', background: 'var(--sc-ok)', flexShrink: 0 }} />
                       <Link href={`/point/${n.id}`} className="sc-foc" style={{ color: 'var(--sc-primary)', textDecoration: 'underline', fontWeight: 700 }}>{n.name}</Link>
                       <span style={{ color: 'var(--sc-muted)' }}>· {categoryLabel[n.category]}</span>
@@ -232,8 +232,8 @@ function RouteInner() {
               {steps.map((s, i) => (
                 <li key={i} style={{ display: 'flex', gap: '0.7em', padding: '0.7em 0.9em', borderTop: i ? 'var(--sc-bw) solid var(--sc-border)' : 'none' }}>
                   <span aria-hidden style={{ width: '1.7em', height: '1.7em', flexShrink: 0, borderRadius: '50%', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '0.8em' }}>{i + 1}</span>
-                  <span style={{ flex: 1, fontSize: '0.92em' }}>{s.instruction}</span>
-                  <span style={{ color: 'var(--sc-muted)', fontSize: '0.8em', whiteSpace: 'nowrap' }}>{distanceLabel(s.distance)}</span>
+                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.92em' }}>{s.instruction}</span>
+                  <span style={{ color: 'var(--sc-muted)', fontSize: '0.8em', whiteSpace: 'nowrap', flexShrink: 0 }}>{distanceLabel(s.distance)}</span>
                 </li>
               ))}
             </ol>

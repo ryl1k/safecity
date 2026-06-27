@@ -83,7 +83,7 @@ export default function ContributePage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="map" />
-      <main id="main-content" tabIndex={-1} style={{ flex: 1, width: '100%', maxWidth: 620, margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
+      <main id="main-content" tabIndex={-1} style={{ flex: 1, width: '100%', maxWidth: 'min(100%, 620px)', margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
         <h1 style={{ margin: '0 0 1em', fontSize: '1.7em', fontWeight: 800 }}>Додати місце</h1>
 
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1em' }}>
@@ -99,7 +99,7 @@ export default function ContributePage() {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Що це за місце та що варто знати про доступність?"
               rows={3}
-              style={{ width: '100%', padding: '0.7em 0.9em', borderRadius: '0.7em', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em', border: 'var(--sc-bw) solid var(--sc-border-strong)', resize: 'vertical' }}
+              style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', padding: '0.7em 0.9em', borderRadius: '0.7em', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em', border: 'var(--sc-bw) solid var(--sc-border-strong)', resize: 'vertical' }}
             />
           </div>
 
@@ -139,12 +139,12 @@ export default function ContributePage() {
           <fieldset style={{ border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', padding: '1em' }}>
             <legend style={{ fontWeight: 700, fontSize: '0.9em', padding: '0 0.4em' }}>Зручності доступності</legend>
             {features.map((f) => (
-              <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '0.8em', padding: '0.5em 0' }}>
-                <span style={{ flex: 1, fontSize: '0.9em', fontWeight: 600 }}>
+              <div key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '0.8em', padding: '0.5em 0', flexWrap: 'wrap' }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: '0.9em', fontWeight: 600 }}>
                   {f.label}
                   {f.critical ? <span style={{ color: 'var(--sc-accent)' }}> ★</span> : null}
                 </span>
-                <div style={{ width: 180 }}>
+                <div style={{ width: 'min(100%, 180px)' }}>
                   <Segmented
                     ariaLabel={f.label}
                     value={values[f.key] ?? 'unknown'}

@@ -53,7 +53,7 @@ function AuthInner() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader />
-      <main id="main-content" tabIndex={-1} style={{ maxWidth: 420, margin: '0 auto', padding: '2.4em 1.25em 4em' }}>
+      <main id="main-content" tabIndex={-1} style={{ width: '100%', maxWidth: 'min(100%, 420px)', margin: '0 auto', padding: '2.4em 1.25em 4em' }}>
         <h1 style={{ margin: '0 0 0.2em', fontSize: '1.6em', fontWeight: 800 }}>
           {mode === 'in' ? 'Увійти' : 'Створити акаунт'}
         </h1>

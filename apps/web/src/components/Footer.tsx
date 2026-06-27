@@ -25,7 +25,7 @@ export function Footer() {
       <div
         style={{
           maxWidth: 1080, margin: '0 auto', padding: '2.4em 1.25em 1.6em',
-          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1.6em',
+          display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 180px), 1fr))', gap: '1.6em',
         }}
       >
         <div style={{ maxWidth: 280 }}>

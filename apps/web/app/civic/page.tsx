@@ -29,7 +29,7 @@ export default function CivicPage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="civic" />
-      <main id="main-content" tabIndex={-1} style={{ maxWidth: 760, margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
+      <main id="main-content" tabIndex={-1} style={{ width: '100%', maxWidth: 'min(100%, 760px)', margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
         <h1 style={{ margin: '0 0 0.3em', fontSize: '1.8em', fontWeight: 800 }}>Громадські проблеми</h1>
         <p style={{ margin: '0 0 1.4em', color: 'var(--sc-muted)', lineHeight: 1.5 }}>
           Повідомляйте про бар’єри, підтверджуйте чужі повідомлення й передавайте їх місту через

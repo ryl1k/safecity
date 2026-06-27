@@ -165,7 +165,7 @@ export function PointDetailContent({ id }: { id: string }) {
               onChange={(e) => setText(e.target.value)}
               placeholder="Поділіться досвідом доступності цього місця"
               rows={3}
-              style={{ width: '100%', padding: '0.7em 0.9em', borderRadius: '0.7em', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em', border: 'var(--sc-bw) solid var(--sc-border-strong)', resize: 'vertical' }}
+              style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', padding: '0.7em 0.9em', borderRadius: '0.7em', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em', border: 'var(--sc-bw) solid var(--sc-border-strong)', resize: 'vertical' }}
             />
             <PhotoInput files={reviewPhotos} onChange={setReviewPhotos} />
             {reviewError ? <div role="alert" style={{ color: 'var(--sc-bad)', fontWeight: 700, fontSize: '0.85em' }}>{reviewError}</div> : null}
@@ -211,6 +211,7 @@ function actionLink(kind: 'primary' | 'danger'): React.CSSProperties {
   const base: React.CSSProperties = {
     display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em',
     borderRadius: '0.7em', fontWeight: 800, textDecoration: 'none', fontFamily: 'inherit',
+    maxWidth: '100%', boxSizing: 'border-box', whiteSpace: 'normal', textAlign: 'center',
   };
   return kind === 'primary'
     ? { ...base, background: 'var(--sc-primary)', color: 'var(--sc-on-primary)' }

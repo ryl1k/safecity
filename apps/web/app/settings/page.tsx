@@ -45,7 +45,7 @@ export default function SettingsPage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader />
-      <main id="main-content" tabIndex={-1} style={{ maxWidth: 600, margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
+      <main id="main-content" tabIndex={-1} style={{ width: '100%', maxWidth: 'min(100%, 600px)', margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
         <h1 style={{ margin: '0 0 1em', fontSize: '1.7em', fontWeight: 800 }}>Налаштування</h1>
 
         <section style={card}>
@@ -69,12 +69,12 @@ export default function SettingsPage() {
           <h2 style={title}>Акаунт</h2>
           {email ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>
-              <span style={{ color: 'var(--sc-muted)' }}>{email}</span>
+              <span style={{ color: 'var(--sc-muted)', minWidth: 0 }}>{email}</span>
               <Button variant="secondary" onClick={signOut} style={{ marginLeft: 'auto' }}>Вийти</Button>
             </div>
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>
-              <span style={{ color: 'var(--sc-muted)' }}>Ви гість. Увійдіть, щоб робити внесок.</span>
+              <span style={{ color: 'var(--sc-muted)', minWidth: 0 }}>Ви гість. Увійдіть, щоб робити внесок.</span>
               <Link href="/auth" style={{ marginLeft: 'auto', textDecoration: 'none' }}><Button>Увійти</Button></Link>
             </div>
           )}

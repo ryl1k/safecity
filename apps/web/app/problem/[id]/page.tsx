@@ -109,7 +109,7 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="civic" />
-      <main id="main-content" tabIndex={-1} style={{ flex: 1, maxWidth: 700, width: '100%', margin: '0 auto', padding: '1.4em 1.25em 4em' }}>
+      <main id="main-content" tabIndex={-1} style={{ flex: 1, maxWidth: 'min(100%, 700px)', width: '100%', margin: '0 auto', padding: '1.4em 1.25em 4em' }}>
         <Link href="/civic" className="sc-foc" style={{ color: 'var(--sc-primary)', fontWeight: 700, textDecoration: 'none', fontSize: '0.9em' }}>
           ‹ До громади
         </Link>
@@ -120,9 +120,9 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
 
         {status === 'ready' && problem && (
           <>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6em', marginTop: '1em' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.6em', marginTop: '1em', flexWrap: 'wrap' }}>
               <StatusPill status={problem.status} />
-              {problem.pointName ? <span style={{ color: 'var(--sc-muted)', fontSize: '0.85em' }}>{problem.pointName}</span> : null}
+              {problem.pointName ? <span style={{ color: 'var(--sc-muted)', fontSize: '0.85em', minWidth: 0 }}>{problem.pointName}</span> : null}
             </div>
             <h1 style={{ margin: '0.4em 0 0.3em', fontSize: '1.7em', fontWeight: 800, lineHeight: 1.2 }}>{problem.title}</h1>
             {problem.description ? <p style={{ margin: 0, color: 'var(--sc-text)', lineHeight: 1.55 }}>{problem.description}</p> : null}
@@ -152,7 +152,7 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
                         className="sc-foc"
                         value={draftTitle}
                         onChange={(e) => setDraftTitle(e.target.value)}
-                        style={{ width: '100%', marginTop: '0.3em', padding: '0.6em 0.8em', borderRadius: '0.6em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em' }}
+                        style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', marginTop: '0.3em', padding: '0.6em 0.8em', borderRadius: '0.6em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em' }}
                       />
                     </label>
                     <label style={{ fontWeight: 700, fontSize: '0.85em' }}>
@@ -162,7 +162,7 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
                         value={draftBody}
                         onChange={(e) => setDraftBody(e.target.value)}
                         rows={5}
-                        style={{ width: '100%', marginTop: '0.3em', padding: '0.6em 0.8em', borderRadius: '0.6em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em', resize: 'vertical' }}
+                        style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', marginTop: '0.3em', padding: '0.6em 0.8em', borderRadius: '0.6em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em', resize: 'vertical' }}
                       />
                     </label>
                     <div style={{ display: 'flex', gap: '0.6em', flexWrap: 'wrap' }}>
@@ -180,7 +180,7 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
                 <h2 style={{ margin: '0.3em 0 0.4em', fontSize: '1.2em', fontWeight: 800 }}>{petition.title}</h2>
                 {petition.body ? <p style={{ margin: '0 0 1em', color: 'var(--sc-muted)', lineHeight: 1.5 }}>{petition.body}</p> : null}
 
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85em', fontWeight: 700, marginBottom: '0.35em' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85em', fontWeight: 700, marginBottom: '0.35em', flexWrap: 'wrap', gap: '0.2em 0.6em' }}>
                   <span>{petition.internalSignatures + (signed ? 1 : 0)} підписів</span>
                   <span style={{ color: 'var(--sc-muted)' }}>ціль {PETITION_GOAL}</span>
                 </div>

@@ -19,7 +19,7 @@ export function ReviewItem({ author, profileTag, timeAgo, text }: ReviewItemProp
       <span aria-hidden style={avatar}>
         {author.charAt(0)}
       </span>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.5em', flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 800, fontSize: '0.92em' }}>{author}</span>
           {profileTag ? (

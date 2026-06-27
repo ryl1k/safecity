@@ -9,6 +9,8 @@ export interface FieldProps extends InputHTMLAttributes<HTMLInputElement> {
 
 const inputBase: CSSProperties = {
   width: '100%',
+  maxWidth: '100%',
+  boxSizing: 'border-box',
   minHeight: '2.75em',
   padding: '0 0.9em',
   borderRadius: '0.7em',
@@ -27,7 +29,7 @@ export function Field({ label, help, error, id, style, ...rest }: FieldProps) {
   const describedBy = error ? errId : help ? helpId : undefined;
 
   return (
-    <div>
+    <div style={{ minWidth: 0 }}>
       <label
         htmlFor={inputId}
         style={{ display: 'block', fontWeight: 600, fontSize: '0.9em', marginBottom: '0.4em' }}

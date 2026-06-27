@@ -40,6 +40,8 @@ export function Switch({ checked, onChange, label }: SwitchProps) {
         alignItems: 'center',
         gap: '0.7em',
         width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
         minHeight: '2.9em',
         padding: '0 1em',
         border: 'var(--sc-bw) solid var(--sc-border-strong)',
@@ -54,7 +56,7 @@ export function Switch({ checked, onChange, label }: SwitchProps) {
       <span aria-hidden style={track}>
         <span style={thumb} />
       </span>
-      <span style={{ fontSize: '0.95em' }}>{label}</span>
+      <span style={{ fontSize: '0.95em', flex: 1, minWidth: 0 }}>{label}</span>
       <span
         aria-hidden
         style={{

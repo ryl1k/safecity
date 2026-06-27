@@ -21,6 +21,8 @@ export function Segmented<T extends string>({
   const wrap: CSSProperties = {
     display: 'inline-flex',
     width: '100%',
+    maxWidth: '100%',
+    boxSizing: 'border-box',
     background: 'var(--sc-surface-2)',
     border: 'var(--sc-bw) solid var(--sc-border)',
     borderRadius: '0.8em',

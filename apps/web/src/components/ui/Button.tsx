@@ -14,6 +14,10 @@ const base: CSSProperties = {
   placeItems: 'center',
   border: 'var(--sc-bw) solid transparent',
   lineHeight: 1.1,
+  boxSizing: 'border-box',
+  maxWidth: '100%',
+  whiteSpace: 'normal',
+  textAlign: 'center',
 };
 
 const variants: Record<Variant, CSSProperties> = {
