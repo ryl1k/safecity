@@ -1,9 +1,10 @@
 // Spike (throwaway): verifies the riskiest backend assumptions against the real
 // Supabase DB before we build the service:
-//   1. pgx connects through the Supabase pooler.
-//   2. RLS-via-claims works: SET LOCAL role authenticated + request.jwt.claims
-//      makes auth.uid() resolve and existing RLS policies apply.
-//   3. Which JWT scheme Supabase issues (asymmetric/JWKS vs legacy HS256).
+//  1. pgx connects through the Supabase pooler.
+//  2. RLS-via-claims works: SET LOCAL role authenticated + request.jwt.claims
+//     makes auth.uid() resolve and existing RLS policies apply.
+//  3. Which JWT scheme Supabase issues (asymmetric/JWKS vs legacy HS256).
+//
 // Everything DB-mutating runs in a transaction that is rolled back.
 package main
 

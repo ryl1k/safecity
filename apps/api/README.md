@@ -1,16 +1,31 @@
-# @safecity/api
+# @safecity/api — Go API
 
-Thin Node REST API over Supabase. Holds custom logic only.
+Go service that sits in front of Supabase (Postgres + PostGIS, Auth, Storage). It owns
+validated/heavy paths (contribution + civic writes, point reads, ingestion, routing/geocoding
+proxies, ML orchestration). Clients keep **Auth, Storage uploads, and Realtime** on Supabase
+directly. See board epic **M10 · Go API backend**.
 
+## Layout
+- `cmd/server` — entrypoint (HTTP server, graceful shutdown, structured logging)
+- `cmd/spike` — throwaway DB/auth probe used to de-risk pgx + pooler + RLS-via-claims
+- `internal/config` — typed env config
+- `internal/server` — chi router, middleware, handlers
+
+## Run (dev)
 ```
-src/
-  modules/   points, features, reviews, problems, petitions, profiles,
-             routing (ORS proxy + avoid_polygons), import, moderation, ml-client (gRPC)
-  plugins/   db (PostGIS), auth (verify Supabase JWT), validation (zod), errors
-  server.ts  + OpenAPI spec generation
+cd apps/api
+go run ./cmd/server        # loads repo-root .env if present; serves :8080
+curl localhost:8080/healthz
 ```
 
-Supabase handles auth/storage/RLS. The API owns: ORS routing + live-barrier avoidance,
-seed imports, moderation endpoints, and gRPC calls to `apps/ml`.
+## Test
+```
+go test ./...
+```
 
-KB: `05 · Routing`, `09 · Data Seeding`, `10 · Tech & Architecture`.
+## Notes
+- **Auth:** Supabase issues asymmetric JWTs — verified via the JWKS endpoint (no shared secret).
+- **DB authz:** keep Postgres RLS by running each request in a transaction that sets
+  `role authenticated` + `request.jwt.claims` (validated by the spike).
+- Connect via the Supabase **session pooler** (5432). If moving to the transaction pooler
+  (6543), switch pgx to simple protocol / disable the statement cache.
