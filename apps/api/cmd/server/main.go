@@ -14,6 +14,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/safecity/api/internal/config"
+	"github.com/safecity/api/internal/db"
 	"github.com/safecity/api/internal/server"
 )
 
@@ -28,7 +29,16 @@ func main() {
 		os.Exit(1)
 	}
 
-	srv := server.New(logger)
+	ctx := context.Background()
+	database, err := db.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		logger.Error("db connect failed", "err", err)
+		os.Exit(1)
+	}
+	defer database.Close()
+	logger.Info("db connected")
+
+	srv := server.New(logger, database.Ping)
 	httpSrv := &http.Server{
 		Addr:              ":" + cfg.Port,
 		Handler:           srv.Handler(),

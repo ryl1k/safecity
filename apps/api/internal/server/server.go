@@ -2,6 +2,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -15,10 +16,12 @@ import (
 type Server struct {
 	router chi.Router
 	log    *slog.Logger
+	ready  func(context.Context) error // readiness check (e.g. DB ping); may be nil
 }
 
-// New builds a Server with base middleware and routes registered.
-func New(log *slog.Logger) *Server {
+// New builds a Server with base middleware and routes registered. ready is called
+// by /readyz (pass the DB ping); nil means "always ready".
+func New(log *slog.Logger, ready func(context.Context) error) *Server {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
@@ -26,7 +29,7 @@ func New(log *slog.Logger) *Server {
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Timeout(30 * time.Second))
 
-	s := &Server{router: r, log: log}
+	s := &Server{router: r, log: log, ready: ready}
 	s.routes()
 	return s
 }
@@ -44,8 +47,16 @@ func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
-// handleReady is a readiness probe. TODO(db): ping Postgres once the DB layer lands.
-func (s *Server) handleReady(w http.ResponseWriter, _ *http.Request) {
+// handleReady is a readiness probe — runs the readiness check (DB ping) if set.
+func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
+	if s.ready != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
+		defer cancel()
+		if err := s.ready(ctx); err != nil {
+			writeJSON(w, http.StatusServiceUnavailable, map[string]string{"status": "unavailable"})
+			return
+		}
+	}
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
 }
 

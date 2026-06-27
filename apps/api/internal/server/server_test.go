@@ -1,7 +1,9 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -9,13 +11,13 @@ import (
 	"testing"
 )
 
-func newTestServer() *Server {
-	return New(slog.New(slog.NewTextHandler(io.Discard, nil)))
+func newTestServer(ready func(context.Context) error) *Server {
+	return New(slog.New(slog.NewTextHandler(io.Discard, nil)), ready)
 }
 
 func TestHealthz(t *testing.T) {
 	rec := httptest.NewRecorder()
-	newTestServer().Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
+	newTestServer(nil).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/healthz", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
 	}
@@ -28,10 +30,20 @@ func TestHealthz(t *testing.T) {
 	}
 }
 
-func TestReadyz(t *testing.T) {
+func TestReadyzOK(t *testing.T) {
 	rec := httptest.NewRecorder()
-	newTestServer().Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	ready := func(context.Context) error { return nil }
+	newTestServer(ready).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+}
+
+func TestReadyzUnavailable(t *testing.T) {
+	rec := httptest.NewRecorder()
+	ready := func(context.Context) error { return errors.New("db down") }
+	newTestServer(ready).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/readyz", nil))
+	if rec.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", rec.Code)
 	}
 }
