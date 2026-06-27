@@ -24,8 +24,13 @@ const title = { margin: '0 0 0.8em', fontSize: '1.05em', fontWeight: 800 } as co
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { primary, setPrimary } = useProfile();
+  const { primary, setPrimary, setNeeds } = useProfile();
   const [email, setEmail] = useState<string | null>(null);
+
+  function changePrimary(p: Profile) {
+    setPrimary(p);
+    setNeeds([p]); // settings selects a single need; re-run onboarding to pick both
+  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
@@ -45,7 +50,7 @@ export default function SettingsPage() {
 
         <section style={card}>
           <h2 style={title}>Основна потреба</h2>
-          <Segmented ariaLabel="Основна потреба" value={primary} onChange={setPrimary} options={PROFILE_OPTIONS} />
+          <Segmented ariaLabel="Основна потреба" value={primary} onChange={changePrimary} options={PROFILE_OPTIONS} />
           <p style={{ margin: '0.7em 0 0', color: 'var(--sc-muted)', fontSize: '0.85em' }}>
             Визначає вигляд інтерфейсу й оцінки доступності, які ви бачите.
           </p>

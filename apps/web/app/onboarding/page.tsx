@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Profile } from '@safecity/shared';
 import { Button, Segmented } from '@/components/ui';
+import { FontSizeSlider } from '@/components/FontSizeSlider';
 import { useProfile } from '@/profile/ProfileProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 
@@ -11,8 +12,8 @@ const STEPS = ['Вітання', 'Потреби', 'Уточнення', 'Виг
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { setPrimary } = useProfile();
-  const { setTheme, toggleBig, big } = useTheme();
+  const { setPrimary, setNeeds: persistNeeds } = useProfile();
+  const { setTheme, setFontScale, fontScale } = useTheme();
 
   const [step, setStep] = useState(0);
   const [needs, setNeeds] = useState<{ wheelchair: boolean; blind: boolean }>({ wheelchair: false, blind: false });
@@ -35,14 +36,14 @@ export default function OnboardingPage() {
 
   function finish() {
     setPrimary(primary);
+    persistNeeds(chosen);
     // Apply the UI-mode swap from the chosen profile.
     if (chosen.includes('blind')) {
       setTheme('contrast');
-      if (vision === 'low' && big !== '1') toggleBig();
+      if (vision === 'low' && fontScale < 1.3) setFontScale(1.3);
     }
     try {
       localStorage.setItem('sc-onboarded', '1');
-      localStorage.setItem('sc-needs', JSON.stringify(chosen));
     } catch {}
     router.push('/map');
   }
@@ -95,9 +96,20 @@ export default function OnboardingPage() {
           )}
 
           {step === 3 && (
-            <Step title="Вигляд під вас" desc={chosen.includes('blind') ? 'Увімкнемо високий контраст і, за потреби, великий шрифт та озвучення.' : 'Залишимо звичайний візуальний режим. Контраст і розмір тексту можна змінити будь-коли вгорі.'}>
+            <Step title="Зручний розмір тексту" desc="Перетягніть повзунок, доки текст не стане комфортним. Це можна змінити будь-коли згодом.">
+              <div style={{ marginBottom: '1.1em' }}>
+                <FontSizeSlider />
+              </div>
+              <p style={{ margin: '0 0 1.3em', padding: '0.9em 1em', borderRadius: '0.8em', background: 'var(--sc-surface-2)', border: 'var(--sc-bw) solid var(--sc-border)', lineHeight: 1.5 }}>
+                Приклад тексту: «Кав’ярня на розі — вхід без сходів, є доступний туалет.»
+              </p>
+              {chosen.includes('blind') && (
+                <p style={{ margin: '0 0 1.3em', color: 'var(--sc-muted)', fontSize: '0.9em' }}>
+                  Для незрячих і слабкозорих ми також увімкнемо високий контраст.
+                </p>
+              )}
               <Row>
-                <Button onClick={() => setStep(4)}>Застосувати</Button>
+                <Button onClick={() => setStep(4)}>Далі</Button>
                 <Button variant="ghost" onClick={() => setStep(2)}>Назад</Button>
               </Row>
             </Step>
