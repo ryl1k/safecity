@@ -23,3 +23,13 @@
     border-radius: 4px;
   }
 }
+
+/* Entrance animation (page transitions + reveal). Respects reduced motion. */
+@keyframes sc-fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.sc-animate-in { animation: sc-fade-in-up 0.45s ease both; }
+@media (prefers-reduced-motion: reduce) {
+  .sc-animate-in { animation: none; }
+}
