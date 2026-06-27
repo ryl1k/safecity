@@ -7,6 +7,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { Button, Field, LoadingState } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
+import { syncProfileToAccount } from '@/lib/account';
 
 function AuthInner() {
   const router = useRouter();
@@ -34,10 +35,12 @@ function AuthInner() {
         if (!res.ok) throw new Error(j.error || 'Не вдалося створити акаунт');
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        await syncProfileToAccount();
         router.push(next);
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        await syncProfileToAccount();
         router.push(next);
       }
     } catch (err: any) {

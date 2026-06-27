@@ -42,6 +42,7 @@ export default function OnboardingPage() {
     }
     try {
       localStorage.setItem('sc-onboarded', '1');
+      localStorage.setItem('sc-needs', JSON.stringify(chosen));
     } catch {}
     router.push('/map');
   }
