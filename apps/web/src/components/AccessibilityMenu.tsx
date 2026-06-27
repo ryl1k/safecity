@@ -20,14 +20,16 @@ export function AccessibilityMenu() {
   return (
     <div style={{ position: 'relative' }}>
       <button
+        type="button"
         className="sc-foc"
         aria-haspopup="true"
         aria-expanded={open}
+        aria-label="Вигляд"
         onClick={() => setOpen((o) => !o)}
         style={triggerStyle}
       >
         <SlidersHorizontal size={18} aria-hidden />
-        <span style={labelStyle}>Вигляд</span>
+        <span className="sc-hide-sm" style={labelStyle}>Вигляд</span>
       </button>
 
       {open && (
@@ -37,7 +39,7 @@ export function AccessibilityMenu() {
             role="dialog"
             aria-label="Налаштування вигляду"
             style={{
-              position: 'absolute', right: 0, top: 'calc(100% + 0.5em)', zIndex: 41, width: 240,
+              position: 'absolute', right: 0, top: 'calc(100% + 0.5em)', zIndex: 41, width: 'min(86vw, 260px)',
               background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)',
               borderRadius: '0.9em', boxShadow: 'var(--sc-shadow-2)', padding: '0.9em',
             }}
