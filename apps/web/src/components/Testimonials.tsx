@@ -6,11 +6,12 @@ const QUOTES = [
   { name: 'Софія', tag: 'волонтерка', text: 'Додавати місця легко — і це реально допомагає людям навколо.' },
 ];
 
-function Card({ q }: { q: (typeof QUOTES)[number] }) {
+function Card({ q, hidden }: { q: (typeof QUOTES)[number]; hidden?: boolean }) {
   return (
     <figure
+      aria-hidden={hidden}
       style={{
-        margin: 0, width: 'min(78vw, 320px)', flexShrink: 0, scrollSnapAlign: 'start',
+        margin: 0, width: 320, flexShrink: 0, marginRight: '1em',
         background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)',
         borderRadius: '1em', padding: '1.1em 1.2em', boxShadow: 'var(--sc-shadow-1)',
       }}
@@ -29,26 +30,17 @@ function Card({ q }: { q: (typeof QUOTES)[number] }) {
   );
 }
 
-/** Contained, swipeable strip of reviews — consistent width with the rest of the page. */
+/** Continuously looping strip of reviews — contained, seamless (pauses on hover; stops at reduced-motion). */
 export function Testimonials() {
   return (
     <section aria-label="Відгуки користувачів" style={{ maxWidth: 1080, margin: '0 auto', padding: '0 1.25em' }}>
       <h2 style={{ fontSize: '1.5em', fontWeight: 800, margin: '0 0 1.2em' }}>Що кажуть користувачі</h2>
-      <ul
-        tabIndex={0}
-        aria-label="Відгуки — прокрутіть, щоб побачити більше"
-        className="sc-foc"
-        style={{
-          listStyle: 'none', margin: 0, padding: '0 0 0.6em', display: 'flex', gap: '1em',
-          overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch',
-        }}
-      >
-        {QUOTES.map((q, i) => (
-          <li key={i}>
-            <Card q={q} />
-          </li>
-        ))}
-      </ul>
+      <div className="sc-marquee" role="region" aria-label="Відгуки користувачів, що прокручуються">
+        <div className="sc-marquee-track" style={{ padding: '0.3em 0' }}>
+          {QUOTES.map((q, i) => <Card key={`a${i}`} q={q} />)}
+          {QUOTES.map((q, i) => <Card key={`b${i}`} q={q} hidden />)}
+        </div>
+      </div>
     </section>
   );
 }

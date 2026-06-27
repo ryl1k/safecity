@@ -74,7 +74,7 @@ export default function HomePage() {
             <p style={{ margin: '0 0 1.4em', color: 'var(--sc-muted)', maxWidth: '70ch', lineHeight: 1.55 }}>
               Від першого налаштування до реальних змін у місті — чотири прості кроки.
             </p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.2em' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 400px), 1fr))', gap: '1.2em' }}>
               {STEPS.map((s, i) => (
                 <Reveal key={s.n} delay={i * 90}>
                   <div
