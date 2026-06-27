@@ -83,6 +83,7 @@ export function ExploreMap({
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const problemMarkersRef = useRef<any[]>([]);
+  const observerRef = useRef<MutationObserver | null>(null);
   const onSelectRef = useRef(onSelect);
   const onSelectProblemRef = useRef(onSelectProblem);
   const onMoveEndRef = useRef(onMoveEnd);
@@ -121,9 +122,18 @@ export function ExploreMap({
       };
       map.on('load', emit);
       map.on('moveend', emit);
+
+      // Swap the basemap (light/dark) when the app theme changes. HTML markers persist.
+      observerRef.current = new MutationObserver(() => {
+        const d = document.documentElement.getAttribute('data-theme') === 'dark';
+        try { map.setStyle(basemapStyle(d) as any); } catch {}
+      });
+      observerRef.current.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     })();
     return () => {
       cancelled = true;
+      observerRef.current?.disconnect();
+      observerRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
     };

@@ -58,6 +58,7 @@ export function MapView({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const observerRef = useRef<MutationObserver | null>(null);
   const onSelectRef = useRef(onSelect);
   const lineRef = useRef(line);
   onSelectRef.current = onSelect;
@@ -98,9 +99,17 @@ export function MapView({
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
       // Draw any route once the style is ready (handles the set-before-init race).
       map.on('load', () => applyLine());
+      // Swap basemap on theme change, then re-draw the route (setStyle clears layers).
+      observerRef.current = new MutationObserver(() => {
+        const d = document.documentElement.getAttribute('data-theme') === 'dark';
+        try { map.setStyle(basemapStyle(d) as any); map.once('styledata', () => applyLine()); } catch {}
+      });
+      observerRef.current.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     })();
     return () => {
       cancelled = true;
+      observerRef.current?.disconnect();
+      observerRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
     };

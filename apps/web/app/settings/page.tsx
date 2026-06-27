@@ -9,6 +9,7 @@ import { Footer } from '@/components/Footer';
 import { Button, Segmented } from '@/components/ui';
 import { ThemeSwitcher } from '@/theme/ThemeSwitcher';
 import { useProfile } from '@/profile/ProfileProvider';
+import { getMyRole } from '@/lib/admin';
 import { supabase } from '@/lib/supabase';
 
 const PROFILE_OPTIONS: { value: Profile; label: string }[] = [
@@ -26,6 +27,7 @@ export default function SettingsPage() {
   const router = useRouter();
   const { primary, setPrimary, setNeeds } = useProfile();
   const [email, setEmail] = useState<string | null>(null);
+  const [isModerator, setIsModerator] = useState(false);
 
   function changePrimary(p: Profile) {
     setPrimary(p);
@@ -34,6 +36,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+    getMyRole().then((me) => setIsModerator(me?.role === 'moderator')).catch(() => {});
   }, []);
 
   async function signOut() {
@@ -79,6 +82,14 @@ export default function SettingsPage() {
             </div>
           )}
         </section>
+
+        {isModerator && (
+          <section style={card}>
+            <h2 style={title}>Модерація</h2>
+            <p style={{ margin: '0 0 0.8em', color: 'var(--sc-muted)', fontSize: '0.85em' }}>Перевірка місць, проблем, відгуків і ролей користувачів.</p>
+            <Link href="/admin" style={{ textDecoration: 'none' }}><Button>Відкрити консоль модерації</Button></Link>
+          </section>
+        )}
       </main>
       <Footer />
     </div>
