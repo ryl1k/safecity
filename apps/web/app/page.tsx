@@ -80,20 +80,20 @@ export default function HomePage() {
                   <div
                     style={{
                       width: '100%', height: '100%',
-                      display: 'flex', gap: '1.4em', alignItems: 'flex-start', background: 'var(--sc-surface)',
-                      border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1.3em', padding: '1.8em',
+                      display: 'flex', flexDirection: 'column', gap: '0.9em', background: 'var(--sc-surface)',
+                      border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1.3em', padding: '1.6em',
                     }}
                   >
-                    <span aria-hidden style={{ position: 'relative', width: '4.4em', height: '4.4em', flexShrink: 0, borderRadius: '1.1em', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', display: 'grid', placeItems: 'center' }}>
-                      <s.Icon size={30} />
-                      <span style={{ position: 'absolute', top: '-0.5em', left: '-0.5em', width: '1.7em', height: '1.7em', borderRadius: '50%', background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '0.8em' }}>
-                        {s.n}
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.7em 0.9em' }}>
+                      <span aria-hidden style={{ position: 'relative', width: '3em', height: '3em', flexShrink: 0, borderRadius: '0.9em', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', display: 'grid', placeItems: 'center' }}>
+                        <s.Icon size={22} />
+                        <span style={{ position: 'absolute', top: '-0.45em', left: '-0.45em', width: '1.6em', height: '1.6em', borderRadius: '50%', background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '0.72em' }}>
+                          {s.n}
+                        </span>
                       </span>
-                    </span>
-                    <div style={{ flex: '1 1 auto', minWidth: 0 }}>
-                      <h3 style={{ margin: '0 0 0.35em', fontSize: '1.25em', fontWeight: 800 }}>{s.title}</h3>
-                      <p style={{ margin: 0, fontSize: '1em', lineHeight: 1.55, color: 'var(--sc-muted)' }}>{s.body}</p>
+                      <h3 style={{ margin: 0, flex: '1 1 9em', minWidth: 0, fontSize: '1.2em', fontWeight: 800 }}>{s.title}</h3>
                     </div>
+                    <p style={{ margin: 0, fontSize: '1em', lineHeight: 1.55, color: 'var(--sc-muted)' }}>{s.body}</p>
                   </div>
                 </Reveal>
               ))}
@@ -106,12 +106,12 @@ export default function HomePage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1em' }}>
               {PROFILES.map(({ title, body, Icon }) => (
                 <Reveal key={title}>
-                  <div style={{ ...cardStyle, display: 'flex', gap: '0.9em', alignItems: 'flex-start', height: '100%' }}>
-                    <span aria-hidden style={iconSquare}><Icon size={26} /></span>
-                    <div>
-                      <h3 style={{ margin: '0 0 0.3em', fontSize: '1.1em', fontWeight: 800 }}>{title}</h3>
-                      <p style={{ margin: 0, fontSize: '0.92em', lineHeight: 1.5, color: 'var(--sc-muted)' }}>{body}</p>
+                  <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '0.7em', height: '100%' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.6em 0.8em' }}>
+                      <span aria-hidden style={iconSquare}><Icon size={24} /></span>
+                      <h3 style={{ margin: 0, flex: '1 1 9em', minWidth: 0, fontSize: '1.1em', fontWeight: 800 }}>{title}</h3>
                     </div>
+                    <p style={{ margin: 0, fontSize: '0.92em', lineHeight: 1.5, color: 'var(--sc-muted)' }}>{body}</p>
                   </div>
                 </Reveal>
               ))}

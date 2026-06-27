@@ -122,7 +122,9 @@ export function PointDetailContent({ id }: { id: string }) {
       <div style={{ display: 'flex', gap: '1.4em', flexWrap: 'wrap', marginTop: '1.2em' }}>
         {shownProfiles.map((pr) => (
           <div key={pr} style={{ display: 'flex', flexDirection: 'column', gap: '0.4em' }}>
-            <span style={{ fontSize: '0.78em', fontWeight: 700, color: 'var(--sc-muted)' }}>{profileLabel[pr]}</span>
+            <span style={{ fontSize: '0.78em', fontWeight: 700, color: 'var(--sc-muted)' }}>
+              {shownProfiles.length === 1 ? 'Доступність' : profileLabel[pr]}
+            </span>
             <RatingBadge rating={computeRating(point.features, catalog, point.category, pr)} />
           </div>
         ))}

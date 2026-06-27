@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Map as MapIcon, Megaphone, Plus, CircleUserRound, type LucideIcon } from 'lucide-react';
+import { Map as MapIcon, List as ListIcon, Megaphone, Plus, CircleUserRound, type LucideIcon } from 'lucide-react';
 import { AccessibilityMenu } from '@/components/AccessibilityMenu';
 import { supabase } from '@/lib/supabase';
 
-export function AppHeader({ active }: { active?: 'map' | 'civic' }) {
+export function AppHeader({ active }: { active?: 'map' | 'places' | 'civic' }) {
   const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
@@ -39,6 +39,7 @@ export function AppHeader({ active }: { active?: 'map' | 'civic' }) {
 
         <nav aria-label="Головна навігація" className="sc-header-nav" style={{ display: 'flex', gap: '0.2em', alignItems: 'center', flexWrap: 'wrap' }}>
           <NavLink href="/map" icon={MapIcon} label="Мапа" current={active === 'map'} />
+          <NavLink href="/places" icon={ListIcon} label="Місця" current={active === 'places'} />
           <NavLink href="/civic" icon={Megaphone} label="Громада" current={active === 'civic'} />
           <NavLink href="/contribute" icon={Plus} label="Додати" />
         </nav>

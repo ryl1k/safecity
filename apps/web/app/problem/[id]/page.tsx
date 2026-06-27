@@ -43,6 +43,21 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
       setPetition(res.petition);
       setConfirms(res.problem.confirmations);
       setStatus('ready');
+      // Reflect whether the signed-in user already confirmed / signed (so we don't
+      // re-POST and hit a 409, and the buttons show the right state).
+      const { data: auth } = await supabase.auth.getUser();
+      if (auth.user) {
+        const { data: conf } = await supabase
+          .from('problem_confirmations').select('problem_id')
+          .eq('problem_id', params.id).eq('user_id', auth.user.id).maybeSingle();
+        if (conf) setConfirmed(true);
+        if (res.petition) {
+          const { data: sig } = await supabase
+            .from('petition_signatures').select('petition_id')
+            .eq('petition_id', res.petition.id).eq('user_id', auth.user.id).maybeSingle();
+          if (sig) setSigned(true);
+        }
+      }
     } catch {
       setStatus('error');
     }

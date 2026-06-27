@@ -164,8 +164,8 @@ function Nav({ onBack, onNext, nextDisabled }: { onBack: () => void; onNext: () 
 function NeedCard({ label, picked, primary, onToggle, onPrimary, canPrimary }: { label: string; picked: boolean; primary: boolean; onToggle: () => void; onPrimary: () => void; canPrimary: boolean }) {
   return (
     <div style={{ border: `var(--sc-bw) solid ${picked ? 'var(--sc-primary)' : 'var(--sc-border-strong)'}`, borderRadius: '0.9em', padding: '0.9em', background: picked ? 'var(--sc-primary-tint)' : 'var(--sc-surface)' }}>
-      <button className="sc-foc" aria-pressed={picked} onClick={onToggle} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '0.7em', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-        <span aria-hidden style={{ width: '1.5em', height: '1.5em', borderRadius: '0.4em', display: 'grid', placeItems: 'center', background: picked ? 'var(--sc-primary)' : 'var(--sc-surface-2)', color: '#fff', fontWeight: 800 }}>{picked ? '✓' : ''}</span>
+      <button className="sc-foc" aria-pressed={picked} onClick={onToggle} style={{ display: 'flex', width: '100%', alignItems: 'flex-start', gap: '0.7em', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+        <span aria-hidden style={{ width: '1.5em', height: '1.5em', flexShrink: 0, borderRadius: '0.4em', display: 'grid', placeItems: 'center', background: picked ? 'var(--sc-primary)' : 'var(--sc-surface-2)', color: '#fff', fontWeight: 800 }}>{picked ? '✓' : ''}</span>
         <span style={{ fontWeight: 700, flex: 1, minWidth: 0 }}>{label}</span>
       </button>
       {canPrimary && (
