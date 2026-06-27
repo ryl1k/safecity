@@ -2,7 +2,7 @@ name: CI
 
 on:
   pull_request:
-  push: # all branches (CI runs everywhere; there is no CD)
+  push: # all branches — CI runs everywhere; CD (cd.yml) runs on main only
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -89,7 +89,7 @@ jobs:
         if: steps.gomod.outputs.exists == 'true'
         run: go build ./...
 
-  # mobile — tests + lint on CI (production EAS build is out of scope — CI only)
+  # mobile — tests + lint on CI (production EAS build happens on CD, main only)
   mobile:
     needs: changes
     if: ${{ needs.changes.outputs.mobile == 'true' }}
