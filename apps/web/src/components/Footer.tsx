@@ -34,7 +34,7 @@ export function Footer() {
             <span style={{ fontWeight: 800 }}>SafeCity</span>
           </div>
           <p style={{ margin: 0, fontSize: '0.85em', color: 'var(--sc-muted)', lineHeight: 1.5 }}>
-            Інклюзивна мапа Львова — щоб місто було доступним для кожного.
+            Інклюзивна мапа вашого міста — щоб воно було доступним для кожного.
           </p>
         </div>
 
@@ -56,12 +56,12 @@ export function Footer() {
           <p style={{ margin: '0 0 0.5em', fontSize: '0.85em', color: 'var(--sc-muted)', lineHeight: 1.5 }}>
             Громадський проєкт. Дані відкриті та підтримуються спільнотою.
           </p>
-          <a href="mailto:hello@safecity.lviv.ua" className="sc-foc" style={{ color: 'var(--sc-primary)', fontWeight: 700, fontSize: '0.85em', textDecoration: 'none' }}>hello@safecity.lviv.ua</a>
+          <a href="mailto:support@safecity.lviv.ua" className="sc-foc" style={{ color: 'var(--sc-primary)', fontWeight: 700, fontSize: '0.85em', textDecoration: 'none' }}>support@safecity.lviv.ua</a>
         </div>
       </div>
 
       <div style={{ borderTop: 'var(--sc-bw) solid var(--sc-border)', padding: '1em 1.25em', textAlign: 'center', color: 'var(--sc-muted)', fontSize: '0.8em' }}>
-        © 2026 SafeCity · Львів, Україна · дані © OpenStreetMap, © CARTO
+        © 2026 SafeCity · дані © OpenStreetMap, © CARTO
       </div>
     </footer>
   );

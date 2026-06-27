@@ -33,7 +33,7 @@ export default function CivicPage() {
         <h1 style={{ margin: '0 0 0.3em', fontSize: '1.8em', fontWeight: 800 }}>Громадські проблеми</h1>
         <p style={{ margin: '0 0 1.4em', color: 'var(--sc-muted)', lineHeight: 1.5 }}>
           Повідомляйте про бар’єри, підтверджуйте чужі повідомлення й передавайте їх місту через
-          офіційні петиції. Разом ми робимо Львів доступним.
+          офіційні петиції. Разом ми робимо ваше місто доступним.
         </p>
 
         {status === 'loading' && <LoadingState label="Завантаження проблем" />}
