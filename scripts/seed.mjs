@@ -139,8 +139,28 @@ try {
     if (r.length) pets++;
   }
 
+  // Real confirmations from the seeded users so the (trigger-derived) counts are consistent.
+  const users = await sql`select id, email from auth.users where email in ('test@safecity.app', 'admin@safecity.app')`;
+  const byEmail = Object.fromEntries(users.map((u) => [u.email, u.id]));
+  const CONFIRMS = [
+    { problem: '22222222-2222-2222-2222-000000000002', emails: ['test@safecity.app', 'admin@safecity.app'] },
+    { problem: '22222222-2222-2222-2222-000000000001', emails: ['admin@safecity.app'] },
+    { problem: '22222222-2222-2222-2222-000000000003', emails: ['test@safecity.app'] },
+  ];
+  let confs = 0;
+  for (const c of CONFIRMS) {
+    for (const em of c.emails) {
+      const uid = byEmail[em];
+      if (!uid) continue;
+      const r = await sql`
+        insert into problem_confirmations (problem_id, user_id) values (${c.problem}, ${uid})
+        on conflict do nothing returning problem_id`;
+      if (r.length) confs++;
+    }
+  }
+
   const total = await sql`select count(*)::int c from points`;
-  console.log(`seeded ${pts} points, ${fvs} feature values, ${probs} problems, ${pets} petitions; points total = ${total[0].c}`);
+  console.log(`seeded ${pts} points, ${fvs} feature values, ${probs} problems, ${pets} petitions, ${confs} confirmations; points total = ${total[0].c}`);
 } catch (e) {
   console.error('seed failed:', e.message);
   process.exitCode = 1;
