@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { X } from 'lucide-react';
 import { PointDetailContent } from './PointDetailContent';
 
-/** Map-context modal for a point — keeps the user on the map. */
+/** Map-context modal for a point — keeps the user on the map. Centered, scrolls if tall. */
 export function PointDetailModal({ id, onClose }: { id: string; onClose: () => void }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -27,7 +27,7 @@ export function PointDetailModal({ id, onClose }: { id: string; onClose: () => v
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,.45)',
-        display: 'flex', justifyContent: 'center', alignItems: 'flex-start',
+        display: 'flex', justifyContent: 'center', alignItems: 'center',
         padding: '4vh 1em', overflowY: 'auto',
       }}
     >
@@ -35,8 +35,8 @@ export function PointDetailModal({ id, onClose }: { id: string; onClose: () => v
         onClick={(e) => e.stopPropagation()}
         className="sc-animate-in"
         style={{
-          width: '100%', maxWidth: 720, background: 'var(--sc-bg)',
-          borderRadius: '1.1em', boxShadow: 'var(--sc-shadow-2)', position: 'relative',
+          width: '100%', maxWidth: 720, maxHeight: '92vh', overflowY: 'auto',
+          background: 'var(--sc-bg)', borderRadius: '1.1em', boxShadow: 'var(--sc-shadow-2)', position: 'relative',
         }}
       >
         <button
@@ -45,7 +45,7 @@ export function PointDetailModal({ id, onClose }: { id: string; onClose: () => v
           aria-label="Закрити"
           className="sc-foc"
           style={{
-            position: 'absolute', top: '0.7em', right: '0.7em', zIndex: 1,
+            position: 'sticky', top: '0.7em', float: 'right', marginRight: '0.7em', zIndex: 1,
             width: '2.2em', height: '2.2em', borderRadius: '50%', cursor: 'pointer',
             border: 'var(--sc-bw) solid var(--sc-border)', background: 'var(--sc-surface)',
             color: 'var(--sc-text)', display: 'grid', placeItems: 'center',
