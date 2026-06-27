@@ -48,9 +48,12 @@ jobs:
             web:
               - *shared
               - 'apps/web/**'
+            # Go service: triggers on its own tree, shared protos, and workflows —
+            # NOT the JS workspace (it doesn't depend on packages/* or pnpm).
             api:
-              - *shared
               - 'apps/api/**'
+              - 'packages/proto/**'
+              - '.github/workflows/**'
             mobile:
               - *shared
               - 'apps/mobile/**'
