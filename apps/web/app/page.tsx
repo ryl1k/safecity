@@ -1,14 +1,35 @@
 import Link from 'next/link';
-import { Accessibility, Eye, SlidersHorizontal, MapPinned, Megaphone, type LucideIcon } from 'lucide-react';
+import { Accessibility, Eye, SlidersHorizontal, MapPinned, Navigation, Megaphone, type LucideIcon } from 'lucide-react';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { Testimonials } from '@/components/Testimonials';
 import { Reveal } from '@/components/Reveal';
 
 const STEPS: { n: string; title: string; body: string; Icon: LucideIcon }[] = [
-  { n: '1', title: 'Налаштуйте під себе', body: 'Оберіть свої потреби — застосунок адаптує інтерфейс, шари мапи й маршрути саме під вас.', Icon: SlidersHorizontal },
-  { n: '2', title: 'Знайдіть доступні місця', body: 'Кожне місце має оцінку доступності окремо для крісла колісного й для незрячих — колір, іконка та підпис.', Icon: MapPinned },
-  { n: '3', title: 'Змінюйте місто', body: 'Повідомляйте про бар’єри, підтримуйте петиції до міста — і стежте, як їх усувають.', Icon: Megaphone },
+  {
+    n: '1',
+    title: 'Налаштуйте під себе',
+    body: 'Оберіть свої потреби — крісло колісне, незрячість або обидві. Інтерфейс умить адаптується: розмір тексту, контраст, озвучення й вібрація, а мапа показує саме те, що важливо вам.',
+    Icon: SlidersHorizontal,
+  },
+  {
+    n: '2',
+    title: 'Знаходьте доступні місця',
+    body: 'Кожне місце оцінюється окремо для вашого профілю — колір, форма й підпис показують, чи підходить вам вхід, двері, туалет. Шукайте за назвою чи адресою, фільтруйте за категоріями або слухайте аудіо-список місць поруч.',
+    Icon: MapPinned,
+  },
+  {
+    n: '3',
+    title: 'Прокладайте безпечний маршрут',
+    body: 'Маршрути без сходів і з пологими ділянками, що оминають підтверджені бар’єри. Покрокові підказки можна слухати голосом, а поруч на шляху застосунок підкаже доступні місця.',
+    Icon: Navigation,
+  },
+  {
+    n: '4',
+    title: 'Змінюйте місто',
+    body: 'Повідомляйте про бар’єри з фото, підтверджуйте чужі повідомлення — і коли набереться достатньо голосів, створюйте петицію до міста та стежте, як проблему усувають.',
+    Icon: Megaphone,
+  },
 ];
 
 const PROFILES: { title: string; body: string; Icon: LucideIcon }[] = [
@@ -47,16 +68,19 @@ export default function HomePage() {
         </section>
 
         <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 1.25em 4em' }}>
-          {/* How it works — zigzag, trimmed width */}
+          {/* How it works — full-width rows with richer copy */}
           <section style={{ marginBottom: '4em' }}>
-            <h2 style={{ fontSize: '1.5em', fontWeight: 800, margin: '0 0 1.2em' }}>Як це працює</h2>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2em' }}>
+            <h2 style={{ fontSize: '1.5em', fontWeight: 800, margin: '0 0 0.3em' }}>Як це працює</h2>
+            <p style={{ margin: '0 0 1.4em', color: 'var(--sc-muted)', maxWidth: '70ch', lineHeight: 1.55 }}>
+              Від першого налаштування до реальних змін у місті — чотири прості кроки.
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '1.2em' }}>
               {STEPS.map((s, i) => (
                 <Reveal key={s.n} delay={i * 90}>
                   <div
                     style={{
-                      width: 'min(100%, 620px)', marginLeft: i % 2 === 1 ? 'auto' : 0, marginRight: i % 2 === 1 ? 0 : 'auto',
-                      display: 'flex', gap: '1.4em', alignItems: 'center', background: 'var(--sc-surface)',
+                      width: '100%', height: '100%',
+                      display: 'flex', gap: '1.4em', alignItems: 'flex-start', background: 'var(--sc-surface)',
                       border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1.3em', padding: '1.8em',
                     }}
                   >
