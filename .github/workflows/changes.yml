@@ -1,0 +1,59 @@
+name: changes
+
+# Reusable pre-flight: detects which services changed so CI/CD only run the
+# affected service. Consumed by ci.yml and cd.yml via `uses:`.
+on:
+  workflow_call:
+    outputs:
+      web:
+        description: apps/web (or shared) changed
+        value: ${{ jobs.detect.outputs.web }}
+      api:
+        description: apps/api (or shared) changed
+        value: ${{ jobs.detect.outputs.api }}
+      mobile:
+        description: apps/mobile (or shared) changed
+        value: ${{ jobs.detect.outputs.mobile }}
+      ml:
+        description: apps/ml changed
+        value: ${{ jobs.detect.outputs.ml }}
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      web: ${{ steps.filter.outputs.web }}
+      api: ${{ steps.filter.outputs.api }}
+      mobile: ${{ steps.filter.outputs.mobile }}
+      ml: ${{ steps.filter.outputs.ml }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          # Shared deps (workspace packages, root config, workflows) rebuild every
+          # JS service. apps/ml is isolated (its own Python toolchain).
+          filters: |
+            shared: &shared
+              - 'packages/**'
+              - 'package.json'
+              - 'pnpm-lock.yaml'
+              - 'pnpm-workspace.yaml'
+              - 'turbo.json'
+              - 'tsconfig.base.json'
+              - '.github/workflows/**'
+            web:
+              - *shared
+              - 'apps/web/**'
+            api:
+              - *shared
+              - 'apps/api/**'
+            mobile:
+              - *shared
+              - 'apps/mobile/**'
+            ml:
+              - 'apps/ml/**'
+              - '.github/workflows/**'
