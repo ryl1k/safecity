@@ -7,10 +7,11 @@ import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { StatusPill } from '@/components/StatusPill';
 import { Button, LoadingState, ErrorState } from '@/components/ui';
-import { problemById, type ProblemRow, type PetitionRow } from '@/lib/civic';
+import { problemById, createPetition, type ProblemRow, type PetitionRow } from '@/lib/civic';
 import { supabase } from '@/lib/supabase';
 
 const PETITION_GOAL = 250;
+const ESCALATE_AT = 5; // confirmations needed before we suggest a petition
 
 function isDuplicate(message?: string): boolean {
   return Boolean(message && /(duplicate|already exists|23505)/i.test(message));
@@ -24,6 +25,10 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
   const [confirms, setConfirms] = useState(0);
   const [confirmed, setConfirmed] = useState(false);
   const [signed, setSigned] = useState(false);
+  const [draftOpen, setDraftOpen] = useState(false);
+  const [draftTitle, setDraftTitle] = useState('');
+  const [draftBody, setDraftBody] = useState('');
+  const [creating, setCreating] = useState(false);
 
   async function load() {
     setStatus('loading');
@@ -65,6 +70,32 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
     setConfirmed(true);
   }
 
+  function openDraft() {
+    if (!problem) return;
+    setDraftTitle(`Усунути бар’єр: ${problem.title}`);
+    setDraftBody(
+      `${problem.description ? problem.description + '\n\n' : ''}` +
+        `${problem.pointName ? `Локація: ${problem.pointName}.\n` : ''}` +
+        `Цей бар’єр уже підтвердили ${confirms} мешканців. Просимо місто усунути його та зробити цю ділянку доступною для людей з інвалідністю та зниженою мобільністю.`,
+    );
+    setDraftOpen(true);
+  }
+
+  async function submitPetition() {
+    const uid = await requireUser();
+    if (!uid || !problem) return;
+    setCreating(true);
+    try {
+      const pet = await createPetition(problem.id, draftTitle.trim() || `Петиція: ${problem.title}`, draftBody.trim());
+      setPetition(pet);
+      setDraftOpen(false);
+    } catch {
+      /* leave the draft open so the user can retry */
+    } finally {
+      setCreating(false);
+    }
+  }
+
   async function sign() {
     if (!petition) return;
     const uid = await requireUser();
@@ -101,6 +132,45 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
               </Button>
               <span style={{ color: 'var(--sc-muted)', fontWeight: 700 }} aria-live="polite">{confirms} підтверджень</span>
             </div>
+
+            {!petition && confirms >= ESCALATE_AT && (
+              <section style={{ marginTop: '1.6em', background: 'var(--sc-warn-bg)', border: 'var(--sc-bw) solid var(--sc-warn-line)', borderRadius: '1em', padding: '1.3em' }}>
+                <div style={{ fontSize: '0.78em', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--sc-warn)' }}>Готово до ескалації</div>
+                <h2 style={{ margin: '0.3em 0 0.4em', fontSize: '1.15em', fontWeight: 800 }}>Цей бар’єр підтвердили {confirms} людей</h2>
+                <p style={{ margin: '0 0 1em', color: 'var(--sc-muted)', lineHeight: 1.5 }}>
+                  Достатньо підтверджень, щоб передати проблему місту. Створіть петицію за готовим чернетковим текстом — його можна відредагувати.
+                </p>
+                {!draftOpen ? (
+                  <Button onClick={openDraft}>Створити петицію</Button>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7em' }}>
+                    <label style={{ fontWeight: 700, fontSize: '0.85em' }}>
+                      Заголовок
+                      <input
+                        className="sc-foc"
+                        value={draftTitle}
+                        onChange={(e) => setDraftTitle(e.target.value)}
+                        style={{ width: '100%', marginTop: '0.3em', padding: '0.6em 0.8em', borderRadius: '0.6em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em' }}
+                      />
+                    </label>
+                    <label style={{ fontWeight: 700, fontSize: '0.85em' }}>
+                      Текст звернення
+                      <textarea
+                        className="sc-foc"
+                        value={draftBody}
+                        onChange={(e) => setDraftBody(e.target.value)}
+                        rows={5}
+                        style={{ width: '100%', marginTop: '0.3em', padding: '0.6em 0.8em', borderRadius: '0.6em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em', resize: 'vertical' }}
+                      />
+                    </label>
+                    <div style={{ display: 'flex', gap: '0.6em', flexWrap: 'wrap' }}>
+                      <Button onClick={submitPetition} disabled={creating}>{creating ? 'Створення…' : 'Опублікувати петицію'}</Button>
+                      <Button variant="secondary" onClick={() => setDraftOpen(false)}>Скасувати</Button>
+                    </div>
+                  </div>
+                )}
+              </section>
+            )}
 
             {petition && (
               <section style={{ marginTop: '1.6em', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-primary)', borderRadius: '1em', padding: '1.3em' }}>

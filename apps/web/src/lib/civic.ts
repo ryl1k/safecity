@@ -45,6 +45,36 @@ export async function listProblems(): Promise<ProblemRow[]> {
   return (data ?? []).map(mapProblem);
 }
 
+function mapPetition(pet: any): PetitionRow {
+  return {
+    id: pet.id,
+    scope: pet.scope,
+    title: pet.title,
+    body: pet.body,
+    officialUrl: pet.official_url,
+    internalSignatures: pet.internal_signatures,
+    officialSignatureCount: pet.official_signature_count,
+    status: pet.status,
+  };
+}
+
+/** Community-create an internal petition for a problem (escalation step). */
+export async function createPetition(
+  problemId: string,
+  title: string,
+  body: string,
+): Promise<PetitionRow> {
+  const { data: auth } = await supabase.auth.getUser();
+  if (!auth.user) throw new Error('not-authenticated');
+  const { data, error } = await supabase
+    .from('petitions')
+    .insert({ problem_id: problemId, scope: 'internal', title, body: body || null, created_by: auth.user.id })
+    .select('*')
+    .single();
+  if (error) throw error;
+  return mapPetition(data);
+}
+
 export async function problemById(
   id: string,
 ): Promise<{ problem: ProblemRow; petition: PetitionRow | null } | null> {
@@ -57,17 +87,6 @@ export async function problemById(
   const pet = (data as any).petitions?.[0];
   return {
     problem: mapProblem(data),
-    petition: pet
-      ? {
-          id: pet.id,
-          scope: pet.scope,
-          title: pet.title,
-          body: pet.body,
-          officialUrl: pet.official_url,
-          internalSignatures: pet.internal_signatures,
-          officialSignatureCount: pet.official_signature_count,
-          status: pet.status,
-        }
-      : null,
+    petition: pet ? mapPetition(pet) : null,
   };
 }
