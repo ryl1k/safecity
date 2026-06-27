@@ -45,7 +45,8 @@ export default function OnboardingPage() {
     try {
       localStorage.setItem('sc-onboarded', '1');
     } catch {}
-    router.push('/map');
+    // Blind users start on the audio-first list rather than the visual map.
+    router.push(chosen.includes('blind') ? '/places' : '/map');
   }
 
   return (
