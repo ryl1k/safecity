@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppHeader } from '@/components/AppHeader';
+import { Footer } from '@/components/Footer';
 import { StatusPill } from '@/components/StatusPill';
 import { LoadingState, ErrorState, EmptyState } from '@/components/ui';
 import { listProblems, type ProblemRow } from '@/lib/civic';
@@ -26,7 +27,7 @@ export default function CivicPage() {
   }, []);
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="civic" />
       <main style={{ maxWidth: 760, margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
         <h1 style={{ margin: '0 0 0.3em', fontSize: '1.8em', fontWeight: 800 }}>Громадські проблеми</h1>
@@ -69,6 +70,7 @@ export default function CivicPage() {
           </ul>
         )}
       </main>
+      <Footer />
     </div>
   );
 }

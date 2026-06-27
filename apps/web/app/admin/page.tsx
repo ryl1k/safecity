@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AppHeader } from '@/components/AppHeader';
+import { Footer } from '@/components/Footer';
 import { StatusPill } from '@/components/StatusPill';
 import { Button, LoadingState, ErrorState } from '@/components/ui';
 import { categoryLabel } from '@/lib/format';
@@ -61,7 +62,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader />
       <main style={{ maxWidth: 1000, margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
         <h1 style={{ margin: '0 0 1em', fontSize: '1.7em', fontWeight: 800 }}>Консоль модерації</h1>
@@ -126,6 +127,7 @@ export default function AdminPage() {
           </div>
         )}
       </main>
+      <Footer />
     </div>
   );
 }

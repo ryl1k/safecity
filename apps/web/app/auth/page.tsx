@@ -4,6 +4,7 @@ import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AppHeader } from '@/components/AppHeader';
+import { Footer } from '@/components/Footer';
 import { Button, Field, LoadingState } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 
@@ -47,7 +48,7 @@ function AuthInner() {
   }
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader />
       <main style={{ maxWidth: 420, margin: '0 auto', padding: '2.4em 1.25em 4em' }}>
         <h1 style={{ margin: '0 0 0.2em', fontSize: '1.6em', fontWeight: 800 }}>
@@ -79,6 +80,7 @@ function AuthInner() {
           <Link href="/map" style={{ color: 'var(--sc-muted)', fontSize: '0.85em' }}>Продовжити як гість</Link>
         </div>
       </main>
+      <Footer />
     </div>
   );
 }

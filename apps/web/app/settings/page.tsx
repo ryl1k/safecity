@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { Profile } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
+import { Footer } from '@/components/Footer';
 import { Button, Segmented } from '@/components/ui';
 import { ThemeSwitcher } from '@/theme/ThemeSwitcher';
 import { useProfile } from '@/profile/ProfileProvider';
@@ -37,7 +38,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader />
       <main style={{ maxWidth: 600, margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
         <h1 style={{ margin: '0 0 1em', fontSize: '1.7em', fontWeight: 800 }}>Налаштування</h1>
@@ -74,6 +75,7 @@ export default function SettingsPage() {
           )}
         </section>
       </main>
+      <Footer />
     </div>
   );
 }

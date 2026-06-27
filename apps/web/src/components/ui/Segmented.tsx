@@ -32,10 +32,15 @@ export function Segmented<T extends string>({
         const active = o.value === value;
         const style: CSSProperties = {
           flex: 1,
+          minWidth: 0,
           minHeight: '2.5em',
+          padding: '0.3em 0.5em',
           border: 'none',
           borderRadius: '0.6em',
           fontFamily: 'inherit',
+          fontSize: '0.95em',
+          lineHeight: 1.15,
+          whiteSpace: 'normal',
           cursor: 'pointer',
           background: active ? 'var(--sc-surface)' : 'transparent',
           color: active ? 'var(--sc-primary)' : 'var(--sc-muted)',
