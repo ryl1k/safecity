@@ -29,6 +29,7 @@ export interface PointSummary {
   category: Category;
   address?: string | null;
   description?: string | null;
+  photos?: string[];
   lng: number;
   lat: number;
   verifyStatus: VerifyStatus;

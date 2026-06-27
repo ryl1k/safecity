@@ -8,6 +8,7 @@ export interface ProblemRow {
   status: ProblemStatus;
   severity: number;
   confirmations: number;
+  photos: string[];
   pointName: string | null;
   createdAt: string;
 }
@@ -31,6 +32,7 @@ function mapProblem(r: any): ProblemRow {
     status: r.status,
     severity: r.severity,
     confirmations: r.confirmations,
+    photos: r.photos ?? [],
     pointName: r.points?.name ?? null,
     createdAt: r.created_at,
   };
@@ -74,7 +76,7 @@ export async function problemsInBbox(
 export async function listProblems(): Promise<ProblemRow[]> {
   const { data, error } = await supabase
     .from('problems')
-    .select('id, title, description, status, severity, confirmations, created_at, points(name)')
+    .select('id, title, description, status, severity, confirmations, photos, created_at, points(name)')
     .order('confirmations', { ascending: false });
   if (error) throw error;
   return (data ?? []).map(mapProblem);
@@ -115,7 +117,7 @@ export async function problemById(
 ): Promise<{ problem: ProblemRow; petition: PetitionRow | null } | null> {
   const { data, error } = await supabase
     .from('problems')
-    .select('id, title, description, status, severity, confirmations, created_at, points(name), petitions(*)')
+    .select('id, title, description, status, severity, confirmations, photos, created_at, points(name), petitions(*)')
     .eq('id', id)
     .maybeSingle();
   if (error || !data) return null;

@@ -6,10 +6,13 @@ import { useRouter } from 'next/navigation';
 import type { AccessibilityFeature, FeatureValue, Profile, PointSummary } from '@safecity/shared';
 import { computeRating } from '@safecity/shared';
 import { RatingBadge, ChecklistRow, ReviewItem, Button, LoadingState, ErrorState } from '@/components/ui';
+import { PhotoInput } from '@/components/PhotoInput';
+import { PhotoGallery } from '@/components/PhotoGallery';
 import { useProfile } from '@/profile/ProfileProvider';
 import { getCatalog } from '@/lib/catalog';
 import { pointById } from '@/lib/points';
 import { reviewsFor, addReview, type ReviewRow } from '@/lib/reviews';
+import { uploadPhotos } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { categoryLabel } from '@/lib/format';
 
@@ -29,6 +32,7 @@ export function PointDetailContent({ id }: { id: string }) {
   const [formOpen, setFormOpen] = useState(false);
   const [stars, setStars] = useState(5);
   const [text, setText] = useState('');
+  const [reviewPhotos, setReviewPhotos] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
 
@@ -82,11 +86,13 @@ export function PointDetailContent({ id }: { id: string }) {
     setReviewError(null);
     setBusy(true);
     try {
-      await addReview(id, primary, stars, text);
+      const urls = await uploadPhotos(reviewPhotos, 'reviews');
+      await addReview(id, primary, stars, text, urls);
       setReviews(await reviewsFor(id));
       setFormOpen(false);
       setText('');
       setStars(5);
+      setReviewPhotos([]);
     } catch (err: any) {
       if (err?.message === 'not-authenticated') router.push(`/auth?next=/point/${id}`);
       else setReviewError(err?.message ?? 'Не вдалося опублікувати');
@@ -107,6 +113,9 @@ export function PointDetailContent({ id }: { id: string }) {
         {point.address ? ` · ${point.address}` : ''}
       </p>
       {point.description ? <p style={{ margin: '0.8em 0 0', lineHeight: 1.55 }}>{point.description}</p> : null}
+      {point.photos && point.photos.length > 0 ? (
+        <div style={{ marginTop: '1em' }}><PhotoGallery photos={point.photos} alt={point.name} /></div>
+      ) : null}
 
       <div style={{ display: 'flex', gap: '1.4em', flexWrap: 'wrap', marginTop: '1.2em' }}>
         {(['wheelchair', 'blind'] as Profile[]).map((pr) => (
@@ -156,6 +165,7 @@ export function PointDetailContent({ id }: { id: string }) {
               rows={3}
               style={{ width: '100%', padding: '0.7em 0.9em', borderRadius: '0.7em', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em', border: 'var(--sc-bw) solid var(--sc-border-strong)', resize: 'vertical' }}
             />
+            <PhotoInput files={reviewPhotos} onChange={setReviewPhotos} />
             {reviewError ? <div role="alert" style={{ color: 'var(--sc-bad)', fontWeight: 700, fontSize: '0.85em' }}>{reviewError}</div> : null}
             <div style={{ display: 'flex', gap: '0.6em', flexWrap: 'wrap' }}>
               <Button type="submit" disabled={busy}>{busy ? 'Публікація…' : 'Опублікувати'}</Button>
@@ -169,7 +179,12 @@ export function PointDetailContent({ id }: { id: string }) {
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1em' }}>
             {reviews.map((r) => (
-              <ReviewItem key={r.id} author="Користувач" profileTag={profileLabel[r.profile].toLowerCase()} timeAgo={new Date(r.createdAt).toLocaleDateString('uk-UA')} text={r.text ?? ''} />
+              <div key={r.id}>
+                <ReviewItem author="Користувач" profileTag={profileLabel[r.profile].toLowerCase()} timeAgo={new Date(r.createdAt).toLocaleDateString('uk-UA')} text={r.text ?? ''} />
+                {r.photos.length > 0 ? (
+                  <div style={{ marginTop: '0.5em', marginLeft: '3.1em' }}><PhotoGallery photos={r.photos} alt="Фото відгуку" /></div>
+                ) : null}
+              </div>
             ))}
           </div>
         )}

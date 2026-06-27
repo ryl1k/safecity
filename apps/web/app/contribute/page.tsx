@@ -6,9 +6,11 @@ import type { AccessibilityFeature, Category, FeatureValue } from '@safecity/sha
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { LocationPicker } from '@/components/LocationPicker';
+import { PhotoInput } from '@/components/PhotoInput';
 import { Button, Field, Segmented } from '@/components/ui';
 import { getCatalog } from '@/lib/catalog';
 import { supabase } from '@/lib/supabase';
+import { uploadPhotos } from '@/lib/storage';
 import { categoryLabel } from '@/lib/format';
 
 const LVIV: [number, number] = [24.0316, 49.8419];
@@ -28,6 +30,7 @@ export default function ContributePage() {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<Category>('venue');
   const [loc, setLoc] = useState<[number, number] | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
   const [values, setValues] = useState<Record<string, FeatureValue>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -55,6 +58,7 @@ export default function ContributePage() {
       const p = loc ?? LVIV;
       const cleaned: Record<string, FeatureValue> = {};
       for (const [k, v] of Object.entries(values)) if (v === 'yes' || v === 'no') cleaned[k] = v;
+      const photoUrls = await uploadPhotos(photos, 'points');
       const { data, error } = await supabase.rpc('add_point', {
         p_name: name,
         p_category: category,
@@ -63,6 +67,7 @@ export default function ContributePage() {
         p_address: address || null,
         p_description: description || null,
         p_features: cleaned,
+        p_photos: photoUrls,
       });
       if (error) throw error;
       router.push(`/point/${data}`);
@@ -124,6 +129,11 @@ export default function ContributePage() {
           <div>
             <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Місцезнаходження</div>
             <LocationPicker value={loc} onChange={(lng, lat) => setLoc([lng, lat])} />
+          </div>
+
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Фото (необов’язково)</div>
+            <PhotoInput files={photos} onChange={setPhotos} />
           </div>
 
           <fieldset style={{ border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', padding: '1em' }}>

@@ -6,7 +6,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { Button, Field, Segmented, LoadingState } from '@/components/ui';
+import { PhotoInput } from '@/components/PhotoInput';
 import { supabase } from '@/lib/supabase';
+import { uploadPhotos } from '@/lib/storage';
 import { pointById } from '@/lib/points';
 
 const SEVERITY: { value: '1' | '2' | '3'; label: string }[] = [
@@ -23,6 +25,7 @@ function NewProblemInner() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<'1' | '2' | '3'>('2');
+  const [photos, setPhotos] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -56,6 +59,7 @@ function NewProblemInner() {
         router.push('/auth?next=/problem/new');
         return;
       }
+      const photoUrls = await uploadPhotos(photos, 'problems');
       const { data, error } = await supabase
         .from('problems')
         .insert({
@@ -63,6 +67,7 @@ function NewProblemInner() {
           title,
           description: description || null,
           severity: Number(severity),
+          photos: photoUrls,
           created_by: auth.user.id,
         })
         .select('id')
@@ -105,6 +110,10 @@ function NewProblemInner() {
           <div>
             <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Серйозність</div>
             <Segmented ariaLabel="Серйозність" value={severity} onChange={setSeverity} options={SEVERITY} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Фото (необов’язково)</div>
+            <PhotoInput files={photos} onChange={setPhotos} />
           </div>
           {error ? <div role="alert" style={{ color: 'var(--sc-bad)', fontWeight: 700, fontSize: '0.85em' }}>{error}</div> : null}
           <Button type="submit" disabled={busy || !title.trim()} block>

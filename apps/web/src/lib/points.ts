@@ -7,6 +7,7 @@ interface NearRow {
   category: PointSummary['category'];
   address: string | null;
   description?: string | null;
+  photos?: string[] | null;
   lng: number;
   lat: number;
   verify_status: PointSummary['verifyStatus'];
@@ -21,6 +22,7 @@ function mapRow(r: NearRow): PointSummary {
     category: r.category,
     address: r.address,
     description: r.description ?? null,
+    photos: r.photos ?? [],
     lng: r.lng,
     lat: r.lat,
     verifyStatus: r.verify_status,

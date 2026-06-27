@@ -7,6 +7,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { StatusPill } from '@/components/StatusPill';
 import { Button, LoadingState, ErrorState } from '@/components/ui';
+import { PhotoGallery } from '@/components/PhotoGallery';
 import { problemById, createPetition, type ProblemRow, type PetitionRow } from '@/lib/civic';
 import { supabase } from '@/lib/supabase';
 
@@ -125,6 +126,7 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
             </div>
             <h1 style={{ margin: '0.4em 0 0.3em', fontSize: '1.7em', fontWeight: 800, lineHeight: 1.2 }}>{problem.title}</h1>
             {problem.description ? <p style={{ margin: 0, color: 'var(--sc-text)', lineHeight: 1.55 }}>{problem.description}</p> : null}
+            {problem.photos.length > 0 ? <div style={{ marginTop: '0.9em' }}><PhotoGallery photos={problem.photos} alt="Фото проблеми" /></div> : null}
 
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', marginTop: '1.2em', flexWrap: 'wrap' }}>
               <Button onClick={confirm} disabled={confirmed} variant={confirmed ? 'secondary' : 'primary'}>
