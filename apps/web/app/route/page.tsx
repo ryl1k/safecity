@@ -175,7 +175,7 @@ function RouteInner() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="map" />
-      <main style={{ flex: 1, width: '100%', maxWidth: 900, margin: '0 auto', padding: '1.2em 1.25em 3em' }}>
+      <main id="main-content" tabIndex={-1} style={{ flex: 1, width: '100%', maxWidth: 900, margin: '0 auto', padding: '1.2em 1.25em 3em' }}>
         <Link href={to ? `/point/${to}` : '/map'} className="sc-foc" style={{ color: 'var(--sc-primary)', fontWeight: 700, textDecoration: 'none', fontSize: '0.9em' }}>
           ‹ Назад
         </Link>

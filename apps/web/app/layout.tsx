@@ -40,6 +40,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: noFlash }} />
       </head>
       <body>
+        <a href="#main-content" className="sc-skip">Перейти до вмісту</a>
         <ThemeProvider>
           <ProfileProvider>{children}</ProfileProvider>
         </ThemeProvider>

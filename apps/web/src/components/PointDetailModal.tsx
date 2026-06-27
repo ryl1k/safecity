@@ -1,29 +1,56 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { PointDetailContent } from './PointDetailContent';
 
+const FOCUSABLE = 'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
+
 /** Map-context modal for a point — keeps the user on the map. Centered, scrolls if tall. */
 export function PointDetailModal({ id, onClose }: { id: string; onClose: () => void }) {
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const closeRef = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
+    const prevActive = document.activeElement as HTMLElement | null;
+    // Move focus into the dialog so screen-reader / keyboard users land on it.
+    closeRef.current?.focus();
+
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+      if (e.key !== 'Tab' || !dialogRef.current) return;
+      // Trap focus within the dialog.
+      const nodes = Array.from(dialogRef.current.querySelectorAll<HTMLElement>(FOCUSABLE)).filter(
+        (el) => el.offsetParent !== null || el === document.activeElement,
+      );
+      const first = nodes[0];
+      const last = nodes[nodes.length - 1];
+      if (!first || !last) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (e.shiftKey && active === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && active === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
+
     document.addEventListener('keydown', onKey);
-    const prev = document.body.style.overflow;
+    const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
     return () => {
       document.removeEventListener('keydown', onKey);
-      document.body.style.overflow = prev;
+      document.body.style.overflow = prevOverflow;
+      prevActive?.focus?.(); // restore focus to whatever opened the modal
     };
   }, [onClose]);
 
   return (
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Деталі місця"
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,.45)',
@@ -32,6 +59,10 @@ export function PointDetailModal({ id, onClose }: { id: string; onClose: () => v
       }}
     >
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Деталі місця"
         onClick={(e) => e.stopPropagation()}
         className="sc-animate-in"
         style={{
@@ -40,6 +71,7 @@ export function PointDetailModal({ id, onClose }: { id: string; onClose: () => v
         }}
       >
         <button
+          ref={closeRef}
           type="button"
           onClick={onClose}
           aria-label="Закрити"

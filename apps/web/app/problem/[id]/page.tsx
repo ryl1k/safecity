@@ -109,7 +109,7 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="civic" />
-      <main style={{ flex: 1, maxWidth: 700, width: '100%', margin: '0 auto', padding: '1.4em 1.25em 4em' }}>
+      <main id="main-content" tabIndex={-1} style={{ flex: 1, maxWidth: 700, width: '100%', margin: '0 auto', padding: '1.4em 1.25em 4em' }}>
         <Link href="/civic" className="sc-foc" style={{ color: 'var(--sc-primary)', fontWeight: 700, textDecoration: 'none', fontSize: '0.9em' }}>
           ‹ До громади
         </Link>

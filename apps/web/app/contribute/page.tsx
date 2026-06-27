@@ -83,7 +83,7 @@ export default function ContributePage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="map" />
-      <main style={{ flex: 1, width: '100%', maxWidth: 620, margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
+      <main id="main-content" tabIndex={-1} style={{ flex: 1, width: '100%', maxWidth: 620, margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
         <h1 style={{ margin: '0 0 1em', fontSize: '1.7em', fontWeight: 800 }}>Додати місце</h1>
 
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1em' }}>

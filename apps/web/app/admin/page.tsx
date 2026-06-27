@@ -104,7 +104,7 @@ export default function AdminPage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader />
-      <main style={{ maxWidth: 1100, margin: '0 auto', padding: '1.6em 1.25em 4em', width: '100%' }}>
+      <main id="main-content" tabIndex={-1} style={{ maxWidth: 1100, margin: '0 auto', padding: '1.6em 1.25em 4em', width: '100%' }}>
         <h1 style={{ margin: '0 0 1em', fontSize: '1.7em', fontWeight: 800 }}>Консоль модерації</h1>
 
         {gate === 'loading' && <LoadingState label="Перевірка доступу" />}

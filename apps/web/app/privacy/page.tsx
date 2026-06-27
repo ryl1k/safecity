@@ -10,7 +10,7 @@ export default function PrivacyPage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader />
-      <main style={{ flex: 1, width: '100%', maxWidth: 760, margin: '0 auto', padding: '2em 1.25em 4em' }}>
+      <main id="main-content" tabIndex={-1} style={{ flex: 1, width: '100%', maxWidth: 760, margin: '0 auto', padding: '2em 1.25em 4em' }}>
         <Link href="/" className="sc-foc" style={{ color: 'var(--sc-primary)', fontWeight: 700, textDecoration: 'none', fontSize: '0.9em' }}>‹ На головну</Link>
         <h1 style={{ margin: '0.5em 0 0.3em', fontSize: '2em', fontWeight: 800 }}>Політика конфіденційності</h1>
         <p style={{ margin: '0 0 1.4em', color: 'var(--sc-muted)', fontSize: '0.85em' }}>Чинна з {UPDATED}</p>

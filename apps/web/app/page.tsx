@@ -21,7 +21,7 @@ export default function HomePage() {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader />
 
-      <main style={{ flex: 1, width: '100%' }}>
+      <main id="main-content" tabIndex={-1} style={{ flex: 1, width: '100%' }}>
         {/* Hero — full-width title */}
         <section style={{ maxWidth: 1080, margin: '0 auto', padding: '3em 1.25em 2em', textAlign: 'center' }}>
           <p style={{ fontSize: '0.78em', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--sc-primary)', margin: 0 }}>

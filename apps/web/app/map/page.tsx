@@ -3,7 +3,7 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { Maximize2, Volume2, Square } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { AccessibilityFeature, PointSummary, Rating } from '@safecity/shared';
 import { computeRating } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
@@ -32,6 +32,7 @@ export default function MapPage() {
   const [onlyAccessible, setOnlyAccessible] = useState(false);
   const [modalId, setModalId] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState(false);
+  const pickedView = useRef(false);
 
   async function load() {
     setStatus('loading');
@@ -52,6 +53,11 @@ export default function MapPage() {
   useEffect(() => () => {
     if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
   }, []);
+
+  // Blind users get the audio-first list by default (unless they pick a view themselves).
+  useEffect(() => {
+    if (!pickedView.current && primary === 'blind') setView('list');
+  }, [primary]);
 
   const rated = useMemo(
     () => points.map((p) => ({ point: p, rating: computeRating(p.features, catalog, p.category, primary) as Rating })),
@@ -97,7 +103,8 @@ export default function MapPage() {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="map" />
 
-      <div style={{ maxWidth: 1100, width: '100%', margin: '0 auto', padding: '1em 1.25em', display: 'flex', flexDirection: 'column', gap: '0.9em' }}>
+      <main id="main-content" tabIndex={-1} style={{ maxWidth: 1100, width: '100%', margin: '0 auto', padding: '1em 1.25em', display: 'flex', flexDirection: 'column', gap: '0.9em' }}>
+        <h1 className="sc-sr">Мапа доступних місць</h1>
         <SearchBar value={query} onChange={setQuery} ariaLabel="Пошук місць" placeholder="Пошук місць, транспорту, переходів" />
 
         <div style={{ display: 'flex', gap: '0.8em', alignItems: 'center', flexWrap: 'wrap' }}>
@@ -105,7 +112,7 @@ export default function MapPage() {
             <Segmented
               ariaLabel="Режим перегляду"
               value={view}
-              onChange={setView}
+              onChange={(v) => { pickedView.current = true; setView(v); }}
               options={[{ value: 'map', label: 'Мапа' }, { value: 'list', label: 'Список' }]}
             />
           </div>
@@ -145,7 +152,8 @@ export default function MapPage() {
         )}
 
         {status === 'ready' && filtered.length > 0 && view === 'map' && (
-          <div style={{ height: 'calc(100vh - 14rem)', minHeight: 460 }}>
+          <div role="group" aria-label="Мапа місць" style={{ height: 'calc(100vh - 14rem)', minHeight: 460 }}>
+            <p className="sc-sr">Це візуальна мапа з позначками місць. Незрячим зручніше переглянути перелік у вкладці «Список» та скористатися кнопкою «Озвучити поруч».</p>
             <MapView points={markers} center={LVIV} onSelect={(id) => setModalId(id)} />
           </div>
         )}
@@ -180,7 +188,7 @@ export default function MapPage() {
             })}
           </ul>
         )}
-      </div>
+      </main>
 
       <Footer />
 

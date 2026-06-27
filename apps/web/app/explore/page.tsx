@@ -41,6 +41,7 @@ export default function ExplorePage() {
   const [pointHits, setPointHits] = useState<PointHit[]>([]);
   const [placeHits, setPlaceHits] = useState<GeoPlace[]>([]);
   const [searching, setSearching] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const nonceRef = useRef(0);
   const bboxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -134,10 +135,50 @@ export default function ExplorePage() {
     flyTo(place.lng, place.lat);
   }
 
+  // Flat result list for keyboard navigation (points first, then places).
+  const flat = useMemo(
+    () => [
+      ...pointHits.map((p) => ({ kind: 'point' as const, p })),
+      ...placeHits.map((pl) => ({ kind: 'place' as const, pl })),
+    ],
+    [pointHits, placeHits],
+  );
+  useEffect(() => setActiveIndex(-1), [flat]);
+
+  function selectAt(i: number) {
+    const sel = flat[i];
+    if (!sel) return;
+    if (sel.kind === 'point') void pickPoint(sel.p.id);
+    else pickPlace(sel.pl);
+  }
+
+  function onSearchKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Escape') {
+      setOpen(false);
+      (e.target as HTMLInputElement).blur();
+      return;
+    }
+    if (!flat.length) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setOpen(true);
+      setActiveIndex((i) => (i + 1) % flat.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveIndex((i) => (i <= 0 ? flat.length - 1 : i - 1));
+    } else if (e.key === 'Enter' && activeIndex >= 0) {
+      e.preventDefault();
+      selectAt(activeIndex);
+    }
+  }
+
   const hasResults = pointHits.length > 0 || placeHits.length > 0;
+  const placeBase = pointHits.length;
 
   return (
-    <div style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
+    <main id="main-content" tabIndex={-1} style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
+      <h1 className="sc-sr">Повноекранна мапа доступних місць</h1>
+      <p className="sc-sr">Це візуальна мапа. Скористайтеся пошуком, щоб знайти місце чи адресу, або перейдіть до списку місць.</p>
       <ExploreMap
         points={markers}
         problems={problems}
@@ -162,6 +203,8 @@ export default function ExplorePage() {
               role="combobox"
               aria-expanded={open && hasResults}
               aria-controls="explore-results"
+              aria-autocomplete="list"
+              aria-activedescendant={activeIndex >= 0 ? `exp-opt-${activeIndex}` : undefined}
               aria-label="Пошук місць або адрес"
               placeholder="Пошук місць, адрес…"
               value={query}
@@ -170,12 +213,7 @@ export default function ExplorePage() {
                 setOpen(true);
               }}
               onFocus={() => setOpen(true)}
-              onKeyDown={(e) => {
-                if (e.key === 'Escape') {
-                  setOpen(false);
-                  (e.target as HTMLInputElement).blur();
-                }
-              }}
+              onKeyDown={onSearchKeyDown}
               style={searchInput}
             />
             {query ? (
@@ -191,30 +229,47 @@ export default function ExplorePage() {
               {!searching && !hasResults && <li style={resultMuted}>Нічого не знайдено</li>}
 
               {pointHits.length > 0 && <li style={resultHead} aria-hidden>Місця SafeCity</li>}
-              {pointHits.map((p) => (
-                <li key={p.id} role="option" aria-selected={false}>
-                  <button type="button" className="sc-foc" onClick={() => void pickPoint(p.id)} style={resultRow}>
-                    <MapPinIcon size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
-                    <span style={{ minWidth: 0 }}>
-                      <span style={resultTitle}>{p.name}</span>
-                      <span style={resultSub}>{categoryLabel[p.category]}{p.address ? ` · ${p.address}` : ''}</span>
-                    </span>
-                  </button>
+              {pointHits.map((p, i) => (
+                <li
+                  key={p.id}
+                  id={`exp-opt-${i}`}
+                  role="option"
+                  aria-selected={activeIndex === i}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseEnter={() => setActiveIndex(i)}
+                  onClick={() => void pickPoint(p.id)}
+                  style={{ ...resultRow, background: activeIndex === i ? 'var(--sc-primary-tint)' : 'transparent', cursor: 'pointer' }}
+                >
+                  <MapPinIcon size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={resultTitle}>{p.name}</span>
+                    <span style={resultSub}>{categoryLabel[p.category]}{p.address ? ` · ${p.address}` : ''}</span>
+                  </span>
                 </li>
               ))}
 
               {placeHits.length > 0 && <li style={resultHead} aria-hidden>Адреси та місця</li>}
-              {placeHits.map((pl) => (
-                <li key={pl.id} role="option" aria-selected={false}>
-                  <button type="button" className="sc-foc" onClick={() => pickPlace(pl)} style={resultRow}>
+              {placeHits.map((pl, j) => {
+                const idx = placeBase + j;
+                return (
+                  <li
+                    key={pl.id}
+                    id={`exp-opt-${idx}`}
+                    role="option"
+                    aria-selected={activeIndex === idx}
+                    onMouseDown={(e) => e.preventDefault()}
+                    onMouseEnter={() => setActiveIndex(idx)}
+                    onClick={() => pickPlace(pl)}
+                    style={{ ...resultRow, background: activeIndex === idx ? 'var(--sc-primary-tint)' : 'transparent', cursor: 'pointer' }}
+                  >
                     <Search size={16} aria-hidden style={{ color: 'var(--sc-muted)', flexShrink: 0 }} />
                     <span style={{ minWidth: 0 }}>
                       <span style={resultTitle}>{pl.label.split(',')[0]}</span>
                       <span style={resultSub}>{pl.label.split(',').slice(1).join(',').trim()}</span>
                     </span>
-                  </button>
-                </li>
-              ))}
+                  </li>
+                );
+              })}
             </ul>
           )}
         </div>
@@ -243,7 +298,7 @@ export default function ExplorePage() {
       </div>
 
       {modalId && <PointDetailModal id={modalId} onClose={() => setModalId(null)} />}
-    </div>
+    </main>
   );
 }
 

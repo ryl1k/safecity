@@ -40,7 +40,7 @@ export default function SettingsPage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader />
-      <main style={{ maxWidth: 600, margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
+      <main id="main-content" tabIndex={-1} style={{ maxWidth: 600, margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
         <h1 style={{ margin: '0 0 1em', fontSize: '1.7em', fontWeight: 800 }}>Налаштування</h1>
 
         <section style={card}>
