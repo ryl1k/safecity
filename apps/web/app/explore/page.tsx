@@ -176,7 +176,7 @@ export default function ExplorePage() {
   const placeBase = pointHits.length;
 
   return (
-    <main id="main-content" tabIndex={-1} style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
+    <main id="main-content" tabIndex={-1} style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100dvh', overflow: 'hidden' }}>
       <h1 className="sc-sr">Повноекранна мапа доступних місць</h1>
       <p className="sc-sr">Це візуальна мапа. Скористайтеся пошуком, щоб знайти місце чи адресу, або перейдіть до списку місць.</p>
       <ExploreMap

@@ -30,11 +30,12 @@ export interface Bbox {
 const ratingKey: Record<Rating, string> = { full: 'ok', partial: 'warn', none: 'bad', unknown: 'unk' };
 const ratingIcon: Record<Rating, string> = { full: '✓', partial: '◑', none: '✕', unknown: '?' };
 
-// Category = shape (mirrors the design's pin set + MapView).
+// Category = shape (mirrors the design's pin set + MapView). Diamond via clip-path
+// so the rating glyph stays upright.
 function shapeCss(category: Category): string {
   switch (category) {
     case 'transit': return 'border-radius:6px;';
-    case 'crossing': return 'transform:rotate(45deg);';
+    case 'crossing': return 'clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);';
     case 'toilet': return 'clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%);';
     case 'parking': return 'clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);';
     default: return 'border-radius:50%;';
@@ -148,7 +149,6 @@ export function ExploreMap({
           shapeCss(p.category);
         const inner = document.createElement('span');
         inner.textContent = ratingIcon[p.rating];
-        if (p.category === 'crossing') inner.style.transform = 'rotate(-45deg)';
         el.appendChild(inner);
         el.addEventListener('click', () => onSelectRef.current(p.id));
         return new maplibregl.Marker({ element: el }).setLngLat([p.lng, p.lat]).addTo(map);

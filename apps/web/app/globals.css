@@ -29,26 +29,19 @@
   from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
-.sc-animate-in { animation: sc-fade-in-up 0.45s ease both; }
+/* `backwards` (not `both`) so no transform is retained after the animation —
+   a retained transform would make this wrapper the containing block for any
+   position:fixed descendant (maps, modals), breaking full-screen layout. */
+.sc-animate-in { animation: sc-fade-in-up 0.45s ease backwards; }
 @media (prefers-reduced-motion: reduce) {
   .sc-animate-in { animation: none; }
-}
-
-/* Looping reviews marquee */
-@keyframes sc-marquee {
-  from { transform: translateX(0); }
-  to { transform: translateX(-50%); }
-}
-.sc-marquee { overflow: hidden; }
-.sc-marquee-track { display: flex; width: max-content; animation: sc-marquee 50s linear infinite; }
-.sc-marquee:hover .sc-marquee-track { animation-play-state: paused; }
-@media (prefers-reduced-motion: reduce) {
-  .sc-marquee-track { animation: none; flex-wrap: wrap; width: 100%; }
 }
 
 /* Hide non-essential labels on small screens (icon-only nav) */
 @media (max-width: 560px) {
   .sc-hide-sm { display: none; }
+  /* Header: drop the primary nav onto its own full-width row, centred. */
+  .sc-header-nav { order: 2; flex-basis: 100%; justify-content: center; }
 }
 
 /* Skip-to-content link — visible only when focused (keyboard / screen-reader users). */

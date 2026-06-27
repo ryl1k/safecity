@@ -53,9 +53,9 @@ export function PointDetailModal({ id, onClose }: { id: string; onClose: () => v
     <div
       onClick={onClose}
       style={{
-        position: 'fixed', inset: 0, zIndex: 60, background: 'rgba(0,0,0,.45)',
+        position: 'fixed', top: 0, left: 0, width: '100%', height: '100dvh', zIndex: 60, background: 'rgba(0,0,0,.45)',
         display: 'flex', justifyContent: 'center', alignItems: 'center',
-        padding: '4vh 1em', overflowY: 'auto',
+        padding: '1em', overflow: 'hidden',
       }}
     >
       <div
@@ -64,9 +64,8 @@ export function PointDetailModal({ id, onClose }: { id: string; onClose: () => v
         aria-modal="true"
         aria-label="Деталі місця"
         onClick={(e) => e.stopPropagation()}
-        className="sc-animate-in"
         style={{
-          width: '100%', maxWidth: 720, maxHeight: '92vh', overflowY: 'auto',
+          width: '100%', maxWidth: 720, maxHeight: 'calc(100dvh - 2em)', overflowY: 'auto',
           background: 'var(--sc-bg)', borderRadius: '1.1em', boxShadow: 'var(--sc-shadow-2)', position: 'relative',
         }}
       >
