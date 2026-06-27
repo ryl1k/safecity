@@ -44,6 +44,10 @@
   .sc-header-nav { order: 2; flex-basis: 100%; justify-content: center; }
 }
 
+/* MapLibre attribution credits are links in a text block — underline so they're
+   distinguishable without relying on colour (WCAG 1.4.1). */
+.maplibregl-ctrl-attrib a { text-decoration: underline !important; }
+
 /* Skip-to-content link — visible only when focused (keyboard / screen-reader users). */
 .sc-skip {
   position: fixed;
