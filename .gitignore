@@ -24,3 +24,10 @@ Thumbs.db
 # supabase
 supabase/.branches/
 supabase/.temp/
+
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
