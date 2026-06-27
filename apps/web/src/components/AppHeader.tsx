@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { Map as MapIcon, Megaphone, Plus, CircleUserRound, type LucideIcon } from 'lucide-react';
+import { Map as MapIcon, List as ListIcon, Megaphone, Plus, CircleUserRound, type LucideIcon } from 'lucide-react';
 import { AccessibilityMenu } from '@/components/AccessibilityMenu';
 import { supabase } from '@/lib/supabase';
 
-export function AppHeader({ active }: { active?: 'map' | 'civic' }) {
+export function AppHeader({ active }: { active?: 'map' | 'places' | 'civic' }) {
   const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
@@ -25,7 +25,7 @@ export function AppHeader({ active }: { active?: 'map' | 'civic' }) {
       <div
         style={{
           maxWidth: 1080, margin: '0 auto', padding: '0.55em 1.25em',
-          display: 'flex', alignItems: 'center', gap: '0.8em 1.2em', flexWrap: 'wrap',
+          display: 'flex', alignItems: 'center', gap: '0.6em 1.2em', flexWrap: 'wrap',
         }}
       >
         <Link
@@ -33,20 +33,13 @@ export function AppHeader({ active }: { active?: 'map' | 'civic' }) {
           className="sc-foc"
           style={{ display: 'flex', alignItems: 'center', gap: '0.5em', textDecoration: 'none', color: 'var(--sc-text)' }}
         >
-          <span
-            aria-hidden
-            style={{
-              width: '2em', height: '2em', borderRadius: '0.5em', background: 'var(--sc-primary)',
-              color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontWeight: 800,
-            }}
-          >
-            ◍
-          </span>
+          <span aria-hidden style={{ width: '2em', height: '2em', borderRadius: '0.5em', background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontWeight: 800 }}>◍</span>
           <span style={{ fontWeight: 800, fontSize: '1.05em' }}>SafeCity</span>
         </Link>
 
-        <nav aria-label="Розділи" style={{ display: 'flex', gap: '0.2em', flexWrap: 'wrap' }}>
+        <nav aria-label="Головна навігація" className="sc-header-nav" style={{ display: 'flex', gap: '0.2em', alignItems: 'center', flexWrap: 'wrap' }}>
           <NavLink href="/map" icon={MapIcon} label="Мапа" current={active === 'map'} />
+          <NavLink href="/places" icon={ListIcon} label="Місця" current={active === 'places'} />
           <NavLink href="/civic" icon={Megaphone} label="Громада" current={active === 'civic'} />
           <NavLink href="/contribute" icon={Plus} label="Додати" />
         </nav>
@@ -55,6 +48,7 @@ export function AppHeader({ active }: { active?: 'map' | 'civic' }) {
           <AccessibilityMenu />
           <Link
             href={signedIn ? '/settings' : '/auth'}
+            aria-label={signedIn ? 'Акаунт' : 'Увійти'}
             className="sc-foc"
             style={{
               display: 'inline-flex', alignItems: 'center', gap: '0.45em', minHeight: '2.5em', padding: '0 0.9em',
@@ -65,7 +59,7 @@ export function AppHeader({ active }: { active?: 'map' | 'civic' }) {
             }}
           >
             <CircleUserRound size={18} aria-hidden />
-            <span style={{ fontSize: '0.9em' }}>{signedIn ? 'Акаунт' : 'Увійти'}</span>
+            <span className="sc-hide-sm" style={{ fontSize: '0.9em' }}>{signedIn ? 'Акаунт' : 'Увійти'}</span>
           </Link>
         </div>
       </div>
@@ -77,6 +71,7 @@ function NavLink({ href, icon: Icon, label, current }: { href: string; icon: Luc
   return (
     <Link
       href={href}
+      aria-label={label}
       className="sc-foc"
       aria-current={current ? 'page' : undefined}
       style={{
@@ -87,7 +82,7 @@ function NavLink({ href, icon: Icon, label, current }: { href: string; icon: Luc
       }}
     >
       <Icon size={18} aria-hidden />
-      {label}
+      <span className="sc-hide-sm">{label}</span>
     </Link>
   );
 }

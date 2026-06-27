@@ -22,6 +22,7 @@ export function ListRow({ name, rating: r, meta, ariaLabel, onClick }: ListRowPr
   const btn: CSSProperties = {
     display: 'flex',
     width: '100%',
+    boxSizing: 'border-box',
     textAlign: 'left',
     gap: '0.9em',
     alignItems: 'center',
@@ -47,7 +48,7 @@ export function ListRow({ name, rating: r, meta, ariaLabel, onClick }: ListRowPr
           {meta}
         </span>
       </span>
-      <span aria-hidden style={{ color: 'var(--sc-muted)', fontSize: '1.3em' }}>
+      <span aria-hidden style={{ color: 'var(--sc-muted)', fontSize: '1.3em', flexShrink: 0 }}>
         ›
       </span>
     </button>

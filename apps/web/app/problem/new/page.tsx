@@ -6,7 +6,9 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { Button, Field, Segmented, LoadingState } from '@/components/ui';
+import { PhotoInput } from '@/components/PhotoInput';
 import { supabase } from '@/lib/supabase';
+import { uploadPhotos } from '@/lib/storage';
 import { pointById } from '@/lib/points';
 
 const SEVERITY: { value: '1' | '2' | '3'; label: string }[] = [
@@ -23,6 +25,7 @@ function NewProblemInner() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<'1' | '2' | '3'>('2');
+  const [photos, setPhotos] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -56,6 +59,7 @@ function NewProblemInner() {
         router.push('/auth?next=/problem/new');
         return;
       }
+      const photoUrls = await uploadPhotos(photos, 'problems');
       const { data, error } = await supabase
         .from('problems')
         .insert({
@@ -63,6 +67,7 @@ function NewProblemInner() {
           title,
           description: description || null,
           severity: Number(severity),
+          photos: photoUrls,
           created_by: auth.user.id,
         })
         .select('id')
@@ -81,7 +86,7 @@ function NewProblemInner() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="civic" />
-      <main style={{ flex: 1, width: '100%', maxWidth: 560, margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
+      <main id="main-content" tabIndex={-1} style={{ flex: 1, width: '100%', maxWidth: 'min(100%, 560px)', margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
         <Link href={pointId ? `/point/${pointId}` : '/map'} className="sc-foc" style={{ color: 'var(--sc-primary)', fontWeight: 700, textDecoration: 'none', fontSize: '0.9em' }}>
           ‹ Назад
         </Link>
@@ -99,12 +104,16 @@ function NewProblemInner() {
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Опишіть бар’єр детальніше"
               rows={4}
-              style={{ width: '100%', padding: '0.7em 0.9em', borderRadius: '0.7em', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em', border: 'var(--sc-bw) solid var(--sc-border-strong)', resize: 'vertical' }}
+              style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', padding: '0.7em 0.9em', borderRadius: '0.7em', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em', border: 'var(--sc-bw) solid var(--sc-border-strong)', resize: 'vertical' }}
             />
           </div>
           <div>
             <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Серйозність</div>
             <Segmented ariaLabel="Серйозність" value={severity} onChange={setSeverity} options={SEVERITY} />
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Фото (необов’язково)</div>
+            <PhotoInput files={photos} onChange={setPhotos} />
           </div>
           {error ? <div role="alert" style={{ color: 'var(--sc-bad)', fontWeight: 700, fontSize: '0.85em' }}>{error}</div> : null}
           <Button type="submit" disabled={busy || !title.trim()} block>

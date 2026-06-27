@@ -1,7 +1,7 @@
 'use client';
 
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { Category, Rating } from '@safecity/shared';
 
 export interface MapPointMarker {
@@ -16,11 +16,11 @@ export interface MapPointMarker {
 const ratingKey: Record<Rating, string> = { full: 'ok', partial: 'warn', none: 'bad', unknown: 'unk' };
 const ratingIcon: Record<Rating, string> = { full: '✓', partial: '◑', none: '✕', unknown: '?' };
 
-// Category = shape (mirrors the design's pin set).
+// Category = shape. Use clip-path for the diamond (crossing) so the glyph stays upright.
 function shapeCss(category: Category): string {
   switch (category) {
     case 'transit': return 'border-radius:6px;';
-    case 'crossing': return 'transform:rotate(45deg);';
+    case 'crossing': return 'clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);';
     case 'toilet': return 'clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%);';
     case 'parking': return 'clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);';
     default: return 'border-radius:50%;';
@@ -58,8 +58,29 @@ export function MapView({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const observerRef = useRef<MutationObserver | null>(null);
   const onSelectRef = useRef(onSelect);
+  const lineRef = useRef(line);
   onSelectRef.current = onSelect;
+  lineRef.current = line;
+
+  // Draw/update the route line + fit it into view. Safe to call repeatedly.
+  const applyLine = useCallback(() => {
+    const map = mapRef.current;
+    const coords = lineRef.current;
+    if (!map || !coords || coords.length < 2) return;
+    const data = { type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: coords } };
+    const src = map.getSource('route');
+    if (src) {
+      src.setData(data);
+    } else {
+      map.addSource('route', { type: 'geojson', data });
+      map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0d5b66', 'line-width': 5 } });
+    }
+    const lngs = coords.map((c) => c[0]);
+    const lats = coords.map((c) => c[1]);
+    map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 50, duration: 600 });
+  }, []);
 
   // Init map once.
   useEffect(() => {
@@ -68,16 +89,27 @@ export function MapView({
       const maplibregl = (await import('maplibre-gl')).default;
       if (cancelled || !containerRef.current || mapRef.current) return;
       const dark = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
-      mapRef.current = new maplibregl.Map({
+      const map = new maplibregl.Map({
         container: containerRef.current,
         style: basemapStyle(dark) as any,
         center,
         zoom: 14,
       });
-      mapRef.current.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+      mapRef.current = map;
+      map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+      // Draw any route once the style is ready (handles the set-before-init race).
+      map.on('load', () => applyLine());
+      // Swap basemap on theme change, then re-draw the route (setStyle clears layers).
+      observerRef.current = new MutationObserver(() => {
+        const d = document.documentElement.getAttribute('data-theme') === 'dark';
+        try { map.setStyle(basemapStyle(d) as any); map.once('styledata', () => applyLine()); } catch {}
+      });
+      observerRef.current.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     })();
     return () => {
       cancelled = true;
+      observerRef.current?.disconnect();
+      observerRef.current = null;
       mapRef.current?.remove();
       mapRef.current = null;
     };
@@ -103,7 +135,6 @@ export function MapView({
           shapeCss(p.category);
         const inner = document.createElement('span');
         inner.textContent = ratingIcon[p.rating];
-        if (p.category === 'crossing') inner.style.transform = 'rotate(-45deg)';
         el.appendChild(inner);
         el.addEventListener('click', () => onSelectRef.current(p.id));
         return new maplibregl.Marker({ element: el }).setLngLat([p.lng, p.lat]).addTo(map);
@@ -114,29 +145,11 @@ export function MapView({
     };
   }, [points]);
 
-  // Draw / update the route line and fit it into view.
+  // Redraw the route when it changes after the map is already up.
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !line || line.length < 2) return;
-    const apply = () => {
-      const data = { type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: line } };
-      const src = map.getSource('route');
-      if (src) {
-        src.setData(data);
-      } else {
-        map.addSource('route', { type: 'geojson', data });
-        map.addLayer({ id: 'route', type: 'line', source: 'route', paint: { 'line-color': '#0d5b66', 'line-width': 5 } });
-      }
-      const lngs = line.map((c) => c[0]);
-      const lats = line.map((c) => c[1]);
-      map.fitBounds(
-        [[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]],
-        { padding: 50, duration: 600 },
-      );
-    };
-    if (map.isStyleLoaded()) apply();
-    else map.once('load', apply);
-  }, [line]);
+    if (map && map.isStyleLoaded()) applyLine();
+  }, [line, applyLine]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: 360, borderRadius: '1em', overflow: 'hidden' }} />;
 }

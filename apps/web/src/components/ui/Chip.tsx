@@ -13,6 +13,8 @@ export function Chip({ pressed, onToggle, children }: ChipProps) {
     gap: '0.4em',
     minHeight: '2.6em',
     padding: '0 1em',
+    maxWidth: '100%',
+    boxSizing: 'border-box',
     borderRadius: '2em',
     fontFamily: 'inherit',
     fontSize: '0.9em',

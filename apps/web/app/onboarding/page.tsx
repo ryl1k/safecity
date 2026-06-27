@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { Profile } from '@safecity/shared';
 import { Button, Segmented } from '@/components/ui';
+import { FontSizeSlider } from '@/components/FontSizeSlider';
 import { useProfile } from '@/profile/ProfileProvider';
 import { useTheme } from '@/theme/ThemeProvider';
 
@@ -11,8 +12,8 @@ const STEPS = ['Вітання', 'Потреби', 'Уточнення', 'Виг
 
 export default function OnboardingPage() {
   const router = useRouter();
-  const { setPrimary } = useProfile();
-  const { setTheme, toggleBig, big } = useTheme();
+  const { setPrimary, setNeeds: persistNeeds } = useProfile();
+  const { setTheme, setFontScale, fontScale } = useTheme();
 
   const [step, setStep] = useState(0);
   const [needs, setNeeds] = useState<{ wheelchair: boolean; blind: boolean }>({ wheelchair: false, blind: false });
@@ -35,22 +36,24 @@ export default function OnboardingPage() {
 
   function finish() {
     setPrimary(primary);
+    persistNeeds(chosen);
     // Apply the UI-mode swap from the chosen profile.
     if (chosen.includes('blind')) {
       setTheme('contrast');
-      if (vision === 'low' && big !== '1') toggleBig();
+      if (vision === 'low' && fontScale < 1.3) setFontScale(1.3);
     }
     try {
       localStorage.setItem('sc-onboarded', '1');
     } catch {}
-    router.push('/map');
+    // Blind users start on the audio-first list rather than the visual map.
+    router.push(chosen.includes('blind') ? '/places' : '/map');
   }
 
   return (
     <div style={{ minHeight: '100vh', display: 'grid', placeItems: 'center', padding: '1.5em' }}>
-      <div style={{ width: '100%', maxWidth: 560 }}>
+      <div style={{ width: '100%', maxWidth: 'min(100%, 560px)' }}>
         {/* Progress */}
-        <ol aria-label="Кроки налаштування" style={{ display: 'flex', gap: '0.4em', listStyle: 'none', padding: 0, margin: '0 0 1.4em' }}>
+        <ol aria-label="Кроки налаштування" style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4em', listStyle: 'none', padding: 0, margin: '0 0 1.4em' }}>
           {STEPS.map((s, i) => (
             <li key={s} aria-current={i === step ? 'step' : undefined} style={{ flex: 1, height: '0.4em', borderRadius: '1em', background: i <= step ? 'var(--sc-primary)' : 'var(--sc-border)' }} />
           ))}
@@ -94,9 +97,20 @@ export default function OnboardingPage() {
           )}
 
           {step === 3 && (
-            <Step title="Вигляд під вас" desc={chosen.includes('blind') ? 'Увімкнемо високий контраст і, за потреби, великий шрифт та озвучення.' : 'Залишимо звичайний візуальний режим. Контраст і розмір тексту можна змінити будь-коли вгорі.'}>
+            <Step title="Зручний розмір тексту" desc="Перетягніть повзунок, доки текст не стане комфортним. Це можна змінити будь-коли згодом.">
+              <div style={{ marginBottom: '1.1em' }}>
+                <FontSizeSlider />
+              </div>
+              <p style={{ margin: '0 0 1.3em', padding: '0.9em 1em', borderRadius: '0.8em', background: 'var(--sc-surface-2)', border: 'var(--sc-bw) solid var(--sc-border)', lineHeight: 1.5 }}>
+                Приклад тексту: «Кав’ярня на розі — вхід без сходів, є доступний туалет.»
+              </p>
+              {chosen.includes('blind') && (
+                <p style={{ margin: '0 0 1.3em', color: 'var(--sc-muted)', fontSize: '0.9em' }}>
+                  Для незрячих і слабкозорих ми також увімкнемо високий контраст.
+                </p>
+              )}
               <Row>
-                <Button onClick={() => setStep(4)}>Застосувати</Button>
+                <Button onClick={() => setStep(4)}>Далі</Button>
                 <Button variant="ghost" onClick={() => setStep(2)}>Назад</Button>
               </Row>
             </Step>
@@ -141,7 +155,7 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 
 function Nav({ onBack, onNext, nextDisabled }: { onBack: () => void; onNext: () => void; nextDisabled?: boolean }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: '1.4em' }}>
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.7em', justifyContent: 'space-between', marginTop: '1.4em' }}>
       <Button variant="ghost" onClick={onBack}>Назад</Button>
       <Button onClick={onNext} disabled={nextDisabled}>Далі</Button>
     </div>
@@ -151,9 +165,9 @@ function Nav({ onBack, onNext, nextDisabled }: { onBack: () => void; onNext: () 
 function NeedCard({ label, picked, primary, onToggle, onPrimary, canPrimary }: { label: string; picked: boolean; primary: boolean; onToggle: () => void; onPrimary: () => void; canPrimary: boolean }) {
   return (
     <div style={{ border: `var(--sc-bw) solid ${picked ? 'var(--sc-primary)' : 'var(--sc-border-strong)'}`, borderRadius: '0.9em', padding: '0.9em', background: picked ? 'var(--sc-primary-tint)' : 'var(--sc-surface)' }}>
-      <button className="sc-foc" aria-pressed={picked} onClick={onToggle} style={{ display: 'flex', width: '100%', alignItems: 'center', gap: '0.7em', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
-        <span aria-hidden style={{ width: '1.5em', height: '1.5em', borderRadius: '0.4em', display: 'grid', placeItems: 'center', background: picked ? 'var(--sc-primary)' : 'var(--sc-surface-2)', color: '#fff', fontWeight: 800 }}>{picked ? '✓' : ''}</span>
-        <span style={{ fontWeight: 700, flex: 1 }}>{label}</span>
+      <button className="sc-foc" aria-pressed={picked} onClick={onToggle} style={{ display: 'flex', width: '100%', alignItems: 'flex-start', gap: '0.7em', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+        <span aria-hidden style={{ width: '1.5em', height: '1.5em', flexShrink: 0, borderRadius: '0.4em', display: 'grid', placeItems: 'center', background: picked ? 'var(--sc-primary)' : 'var(--sc-surface-2)', color: '#fff', fontWeight: 800 }}>{picked ? '✓' : ''}</span>
+        <span style={{ fontWeight: 700, flex: 1, minWidth: 0 }}>{label}</span>
       </button>
       {canPrimary && (
         <button className="sc-foc" aria-pressed={primary} onClick={onPrimary} style={{ marginTop: '0.6em', fontSize: '0.8em', fontWeight: 700, color: primary ? 'var(--sc-primary)' : 'var(--sc-muted)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>

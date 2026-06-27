@@ -3,23 +3,92 @@
 @tailwind utilities;
 
 @layer base {
-  html {
-    /* Base font scale follows the active theme (--sc-scale) + 200% toggle (data-big). */
-    font-size: calc(16px * var(--sc-scale, 1));
-  }
-  html[data-big='1'] {
-    font-size: calc(16px * var(--sc-scale, 1) * 2);
-  }
+  /* Root font-size is set in design-tokens themes.css via [data-sc-root]
+     (per-theme scale × user font-size slider). */
   body {
     background: var(--sc-bg);
     color: var(--sc-text);
     -webkit-font-smoothing: antialiased;
     margin: 0;
+    /* Let long words wrap at large font sizes / narrow screens instead of overflowing. */
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
+  /* Headings are the most likely to overflow when text is scaled up. */
+  h1, h2, h3 { overflow-wrap: break-word; hyphens: auto; }
   /* Global visible focus — never remove (KB 11). */
   :where(a, button, input, select, textarea, [tabindex]):focus-visible {
     outline: 3px solid var(--sc-focus);
     outline-offset: 2px;
     border-radius: 4px;
   }
+}
+
+/* Entrance animation (page transitions + reveal). Respects reduced motion. */
+@keyframes sc-fade-in-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+/* `backwards` (not `both`) so no transform is retained after the animation —
+   a retained transform would make this wrapper the containing block for any
+   position:fixed descendant (maps, modals), breaking full-screen layout. */
+.sc-animate-in { animation: sc-fade-in-up 0.45s ease backwards; }
+@media (prefers-reduced-motion: reduce) {
+  .sc-animate-in { animation: none; }
+}
+
+/* Looping reviews marquee. Two identical groups; translateX(-50%) loops one group
+   width. Lives inside a max-width container, so a group is always wider than the
+   visible box → seamless, never a gap. Pauses on hover/focus; stops at reduced-motion. */
+@keyframes sc-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.sc-marquee {
+  overflow: hidden;
+  /* Fade cards in/out at the edges instead of a hard clip. */
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+}
+.sc-marquee-track { display: flex; width: max-content; animation: sc-marquee 45s linear infinite; }
+.sc-marquee:hover .sc-marquee-track,
+.sc-marquee:focus-within .sc-marquee-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .sc-marquee-track { animation: none; }
+}
+
+/* Hide non-essential labels on small screens (icon-only nav) */
+@media (max-width: 560px) {
+  .sc-hide-sm { display: none; }
+  /* Header: drop the primary nav onto its own full-width row, centred. */
+  .sc-header-nav { order: 2; flex-basis: 100%; justify-content: center; }
+}
+
+/* MapLibre attribution credits are links in a text block — underline so they're
+   distinguishable without relying on colour (WCAG 1.4.1). */
+.maplibregl-ctrl-attrib a { text-decoration: underline !important; }
+
+/* Skip-to-content link — visible only when focused (keyboard / screen-reader users). */
+.sc-skip {
+  position: fixed;
+  left: 0.5em;
+  top: -4em;
+  z-index: 200;
+  background: var(--sc-primary);
+  color: var(--sc-on-primary);
+  padding: 0.7em 1.1em;
+  border-radius: 0.6em;
+  font-weight: 800;
+  text-decoration: none;
+  box-shadow: var(--sc-shadow-2);
+  transition: top 0.15s ease;
+}
+.sc-skip:focus { top: 0.5em; }
+
+/* Screen-reader-only text (visually hidden, still announced). */
+.sc-sr {
+  position: absolute !important;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }

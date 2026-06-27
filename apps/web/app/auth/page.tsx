@@ -7,6 +7,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { Button, Field, LoadingState } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
+import { syncProfileToAccount } from '@/lib/account';
 
 function AuthInner() {
   const router = useRouter();
@@ -34,10 +35,12 @@ function AuthInner() {
         if (!res.ok) throw new Error(j.error || 'Не вдалося створити акаунт');
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        await syncProfileToAccount();
         router.push(next);
       } else {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
+        await syncProfileToAccount();
         router.push(next);
       }
     } catch (err: any) {
@@ -50,7 +53,7 @@ function AuthInner() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader />
-      <main style={{ maxWidth: 420, margin: '0 auto', padding: '2.4em 1.25em 4em' }}>
+      <main id="main-content" tabIndex={-1} style={{ width: '100%', maxWidth: 'min(100%, 420px)', margin: '0 auto', padding: '2.4em 1.25em 4em' }}>
         <h1 style={{ margin: '0 0 0.2em', fontSize: '1.6em', fontWeight: 800 }}>
           {mode === 'in' ? 'Увійти' : 'Створити акаунт'}
         </h1>

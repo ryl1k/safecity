@@ -4,6 +4,7 @@ import '@safecity/design-tokens/src/themes.css';
 import './globals.css';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { ProfileProvider } from '@/profile/ProfileProvider';
+import { A11yDevAudit } from '@/components/A11yDevAudit';
 
 const onest = Onest({
   subsets: ['latin', 'cyrillic'],
@@ -22,8 +23,8 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-// Set theme + text-size before paint to avoid a flash of the wrong theme.
-const noFlash = `(function(){try{var t=localStorage.getItem('sc-theme')||'standard';var b=localStorage.getItem('sc-big')||'0';var e=document.documentElement;e.setAttribute('data-theme',t);e.setAttribute('data-big',b);}catch(e){}})();`;
+// Set theme + text-size before paint to avoid a flash of the wrong theme/size.
+const noFlash = `(function(){try{var e=document.documentElement;e.setAttribute('data-theme',localStorage.getItem('sc-theme')||'standard');var s=parseFloat(localStorage.getItem('sc-font-scale'));if(!isNaN(s)){e.style.setProperty('--sc-user-scale',String(Math.min(1.8,Math.max(0.85,s))));}}catch(e){}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -31,7 +32,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="uk"
       data-sc-root
       data-theme="standard"
-      data-big="0"
       className={onest.className}
       suppressHydrationWarning
     >
@@ -39,9 +39,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script dangerouslySetInnerHTML={{ __html: noFlash }} />
       </head>
       <body>
+        <a href="#main-content" className="sc-skip">Перейти до вмісту</a>
         <ThemeProvider>
           <ProfileProvider>{children}</ProfileProvider>
         </ThemeProvider>
+        <A11yDevAudit />
       </body>
     </html>
   );

@@ -22,7 +22,7 @@ RUN pnpm install --frozen-lockfile
 FROM base AS build
 COPY --from=deps /app/ ./
 COPY . .
-RUN pnpm --filter @safecity/web build
+RUN NEXT_OUTPUT=standalone pnpm --filter @safecity/web build
 
 # --- run ---
 FROM base AS runner

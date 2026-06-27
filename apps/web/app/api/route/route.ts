@@ -1,26 +1,59 @@
 import { NextRequest } from 'next/server';
 
 // Server-side proxy to OpenRouteService — keeps ORS_API_KEY off the client.
+
+interface RouteBody {
+  from?: [number, number];
+  to?: [number, number];
+  profile?: string;
+  // Live-barrier avoidance: GeoJSON MultiPolygon coordinates (array of polygons,
+  // each polygon = array of linear rings of [lng,lat]). Built from confirmed problems.
+  avoid?: number[][][][];
+  // Profile-based routing restrictions (wheelchair).
+  params?: { maxIncline?: number; maxSlopedKerb?: number; minWidth?: number };
+}
+
 export async function POST(req: NextRequest) {
   const key = process.env.ORS_API_KEY?.trim();
   if (!key) return Response.json({ error: 'ORS key missing on server' }, { status: 500 });
 
-  let body: { from?: [number, number]; to?: [number, number]; profile?: string };
+  let body: RouteBody;
   try {
     body = await req.json();
   } catch {
     return Response.json({ error: 'bad request' }, { status: 400 });
   }
-  const { from, to, profile } = body;
+  const { from, to, profile, avoid, params } = body;
   if (!from || !to) return Response.json({ error: 'from and to required' }, { status: 400 });
 
+  const hasAvoid = Array.isArray(avoid) && avoid.length > 0;
+
+  function buildPayload(orsProfile: string) {
+    const payload: Record<string, unknown> = { coordinates: [from, to] };
+    const options: Record<string, unknown> = {};
+    if (hasAvoid) {
+      options.avoid_polygons = { type: 'MultiPolygon', coordinates: avoid };
+    }
+    // Wheelchair-specific accessibility restrictions (foot profile rejects these).
+    if (orsProfile === 'wheelchair') {
+      options.profile_params = {
+        restrictions: {
+          maximum_incline: params?.maxIncline ?? 6,
+          maximum_sloped_kerb: params?.maxSlopedKerb ?? 0.03,
+          minimum_width: params?.minWidth ?? 0.8,
+        },
+      };
+    }
+    if (Object.keys(options).length > 0) payload.options = options;
+    return payload;
+  }
+
   async function orsRoute(orsProfile: string) {
-    const res = await fetch(`https://api.openrouteservice.org/v2/directions/${orsProfile}/geojson`, {
+    return fetch(`https://api.openrouteservice.org/v2/directions/${orsProfile}/geojson`, {
       method: 'POST',
       headers: { Authorization: key as string, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ coordinates: [from, to] }),
+      body: JSON.stringify(buildPayload(orsProfile)),
     });
-    return res;
   }
 
   // Wheelchair gets the dedicated profile; blind users route on foot.
@@ -45,6 +78,7 @@ export async function POST(req: NextRequest) {
   return Response.json({
     profile: usedProfile,
     fallback: usedProfile !== wanted,
+    avoided: hasAvoid ? avoid!.length : 0,
     coordinates: f?.geometry?.coordinates ?? [],
     steps: (seg?.steps ?? []).map((s: any) => ({ instruction: s.instruction, distance: s.distance })),
     summary: f?.properties?.summary ?? (seg ? { distance: seg.distance, duration: seg.duration } : null),
