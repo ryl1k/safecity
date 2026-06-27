@@ -36,6 +36,41 @@ function mapProblem(r: any): ProblemRow {
   };
 }
 
+export interface ProblemMarker {
+  id: string;
+  title: string;
+  status: ProblemStatus;
+  severity: number;
+  confirmations: number;
+  lng: number;
+  lat: number;
+}
+
+/** Open problems with a location, inside a map bounding box (problems map layer). */
+export async function problemsInBbox(
+  minLng: number,
+  minLat: number,
+  maxLng: number,
+  maxLat: number,
+): Promise<ProblemMarker[]> {
+  const { data, error } = await supabase.rpc('problems_in_bbox', {
+    min_lng: minLng,
+    min_lat: minLat,
+    max_lng: maxLng,
+    max_lat: maxLat,
+  });
+  if (error) throw error;
+  return ((data ?? []) as any[]).map((r) => ({
+    id: r.id,
+    title: r.title,
+    status: r.status,
+    severity: r.severity,
+    confirmations: r.confirmations,
+    lng: r.lng,
+    lat: r.lat,
+  }));
+}
+
 export async function listProblems(): Promise<ProblemRow[]> {
   const { data, error } = await supabase
     .from('problems')

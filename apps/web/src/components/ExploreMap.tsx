@@ -13,6 +13,13 @@ export interface ExploreMarker {
   rating: Rating;
 }
 
+export interface ExploreProblem {
+  id: string;
+  title: string;
+  lng: number;
+  lat: number;
+}
+
 export interface Bbox {
   minLng: number;
   minLat: number;
@@ -56,23 +63,30 @@ function basemapStyle(dark: boolean) {
  */
 export function ExploreMap({
   points,
+  problems = [],
   center,
   onSelect,
+  onSelectProblem,
   onMoveEnd,
   focus,
 }: {
   points: ExploreMarker[];
+  problems?: ExploreProblem[];
   center: [number, number];
   onSelect: (id: string) => void;
+  onSelectProblem?: (id: string) => void;
   onMoveEnd?: (b: Bbox) => void;
   focus?: { lng: number; lat: number; nonce: number } | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const problemMarkersRef = useRef<any[]>([]);
   const onSelectRef = useRef(onSelect);
+  const onSelectProblemRef = useRef(onSelectProblem);
   const onMoveEndRef = useRef(onMoveEnd);
   onSelectRef.current = onSelect;
+  onSelectProblemRef.current = onSelectProblem;
   onMoveEndRef.current = onMoveEnd;
 
   // Init map once.
@@ -144,6 +158,33 @@ export function ExploreMap({
       cancelled = true;
     };
   }, [points]);
+
+  // Sync the problems layer (distinct warning markers) when it changes.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const maplibregl = (await import('maplibre-gl')).default;
+      const map = mapRef.current;
+      if (cancelled || !map) return;
+      problemMarkersRef.current.forEach((m) => m.remove());
+      problemMarkersRef.current = problems.map((pr) => {
+        const el = document.createElement('button');
+        el.className = 'sc-foc';
+        el.type = 'button';
+        el.setAttribute('aria-label', `Проблема: ${pr.title}`);
+        el.style.cssText =
+          `width:26px;height:26px;display:grid;place-items:center;font-weight:800;color:#fff;font-size:14px;` +
+          `border:2px solid #fff;box-shadow:var(--sc-shadow-2);cursor:pointer;background:var(--sc-bad);` +
+          `clip-path:polygon(50% 0,100% 100%,0 100%);`;
+        el.textContent = '!';
+        el.addEventListener('click', () => onSelectProblemRef.current?.(pr.id));
+        return new maplibregl.Marker({ element: el }).setLngLat([pr.lng, pr.lat]).addTo(map);
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [problems]);
 
   // Fly to a chosen search result.
   useEffect(() => {

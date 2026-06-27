@@ -2,8 +2,9 @@
 
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, List, MapPin as MapPinIcon, Search, X } from 'lucide-react';
+import { AlertTriangle, ArrowLeft, List, MapPin as MapPinIcon, Search, X } from 'lucide-react';
 import type { AccessibilityFeature, Category, PointSummary, Rating } from '@safecity/shared';
 import { computeRating } from '@safecity/shared';
 import { AccessibilityMenu } from '@/components/AccessibilityMenu';
@@ -11,6 +12,7 @@ import { PointDetailModal } from '@/components/PointDetailModal';
 import { useProfile } from '@/profile/ProfileProvider';
 import { getCatalog } from '@/lib/catalog';
 import { pointById, pointsInBbox, searchPointsByName, type PointHit } from '@/lib/points';
+import { problemsInBbox, type ProblemMarker } from '@/lib/civic';
 import { geocodePlaces, type GeoPlace } from '@/lib/geocode';
 import { categoryLabel } from '@/lib/format';
 
@@ -22,12 +24,16 @@ const CATEGORIES: Category[] = ['venue', 'transit', 'crossing', 'toilet', 'parki
 
 export default function ExplorePage() {
   const { primary } = useProfile();
+  const router = useRouter();
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
   const [points, setPoints] = useState<PointSummary[]>([]);
+  const [problems, setProblems] = useState<ProblemMarker[]>([]);
+  const [showProblems, setShowProblems] = useState(false);
   const [enabled, setEnabled] = useState<Set<Category>>(new Set(CATEGORIES));
   const [onlyAccessible, setOnlyAccessible] = useState(false);
   const [modalId, setModalId] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number } | null>(null);
+  const lastBbox = useRef<{ minLng: number; minLat: number; maxLng: number; maxLat: number } | null>(null);
 
   // Search
   const [query, setQuery] = useState('');
@@ -44,13 +50,29 @@ export default function ExplorePage() {
 
   // Debounced bbox loading as the user pans/zooms.
   function onMoveEnd(b: { minLng: number; minLat: number; maxLng: number; maxLat: number }) {
+    lastBbox.current = b;
     if (bboxTimer.current) clearTimeout(bboxTimer.current);
     bboxTimer.current = setTimeout(() => {
       pointsInBbox(b.minLng, b.minLat, b.maxLng, b.maxLat)
         .then(setPoints)
         .catch(() => {});
+      if (showProblems) {
+        problemsInBbox(b.minLng, b.minLat, b.maxLng, b.maxLat)
+          .then(setProblems)
+          .catch(() => {});
+      }
     }, 250);
   }
+
+  // Load (or clear) the problems layer when toggled.
+  useEffect(() => {
+    if (!showProblems) {
+      setProblems([]);
+      return;
+    }
+    const b = lastBbox.current;
+    if (b) problemsInBbox(b.minLng, b.minLat, b.maxLng, b.maxLat).then(setProblems).catch(() => {});
+  }, [showProblems]);
 
   // Debounced search (points by name + place geocoding), in parallel.
   useEffect(() => {
@@ -116,7 +138,15 @@ export default function ExplorePage() {
 
   return (
     <div style={{ position: 'fixed', inset: 0, overflow: 'hidden' }}>
-      <ExploreMap points={markers} center={LVIV} onSelect={setModalId} onMoveEnd={onMoveEnd} focus={focus} />
+      <ExploreMap
+        points={markers}
+        problems={problems}
+        center={LVIV}
+        onSelect={setModalId}
+        onSelectProblem={(id) => router.push(`/problem/${id}`)}
+        onMoveEnd={onMoveEnd}
+        focus={focus}
+      />
 
       {/* Top floating bar — back, search, appearance. Wrapper lets the map show through gaps. */}
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '0.8em', display: 'flex', gap: '0.6em', alignItems: 'flex-start', pointerEvents: 'none' }}>
@@ -198,6 +228,9 @@ export default function ExplorePage() {
       <div style={{ position: 'absolute', left: '0.8em', bottom: '0.8em', maxWidth: 'calc(100% - 5em)', display: 'flex', flexWrap: 'wrap', gap: '0.4em', pointerEvents: 'none' }}>
         <FilterChip pressed={onlyAccessible} onToggle={() => setOnlyAccessible((v) => !v)} accent>
           ✓ Лише доступні
+        </FilterChip>
+        <FilterChip pressed={showProblems} onToggle={() => setShowProblems((v) => !v)}>
+          <AlertTriangle size={14} aria-hidden /> Проблеми
         </FilterChip>
         {CATEGORIES.map((c) => (
           <FilterChip key={c} pressed={enabled.has(c)} onToggle={() => setEnabled((prev) => toggle(prev, c))}>
