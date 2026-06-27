@@ -27,18 +27,22 @@ function shapeCss(category: Category): string {
   }
 }
 
-const OSM_STYLE = {
-  version: 8 as const,
-  sources: {
-    osm: {
-      type: 'raster' as const,
-      tiles: ['https://tile.openstreetmap.org/{z}/{x}/{y}.png'],
-      tileSize: 256,
-      attribution: '© OpenStreetMap',
+// Clean, muted CARTO basemap (Positron / Dark Matter) — matches the minimal design.
+function basemapStyle(dark: boolean) {
+  const variant = dark ? 'dark_all' : 'light_all';
+  return {
+    version: 8 as const,
+    sources: {
+      carto: {
+        type: 'raster' as const,
+        tiles: ['a', 'b', 'c', 'd'].map((s) => `https://${s}.basemaps.cartocdn.com/${variant}/{z}/{x}/{y}{r}.png`),
+        tileSize: 256,
+        attribution: '© OpenStreetMap © CARTO',
+      },
     },
-  },
-  layers: [{ id: 'osm', type: 'raster' as const, source: 'osm' }],
-};
+    layers: [{ id: 'carto', type: 'raster' as const, source: 'carto' }],
+  };
+}
 
 export function MapView({
   points,
@@ -63,9 +67,10 @@ export function MapView({
     (async () => {
       const maplibregl = (await import('maplibre-gl')).default;
       if (cancelled || !containerRef.current || mapRef.current) return;
+      const dark = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
       mapRef.current = new maplibregl.Map({
         container: containerRef.current,
-        style: OSM_STYLE as any,
+        style: basemapStyle(dark) as any,
         center,
         zoom: 14,
       });
@@ -90,6 +95,7 @@ export function MapView({
       markersRef.current = points.map((p) => {
         const el = document.createElement('button');
         el.className = 'sc-foc';
+        el.type = 'button';
         el.setAttribute('aria-label', p.name);
         el.style.cssText =
           `width:28px;height:28px;display:grid;place-items:center;font-weight:800;color:#fff;` +
