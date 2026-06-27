@@ -228,7 +228,7 @@ function RouteInner() {
                   {nearby.map((n) => (
                     <li key={n.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5em', fontSize: '0.9em' }}>
                       <span aria-hidden style={{ width: '0.7em', height: '0.7em', borderRadius: '50%', background: 'var(--sc-ok)', flexShrink: 0 }} />
-                      <Link href={`/point/${n.id}`} className="sc-foc" style={{ color: 'var(--sc-text)', textDecoration: 'none', fontWeight: 700 }}>{n.name}</Link>
+                      <Link href={`/point/${n.id}`} className="sc-foc" style={{ color: 'var(--sc-primary)', textDecoration: 'underline', fontWeight: 700 }}>{n.name}</Link>
                       <span style={{ color: 'var(--sc-muted)' }}>· {categoryLabel[n.category]}</span>
                     </li>
                   ))}
