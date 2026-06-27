@@ -2,11 +2,11 @@
 
 import dynamic from 'next/dynamic';
 import { useEffect, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import type { AccessibilityFeature, PointSummary, Rating } from '@safecity/shared';
 import { computeRating } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
+import { PointDetailModal } from '@/components/PointDetailModal';
 import { SearchBar, Segmented, Chip, ListRow, LoadingState, ErrorState, EmptyState } from '@/components/ui';
 import { useProfile } from '@/profile/ProfileProvider';
 import { getCatalog } from '@/lib/catalog';
@@ -21,7 +21,6 @@ const MapView = dynamic(() => import('@/components/MapView').then((m) => m.MapVi
 type Status = 'loading' | 'ready' | 'error';
 
 export default function MapPage() {
-  const router = useRouter();
   const { primary } = useProfile();
   const [status, setStatus] = useState<Status>('loading');
   const [points, setPoints] = useState<PointSummary[]>([]);
@@ -29,6 +28,7 @@ export default function MapPage() {
   const [view, setView] = useState<'map' | 'list'>('map');
   const [query, setQuery] = useState('');
   const [onlyAccessible, setOnlyAccessible] = useState(false);
+  const [modalId, setModalId] = useState<string | null>(null);
 
   async function load() {
     setStatus('loading');
@@ -106,7 +106,7 @@ export default function MapPage() {
 
         {status === 'ready' && filtered.length > 0 && view === 'map' && (
           <div style={{ height: 'calc(100vh - 14rem)', minHeight: 460 }}>
-            <MapView points={markers} center={LVIV} onSelect={(id) => router.push(`/point/${id}`)} />
+            <MapView points={markers} center={LVIV} onSelect={(id) => setModalId(id)} />
           </div>
         )}
 
@@ -118,7 +118,7 @@ export default function MapPage() {
               const meta = [categoryLabel[point.category], distanceLabel(point.distanceM), `на ${dir} годині`, summary || 'немає даних'].join(' · ');
               return (
                 <li key={point.id} style={{ borderTop: i ? 'var(--sc-bw) solid var(--sc-border)' : 'none' }}>
-                  <ListRow name={point.name} rating={rating} meta={meta} onClick={() => router.push(`/point/${point.id}`)} />
+                  <ListRow name={point.name} rating={rating} meta={meta} onClick={() => setModalId(point.id)} />
                 </li>
               );
             })}
@@ -127,6 +127,8 @@ export default function MapPage() {
       </div>
 
       <Footer />
+
+      {modalId && <PointDetailModal id={modalId} onClose={() => setModalId(null)} />}
     </div>
   );
 }
