@@ -21,90 +21,92 @@ export default function HomePage() {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader />
 
-      <main style={{ flex: 1, maxWidth: 1080, width: '100%', margin: '0 auto', padding: '2.4em 1.25em 4em' }}>
-        {/* Hero — text + testimonials */}
-        <section style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '2.4em', alignItems: 'center', marginBottom: '3.5em' }}>
-          <div>
-            <p style={{ fontSize: '0.75em', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--sc-primary)', margin: 0 }}>
-              Інклюзивна мапа · Львів
-            </p>
-            <h1 style={{ margin: '0.3em 0', fontSize: '2.4em', lineHeight: 1.1, letterSpacing: '-0.025em', fontWeight: 800 }}>
-              Один застосунок, що адаптується під вас
-            </h1>
-            <p style={{ margin: 0, maxWidth: '52ch', fontSize: '1.05em', lineHeight: 1.6, color: 'var(--sc-muted)' }}>
-              SafeCity допомагає людям з інвалідністю орієнтуватися в місті: знайте заздалегідь,
-              чи підходить вам місце, прокладайте маршрут під свої потреби, а коли щось не так —
-              повідомте й домагайтеся змін.
-            </p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8em', marginTop: '1.6em' }}>
-              <Link href="/onboarding" className="sc-foc" style={cta('primary')}>Почати</Link>
-              <Link href="/map" className="sc-foc" style={cta('secondary')}>Відкрити мапу</Link>
-            </div>
+      <main style={{ flex: 1, width: '100%' }}>
+        {/* Hero — full-width title */}
+        <section style={{ maxWidth: 1080, margin: '0 auto', padding: '3em 1.25em 2em', textAlign: 'center' }}>
+          <p style={{ fontSize: '0.78em', fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--sc-primary)', margin: 0 }}>
+            Інклюзивна мапа · ваше місто
+          </p>
+          <h1 style={{ margin: '0.25em auto', fontSize: 'clamp(2.2rem, 6vw, 3.6rem)', lineHeight: 1.08, letterSpacing: '-0.03em', fontWeight: 800, maxWidth: '18ch' }}>
+            Один застосунок, що адаптується під вас
+          </h1>
+          <p style={{ margin: '0 auto', maxWidth: '64ch', fontSize: '1.1em', lineHeight: 1.6, color: 'var(--sc-muted)' }}>
+            SafeCity допомагає людям з інвалідністю орієнтуватися в місті: знайте заздалегідь,
+            чи підходить вам місце, прокладайте маршрут під свої потреби, а коли щось не так —
+            повідомте й домагайтеся змін.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8em', marginTop: '1.8em', justifyContent: 'center' }}>
+            <Link href="/onboarding" className="sc-foc" style={cta('primary')}>Почати</Link>
+            <Link href="/map" className="sc-foc" style={cta('secondary')}>Відкрити мапу</Link>
           </div>
+        </section>
+
+        {/* Looping reviews */}
+        <section style={{ padding: '0.5em 0 3em' }}>
           <Testimonials />
         </section>
 
-        {/* How it works — a tall block per step, revealed on scroll */}
-        <section style={{ marginBottom: '4em' }}>
-          <h2 style={{ fontSize: '1.5em', fontWeight: 800, margin: '0 0 1.2em' }}>Як це працює</h2>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2em' }}>
-            {STEPS.map((s, i) => (
-              <Reveal key={s.n} delay={i * 90}>
-                <div
-                  style={{
-                    display: 'flex', flexDirection: i % 2 === 1 ? 'row-reverse' : 'row', flexWrap: 'wrap',
-                    gap: '1.8em', alignItems: 'center', background: 'var(--sc-surface)',
-                    border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1.3em', padding: '2.2em',
-                  }}
-                >
-                  <span
-                    aria-hidden
+        <div style={{ maxWidth: 1080, margin: '0 auto', padding: '0 1.25em 4em' }}>
+          {/* How it works — zigzag, trimmed width */}
+          <section style={{ marginBottom: '4em' }}>
+            <h2 style={{ fontSize: '1.5em', fontWeight: 800, margin: '0 0 1.2em' }}>Як це працює</h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2em' }}>
+              {STEPS.map((s, i) => (
+                <Reveal key={s.n} delay={i * 90}>
+                  <div
                     style={{
-                      position: 'relative', width: '5em', height: '5em', flexShrink: 0, borderRadius: '1.2em',
-                      background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', display: 'grid', placeItems: 'center',
+                      width: 'min(100%, 620px)', marginLeft: i % 2 === 1 ? 'auto' : 0, marginRight: i % 2 === 1 ? 0 : 'auto',
+                      display: 'flex', gap: '1.4em', alignItems: 'center', background: 'var(--sc-surface)',
+                      border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1.3em', padding: '1.8em',
                     }}
                   >
-                    <s.Icon size={34} />
-                    <span style={{ position: 'absolute', top: '-0.5em', left: '-0.5em', width: '1.8em', height: '1.8em', borderRadius: '50%', background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '0.85em' }}>
-                      {s.n}
+                    <span aria-hidden style={{ position: 'relative', width: '4.4em', height: '4.4em', flexShrink: 0, borderRadius: '1.1em', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', display: 'grid', placeItems: 'center' }}>
+                      <s.Icon size={30} />
+                      <span style={{ position: 'absolute', top: '-0.5em', left: '-0.5em', width: '1.7em', height: '1.7em', borderRadius: '50%', background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '0.8em' }}>
+                        {s.n}
+                      </span>
                     </span>
-                  </span>
-                  <div style={{ flex: '1 1 280px' }}>
-                    <h3 style={{ margin: '0 0 0.35em', fontSize: '1.35em', fontWeight: 800 }}>{s.title}</h3>
-                    <p style={{ margin: 0, fontSize: '1.02em', lineHeight: 1.55, color: 'var(--sc-muted)', maxWidth: '56ch' }}>{s.body}</p>
+                    <div style={{ flex: '1 1 auto', minWidth: 0 }}>
+                      <h3 style={{ margin: '0 0 0.35em', fontSize: '1.25em', fontWeight: 800 }}>{s.title}</h3>
+                      <p style={{ margin: 0, fontSize: '1em', lineHeight: 1.55, color: 'var(--sc-muted)' }}>{s.body}</p>
+                    </div>
                   </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </section>
+                </Reveal>
+              ))}
+            </div>
+          </section>
 
-        {/* Two profiles */}
-        <section style={{ marginBottom: '3em' }}>
-          <h2 style={{ fontSize: '1.5em', fontWeight: 800, margin: '0 0 1.2em' }}>Два досвіди, один застосунок</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1em' }}>
-            {PROFILES.map(({ title, body, Icon }) => (
-              <Reveal key={title}>
-                <div style={{ ...cardStyle, display: 'flex', gap: '0.9em', alignItems: 'flex-start', height: '100%' }}>
-                  <span aria-hidden style={iconSquare}>
-                    <Icon size={26} />
-                  </span>
-                  <div>
-                    <h3 style={{ margin: '0 0 0.3em', fontSize: '1.1em', fontWeight: 800 }}>{title}</h3>
-                    <p style={{ margin: 0, fontSize: '0.92em', lineHeight: 1.5, color: 'var(--sc-muted)' }}>{body}</p>
+          {/* Two profiles */}
+          <section style={{ marginBottom: '3em' }}>
+            <h2 style={{ fontSize: '1.5em', fontWeight: 800, margin: '0 0 1.2em' }}>Два досвіди, один застосунок</h2>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1em' }}>
+              {PROFILES.map(({ title, body, Icon }) => (
+                <Reveal key={title}>
+                  <div style={{ ...cardStyle, display: 'flex', gap: '0.9em', alignItems: 'flex-start', height: '100%' }}>
+                    <span aria-hidden style={iconSquare}><Icon size={26} /></span>
+                    <div>
+                      <h3 style={{ margin: '0 0 0.3em', fontSize: '1.1em', fontWeight: 800 }}>{title}</h3>
+                      <p style={{ margin: 0, fontSize: '0.92em', lineHeight: 1.5, color: 'var(--sc-muted)' }}>{body}</p>
+                    </div>
                   </div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
-        </section>
+                </Reveal>
+              ))}
+            </div>
+          </section>
 
-        {/* CTA band */}
-        <section style={{ ...cardStyle, textAlign: 'center', background: 'var(--sc-primary-tint)', borderColor: 'var(--sc-primary)' }}>
-          <h2 style={{ margin: '0 0 0.3em', fontSize: '1.3em', fontWeight: 800 }}>Зробимо Львів доступним разом</h2>
-          <p style={{ margin: '0 0 1em', color: 'var(--sc-muted)' }}>Зрозумілий, зручний і доступний для кожного.</p>
-          <Link href="/onboarding" className="sc-foc" style={cta('primary')}>Налаштувати під себе</Link>
-        </section>
+          {/* CTA band — narrower, taller button */}
+          <section style={{ ...cardStyle, textAlign: 'center', background: 'var(--sc-primary-tint)', borderColor: 'var(--sc-primary)', padding: '2em 1.3em' }}>
+            <h2 style={{ margin: '0 0 0.3em', fontSize: '1.3em', fontWeight: 800 }}>Зробимо ваше місто доступним разом</h2>
+            <p style={{ margin: '0 0 1.4em', color: 'var(--sc-muted)' }}>Зрозумілий, зручний і доступний для кожного.</p>
+            <Link
+              href="/onboarding"
+              className="sc-foc"
+              style={{ display: 'grid', placeItems: 'center', width: 'min(100%, 52em)', minHeight: '3.4em', margin: '0 auto', padding: '0 1.5em', borderRadius: '0.8em', fontWeight: 800, fontSize: '1.05em', textDecoration: 'none', background: 'var(--sc-primary)', color: 'var(--sc-on-primary)' }}
+            >
+              Налаштувати під себе
+            </Link>
+          </section>
+        </div>
       </main>
 
       <Footer />

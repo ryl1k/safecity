@@ -33,3 +33,20 @@
 @media (prefers-reduced-motion: reduce) {
   .sc-animate-in { animation: none; }
 }
+
+/* Looping reviews marquee */
+@keyframes sc-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+.sc-marquee { overflow: hidden; }
+.sc-marquee-track { display: flex; width: max-content; animation: sc-marquee 50s linear infinite; }
+.sc-marquee:hover .sc-marquee-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .sc-marquee-track { animation: none; flex-wrap: wrap; width: 100%; }
+}
+
+/* Hide non-essential labels on small screens (icon-only nav) */
+@media (max-width: 560px) {
+  .sc-hide-sm { display: none; }
+}
