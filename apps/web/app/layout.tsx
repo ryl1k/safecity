@@ -4,6 +4,7 @@ import '@safecity/design-tokens/src/themes.css';
 import './globals.css';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { ProfileProvider } from '@/profile/ProfileProvider';
+import { A11yDevAudit } from '@/components/A11yDevAudit';
 
 const onest = Onest({
   subsets: ['latin', 'cyrillic'],
@@ -42,6 +43,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <ProfileProvider>{children}</ProfileProvider>
         </ThemeProvider>
+        <A11yDevAudit />
       </body>
     </html>
   );
