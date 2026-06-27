@@ -24,3 +24,20 @@ Thumbs.db
 # supabase
 supabase/.branches/
 supabase/.temp/
+
+# python
+apps/ml/.venv/
+apps/ml/**/__pycache__/
+apps/ml/**/*.pyc
+*.egg-info/
+
+# ml model weights — large binaries downloaded/generated at runtime
+apps/ml/models/*.pth
+apps/ml/models/*.pt
+apps/ml/models/*.pb
+apps/ml/models/*.tar.gz
+apps/ml/models/DeepLabV3Plus-Pytorch/
+
+# keep exported deployment models (committed so mobile app can bundle them)
+!apps/ml/models/*.onnx
+!apps/ml/models/*.tflite

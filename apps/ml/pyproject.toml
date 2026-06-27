@@ -1,0 +1,48 @@
+[project]
+name = "safecity-ml"
+version = "0.1.0"
+description = "SafeCity ML pipeline — on-device CV models for blind walking assistance"
+requires-python = ">=3.10"
+
+dependencies = [
+    "torch>=2.2",
+    "torchvision>=0.17",
+    "numpy>=1.24",
+    "Pillow>=10.0",
+    "matplotlib>=3.7",
+    "opencv-python>=4.8",
+    "jupyter>=1.0",
+    "jupyterlab>=4.0",
+    "ipykernel>=6.0",
+    "notebook>=7.0",
+    "tqdm>=4.66",
+    "sideseeing-tools",
+    "transformers>=4.36",    # SegFormer + HuggingFace model hub
+    "tensorflow>=2.16",     # TFLite conversion tooling
+    "ai-edge-litert>=1.0",  # lightweight TFLite runtime for inference after conversion
+    "numba>=0.59",      # sideseeing-tools->librosa->numba 0.53 caps at py3.9
+    "llvmlite>=0.42",   # numba 0.59 requires llvmlite 0.42 which supports py3.12
+]
+
+[project.optional-dependencies]
+dev = [
+    "ipywidgets>=8.0",
+    "tqdm>=4.66",
+]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# CUDA 12.4 builds — works with driver CUDA 13.1 (RTX 2080, driver 591.74)
+[tool.uv.sources]
+torch = { index = "pytorch-cu124" }
+torchvision = { index = "pytorch-cu124" }
+
+[[tool.uv.index]]
+name = "pytorch-cu124"
+url = "https://download.pytorch.org/whl/cu124"
+explicit = true
