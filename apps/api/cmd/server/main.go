@@ -21,8 +21,12 @@ func main() {
 	// Dev convenience: load repo-root .env if present (no-op in prod).
 	_ = godotenv.Load("../../.env", ".env")
 
-	cfg := config.Load()
-	logger := newLogger(cfg)
+	cfg, err := config.Load()
+	logger := newLogger(cfg) // Env/LogLevel have defaults even when validation fails
+	if err != nil {
+		logger.Error("invalid config", "err", err)
+		os.Exit(1)
+	}
 
 	srv := server.New(logger)
 	httpSrv := &http.Server{
