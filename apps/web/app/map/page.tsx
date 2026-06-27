@@ -1,6 +1,8 @@
 'use client';
 
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
+import { Maximize2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { AccessibilityFeature, PointSummary, Rating } from '@safecity/shared';
 import { computeRating } from '@safecity/shared';
@@ -84,6 +86,18 @@ export default function MapPage() {
           <Chip pressed={onlyAccessible} onToggle={() => setOnlyAccessible((v) => !v)}>
             <span aria-hidden>✓</span> Лише доступні
           </Chip>
+          <Link
+            href="/explore"
+            className="sc-foc"
+            aria-label="Повноекранна мапа"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.4em', minHeight: '2.5em', padding: '0 0.8em',
+              borderRadius: '0.7em', textDecoration: 'none', fontWeight: 700, fontSize: '0.85em',
+              border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)',
+            }}
+          >
+            <Maximize2 size={15} aria-hidden /> На весь екран
+          </Link>
           <span style={{ marginLeft: 'auto', color: 'var(--sc-muted)', fontSize: '0.85em' }} aria-live="polite">
             {status === 'ready' ? `${filtered.length} місць` : ''}
           </span>
