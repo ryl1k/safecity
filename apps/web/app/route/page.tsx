@@ -14,6 +14,7 @@ import { pointById, pointsInBbox } from '@/lib/points';
 import { problemsInBbox } from '@/lib/civic';
 import { getCatalog } from '@/lib/catalog';
 import { categoryLabel, distanceLabel } from '@/lib/format';
+import { speak, stopSpeech } from '@/lib/tts';
 
 const LVIV: [number, number] = [24.0316, 49.8419];
 const MapView = dynamic(() => import('@/components/MapView').then((m) => m.MapView), { ssr: false });
@@ -41,10 +42,6 @@ function avoidSquare(lng: number, lat: number): number[][][] {
     [lng - d, lat + d],
     [lng - d, lat - d],
   ]];
-}
-
-function stopSpeech() {
-  if (typeof window !== 'undefined' && window.speechSynthesis) window.speechSynthesis.cancel();
 }
 
 function RouteInner() {
@@ -153,7 +150,6 @@ function RouteInner() {
   useEffect(() => () => stopSpeech(), []);
 
   function toggleSpeak() {
-    if (typeof window === 'undefined' || !window.speechSynthesis) return;
     if (speaking) {
       stopSpeech();
       setSpeaking(false);
@@ -163,13 +159,8 @@ function RouteInner() {
     const calloutsText = nearbyRef.current.length
       ? ` Поруч доступні місця: ${nearbyRef.current.map((n) => `${n.name} (${categoryLabel[n.category].toLowerCase()})`).join(', ')}.`
       : '';
-    const u = new SpeechSynthesisUtterance(stepsText + calloutsText);
-    u.lang = 'uk-UA';
-    u.onend = () => setSpeaking(false);
-    u.onerror = () => setSpeaking(false);
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(u);
     setSpeaking(true);
+    speak(stepsText + calloutsText, { onend: () => setSpeaking(false), onerror: () => setSpeaking(false) });
   }
 
   return (
