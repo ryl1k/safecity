@@ -11,7 +11,7 @@ import { SearchBar, Segmented, Chip, ListRow, LoadingState, ErrorState, EmptySta
 import { useProfile } from '@/profile/ProfileProvider';
 import { getCatalog } from '@/lib/catalog';
 import { pointsNear } from '@/lib/points';
-import { categoryLabel, distanceLabel, clockDirection, featureSummary } from '@/lib/format';
+import { categoryLabel, distanceLabel, featureSummary } from '@/lib/format';
 
 const LVIV: [number, number] = [24.0316, 49.8419];
 const RADIUS_M = 2500;
@@ -113,9 +113,8 @@ export default function MapPage() {
         {status === 'ready' && filtered.length > 0 && view === 'list' && (
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', overflow: 'hidden' }}>
             {filtered.map(({ point, rating }, i) => {
-              const dir = clockDirection(LVIV[0], LVIV[1], point.lng, point.lat);
               const summary = featureSummary(point, catalog, primary);
-              const meta = [categoryLabel[point.category], distanceLabel(point.distanceM), `на ${dir} годині`, summary || 'немає даних'].join(' · ');
+              const meta = [categoryLabel[point.category], distanceLabel(point.distanceM), summary || 'немає даних'].join(' · ');
               return (
                 <li key={point.id} style={{ borderTop: i ? 'var(--sc-bw) solid var(--sc-border)' : 'none' }}>
                   <ListRow name={point.name} rating={rating} meta={meta} onClick={() => setModalId(point.id)} />
