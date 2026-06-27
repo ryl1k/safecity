@@ -20,7 +20,9 @@ const profileLabel: Record<Profile, string> = { wheelchair: 'Крісло кол
 
 /** The point detail body (no page shell) — reused by /point/[id] and the map modal. */
 export function PointDetailContent({ id }: { id: string }) {
-  const { primary } = useProfile();
+  const { primary, needs } = useProfile();
+  // Show ratings only for the user's needs; a guest who never onboarded sees both.
+  const shownProfiles: Profile[] = needs.length ? needs : ['wheelchair', 'blind'];
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'notfound'>('loading');
   const [point, setPoint] = useState<PointSummary | null>(null);
@@ -118,7 +120,7 @@ export function PointDetailContent({ id }: { id: string }) {
       ) : null}
 
       <div style={{ display: 'flex', gap: '1.4em', flexWrap: 'wrap', marginTop: '1.2em' }}>
-        {(['wheelchair', 'blind'] as Profile[]).map((pr) => (
+        {shownProfiles.map((pr) => (
           <div key={pr} style={{ display: 'flex', flexDirection: 'column', gap: '0.4em' }}>
             <span style={{ fontSize: '0.78em', fontWeight: 700, color: 'var(--sc-muted)' }}>{profileLabel[pr]}</span>
             <RatingBadge rating={computeRating(point.features, catalog, point.category, pr)} />
