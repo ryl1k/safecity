@@ -1,18 +1,20 @@
 'use client';
 
 import Link from 'next/link';
-import type { Profile } from '@safecity/shared';
-import { ThemeSwitcher } from '@/theme/ThemeSwitcher';
-import { Segmented } from '@/components/ui';
-import { useProfile } from '@/profile/ProfileProvider';
-
-const PROFILE_OPTIONS: { value: Profile; label: string }[] = [
-  { value: 'wheelchair', label: 'Крісло' },
-  { value: 'blind', label: 'Незрячі' },
-];
+import { useEffect, useState } from 'react';
+import { Map as MapIcon, Megaphone, Plus, CircleUserRound, type LucideIcon } from 'lucide-react';
+import { AccessibilityMenu } from '@/components/AccessibilityMenu';
+import { supabase } from '@/lib/supabase';
 
 export function AppHeader({ active }: { active?: 'map' | 'civic' }) {
-  const { primary, setPrimary } = useProfile();
+  const [signedIn, setSignedIn] = useState(false);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setSignedIn(Boolean(data.user)));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setSignedIn(Boolean(session?.user)));
+    return () => sub.subscription.unsubscribe();
+  }, []);
+
   return (
     <header
       style={{
@@ -22,64 +24,70 @@ export function AppHeader({ active }: { active?: 'map' | 'civic' }) {
     >
       <div
         style={{
-          maxWidth: 1080, margin: '0 auto', padding: '0.6em 1.25em',
-          display: 'flex', alignItems: 'center', gap: '1em', flexWrap: 'wrap',
+          maxWidth: 1080, margin: '0 auto', padding: '0.55em 1.25em',
+          display: 'flex', alignItems: 'center', gap: '0.8em 1.2em', flexWrap: 'wrap',
         }}
       >
         <Link
           href="/"
           className="sc-foc"
-          style={{ display: 'flex', alignItems: 'center', gap: '0.55em', textDecoration: 'none', color: 'var(--sc-text)' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5em', textDecoration: 'none', color: 'var(--sc-text)' }}
         >
           <span
             aria-hidden
             style={{
-              width: '2.1em', height: '2.1em', borderRadius: '0.55em', background: 'var(--sc-primary)',
+              width: '2em', height: '2em', borderRadius: '0.5em', background: 'var(--sc-primary)',
               color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontWeight: 800,
             }}
           >
             ◍
           </span>
-          <span style={{ fontWeight: 800 }}>SafeCity</span>
+          <span style={{ fontWeight: 800, fontSize: '1.05em' }}>SafeCity</span>
         </Link>
 
-        <nav aria-label="Розділи" style={{ display: 'flex', gap: '0.3em' }}>
-          <HeaderLink href="/map" current={active === 'map'}>Мапа</HeaderLink>
-          <HeaderLink href="/civic" current={active === 'civic'}>Громада</HeaderLink>
-          <HeaderLink href="/contribute">Додати</HeaderLink>
-          <HeaderLink href="/settings">Налаштування</HeaderLink>
+        <nav aria-label="Розділи" style={{ display: 'flex', gap: '0.2em', flexWrap: 'wrap' }}>
+          <NavLink href="/map" icon={MapIcon} label="Мапа" current={active === 'map'} />
+          <NavLink href="/civic" icon={Megaphone} label="Громада" current={active === 'civic'} />
+          <NavLink href="/contribute" icon={Plus} label="Додати" />
         </nav>
 
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>
-          <div style={{ minWidth: 170 }}>
-            <Segmented
-              ariaLabel="Профіль доступності"
-              value={primary}
-              onChange={setPrimary}
-              options={PROFILE_OPTIONS}
-            />
-          </div>
-          <ThemeSwitcher />
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.6em', flexWrap: 'wrap' }}>
+          <AccessibilityMenu />
+          <Link
+            href={signedIn ? '/settings' : '/auth'}
+            className="sc-foc"
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: '0.45em', minHeight: '2.5em', padding: '0 0.9em',
+              borderRadius: '0.6em', textDecoration: 'none', fontWeight: 700,
+              background: signedIn ? 'var(--sc-surface)' : 'var(--sc-primary)',
+              color: signedIn ? 'var(--sc-text)' : 'var(--sc-on-primary)',
+              border: signedIn ? 'var(--sc-bw) solid var(--sc-border-strong)' : 'none',
+            }}
+          >
+            <CircleUserRound size={18} aria-hidden />
+            <span style={{ fontSize: '0.9em' }}>{signedIn ? 'Акаунт' : 'Увійти'}</span>
+          </Link>
         </div>
       </div>
     </header>
   );
 }
 
-function HeaderLink({ href, current, children }: { href: string; current?: boolean; children: React.ReactNode }) {
+function NavLink({ href, icon: Icon, label, current }: { href: string; icon: LucideIcon; label: string; current?: boolean }) {
   return (
     <Link
       href={href}
       className="sc-foc"
       aria-current={current ? 'page' : undefined}
       style={{
-        fontSize: '0.9em', fontWeight: 700, textDecoration: 'none',
-        padding: '0.4em 0.7em', borderRadius: '0.5em',
+        display: 'inline-flex', alignItems: 'center', gap: '0.4em', minHeight: '2.5em', padding: '0 0.7em',
+        borderRadius: '0.6em', textDecoration: 'none', fontWeight: 700, fontSize: '0.9em',
         color: current ? 'var(--sc-primary)' : 'var(--sc-muted)',
         background: current ? 'var(--sc-primary-tint)' : 'transparent',
       }}
     >
-      {children}
+      <Icon size={18} aria-hidden />
+      {label}
     </Link>
   );
 }
