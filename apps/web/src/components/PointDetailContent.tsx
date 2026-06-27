@@ -2,13 +2,15 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import type { AccessibilityFeature, FeatureValue, Profile, PointSummary } from '@safecity/shared';
 import { computeRating } from '@safecity/shared';
 import { RatingBadge, ChecklistRow, ReviewItem, Button, LoadingState, ErrorState } from '@/components/ui';
 import { useProfile } from '@/profile/ProfileProvider';
 import { getCatalog } from '@/lib/catalog';
 import { pointById } from '@/lib/points';
-import { reviewsFor, type ReviewRow } from '@/lib/reviews';
+import { reviewsFor, addReview, type ReviewRow } from '@/lib/reviews';
+import { supabase } from '@/lib/supabase';
 import { categoryLabel } from '@/lib/format';
 
 const profileLabel: Record<Profile, string> = { wheelchair: 'Крісло колісне', blind: 'Незрячі' };
@@ -16,11 +18,19 @@ const profileLabel: Record<Profile, string> = { wheelchair: 'Крісло кол
 /** The point detail body (no page shell) — reused by /point/[id] and the map modal. */
 export function PointDetailContent({ id }: { id: string }) {
   const { primary } = useProfile();
+  const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'notfound'>('loading');
   const [point, setPoint] = useState<PointSummary | null>(null);
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [showAll, setShowAll] = useState(false);
+
+  // Review form
+  const [formOpen, setFormOpen] = useState(false);
+  const [stars, setStars] = useState(5);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [reviewError, setReviewError] = useState<string | null>(null);
 
   async function load() {
     setStatus('loading');
@@ -58,6 +68,33 @@ export function PointDetailContent({ id }: { id: string }) {
   const shown = showAll ? applicable : reported;
   const hasHidden = applicable.length > reported.length;
 
+  async function openForm() {
+    const { data } = await supabase.auth.getUser();
+    if (!data.user) {
+      router.push(`/auth?next=/point/${id}`);
+      return;
+    }
+    setFormOpen(true);
+  }
+
+  async function submitReview(e: React.FormEvent) {
+    e.preventDefault();
+    setReviewError(null);
+    setBusy(true);
+    try {
+      await addReview(id, primary, stars, text);
+      setReviews(await reviewsFor(id));
+      setFormOpen(false);
+      setText('');
+      setStars(5);
+    } catch (err: any) {
+      if (err?.message === 'not-authenticated') router.push(`/auth?next=/point/${id}`);
+      else setReviewError(err?.message ?? 'Не вдалося опублікувати');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   if (status === 'loading') return <LoadingState label="Завантаження місця" />;
   if (status === 'error') return <ErrorState onRetry={() => void load()} />;
   if (status === 'notfound' || !point) return <p style={{ color: 'var(--sc-muted)' }}>Місце не знайдено.</p>;
@@ -86,29 +123,47 @@ export function PointDetailContent({ id }: { id: string }) {
           <p style={{ color: 'var(--sc-muted)', fontSize: '0.9em', margin: 0 }}>Поки що ніхто не вказав зручності тут — будьте першим.</p>
         ) : (
           shown.map((f, i) => (
-            <ChecklistRow
-              key={f.key}
-              label={f.label}
-              value={(point.features[f.key] ?? 'unknown') as FeatureValue}
-              critical={f.critical}
-              last={i === shown.length - 1}
-            />
+            <ChecklistRow key={f.key} label={f.label} value={(point.features[f.key] ?? 'unknown') as FeatureValue} critical={f.critical} last={i === shown.length - 1} />
           ))
         )}
         {hasHidden && (
-          <button
-            type="button"
-            className="sc-foc"
-            onClick={() => setShowAll((s) => !s)}
-            style={{ marginTop: '0.8em', background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.9em' }}
-          >
+          <button type="button" className="sc-foc" onClick={() => setShowAll((s) => !s)} style={{ marginTop: '0.8em', background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.9em' }}>
             {showAll ? 'Згорнути' : `Показати всі критерії (${applicable.length})`}
           </button>
         )}
       </section>
 
       <section style={card}>
-        <h2 style={cardTitle}>Відгуки</h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.6em', marginBottom: '0.6em', flexWrap: 'wrap' }}>
+          <h2 style={{ ...cardTitle, margin: 0 }}>Відгуки</h2>
+          {!formOpen && <Button variant="secondary" onClick={openForm} style={{ minHeight: '2.4em' }}>Написати відгук</Button>}
+        </div>
+
+        {formOpen && (
+          <form onSubmit={submitReview} style={{ display: 'flex', flexDirection: 'column', gap: '0.7em', marginBottom: '1em', padding: '1em', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '0.8em' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.3em' }} role="radiogroup" aria-label="Оцінка">
+              {[1, 2, 3, 4, 5].map((n) => (
+                <button key={n} type="button" className="sc-foc" role="radio" aria-checked={stars === n} aria-label={`${n} з 5`} onClick={() => setStars(n)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: '1.5em', lineHeight: 1, color: n <= stars ? 'var(--sc-warn)' : 'var(--sc-border-strong)' }}>
+                  ★
+                </button>
+              ))}
+            </div>
+            <textarea
+              className="sc-foc"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Поділіться досвідом доступності цього місця"
+              rows={3}
+              style={{ width: '100%', padding: '0.7em 0.9em', borderRadius: '0.7em', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em', border: 'var(--sc-bw) solid var(--sc-border-strong)', resize: 'vertical' }}
+            />
+            {reviewError ? <div role="alert" style={{ color: 'var(--sc-bad)', fontWeight: 700, fontSize: '0.85em' }}>{reviewError}</div> : null}
+            <div style={{ display: 'flex', gap: '0.6em', flexWrap: 'wrap' }}>
+              <Button type="submit" disabled={busy}>{busy ? 'Публікація…' : 'Опублікувати'}</Button>
+              <Button type="button" variant="ghost" onClick={() => setFormOpen(false)}>Скасувати</Button>
+            </div>
+          </form>
+        )}
+
         {reviews.length === 0 ? (
           <p style={{ color: 'var(--sc-muted)', fontSize: '0.9em', margin: 0 }}>Ще немає відгуків. Будьте першим.</p>
         ) : (
