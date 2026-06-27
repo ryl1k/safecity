@@ -37,7 +37,7 @@ export function AppHeader({ active }: { active?: 'map' | 'explore' | 'civic' }) 
           <span style={{ fontWeight: 800, fontSize: '1.05em' }}>SafeCity</span>
         </Link>
 
-        <nav aria-label="Розділи" style={{ display: 'flex', gap: '0.2em', flexWrap: 'wrap' }}>
+        <nav aria-label="Головна навігація" className="sc-header-nav" style={{ display: 'flex', gap: '0.2em', alignItems: 'center', flexWrap: 'wrap' }}>
           <NavLink href="/map" icon={MapIcon} label="Мапа" current={active === 'map'} />
           <NavLink href="/explore" icon={Compass} label="Огляд" current={active === 'explore'} />
           <NavLink href="/civic" icon={Megaphone} label="Громада" current={active === 'civic'} />
