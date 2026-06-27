@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import type { AccessibilityFeature, Category, FeatureValue } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
+import { LocationPicker } from '@/components/LocationPicker';
 import { Button, Field, Segmented } from '@/components/ui';
 import { getCatalog } from '@/lib/catalog';
 import { supabase } from '@/lib/supabase';
@@ -24,6 +25,7 @@ export default function ContributePage() {
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
   const [name, setName] = useState('');
   const [address, setAddress] = useState('');
+  const [description, setDescription] = useState('');
   const [category, setCategory] = useState<Category>('venue');
   const [loc, setLoc] = useState<[number, number] | null>(null);
   const [values, setValues] = useState<Record<string, FeatureValue>>({});
@@ -43,10 +45,7 @@ export default function ContributePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const features = useMemo(
-    () => catalog.filter((f) => f.categories.includes(category)),
-    [catalog, category],
-  );
+  const features = useMemo(() => catalog.filter((f) => f.categories.includes(category)), [catalog, category]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -62,6 +61,7 @@ export default function ContributePage() {
         p_lng: p[0],
         p_lat: p[1],
         p_address: address || null,
+        p_description: description || null,
         p_features: cleaned,
       });
       if (error) throw error;
@@ -78,12 +78,25 @@ export default function ContributePage() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="map" />
-      <main style={{ maxWidth: 620, margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
+      <main style={{ flex: 1, width: '100%', maxWidth: 620, margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
         <h1 style={{ margin: '0 0 1em', fontSize: '1.7em', fontWeight: 800 }}>Додати місце</h1>
 
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1em' }}>
           <Field label="Назва" required value={name} onChange={(e) => setName(e.target.value)} placeholder="напр. Кав'ярня «Кава»" />
           <Field label="Адреса" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="вул. Прикладна, 1" />
+
+          <div>
+            <label htmlFor="desc" style={{ display: 'block', fontWeight: 600, fontSize: '0.9em', marginBottom: '0.4em' }}>Опис</label>
+            <textarea
+              id="desc"
+              className="sc-foc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Що це за місце та що варто знати про доступність?"
+              rows={3}
+              style={{ width: '100%', padding: '0.7em 0.9em', borderRadius: '0.7em', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em', border: 'var(--sc-bw) solid var(--sc-border-strong)', resize: 'vertical' }}
+            />
+          </div>
 
           <div>
             <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Категорія</div>
@@ -110,21 +123,7 @@ export default function ContributePage() {
 
           <div>
             <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Місцезнаходження</div>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() =>
-                navigator.geolocation?.getCurrentPosition(
-                  (pos) => setLoc([pos.coords.longitude, pos.coords.latitude]),
-                  () => setLoc(LVIV),
-                )
-              }
-            >
-              {loc ? '✓ Місце зафіксовано' : 'Моє місцезнаходження'}
-            </Button>
-            <p style={{ margin: '0.4em 0 0', color: 'var(--sc-muted)', fontSize: '0.8em' }}>
-              Без вибору буде використано центр Львова.
-            </p>
+            <LocationPicker value={loc} onChange={(lng, lat) => setLoc([lng, lat])} />
           </div>
 
           <fieldset style={{ border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', padding: '1em' }}>

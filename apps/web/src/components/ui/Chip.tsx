@@ -25,7 +25,7 @@ export function Chip({ pressed, onToggle, children }: ChipProps) {
     fontWeight: pressed ? 700 : 600,
   };
   return (
-    <button className="sc-foc" aria-pressed={pressed} onClick={onToggle} style={style}>
+    <button type="button" className="sc-foc" aria-pressed={pressed} onClick={onToggle} style={style}>
       {children}
     </button>
   );

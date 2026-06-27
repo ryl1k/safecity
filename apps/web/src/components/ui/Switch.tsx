@@ -30,6 +30,7 @@ export function Switch({ checked, onChange, label }: SwitchProps) {
   };
   return (
     <button
+      type="button"
       className="sc-foc"
       role="switch"
       aria-checked={checked}

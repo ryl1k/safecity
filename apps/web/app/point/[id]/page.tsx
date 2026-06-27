@@ -80,6 +80,9 @@ export default function PointDetailPage({ params }: { params: { id: string } }) 
               {categoryLabel[point.category]}
               {point.address ? ` · ${point.address}` : ''}
             </p>
+            {point.description ? (
+              <p style={{ margin: '0.8em 0 0', lineHeight: 1.55 }}>{point.description}</p>
+            ) : null}
 
             <div style={{ display: 'flex', gap: '1.4em', flexWrap: 'wrap', marginTop: '1.2em' }}>
               {(['wheelchair', 'blind'] as Profile[]).map((pr) => (
