@@ -77,7 +77,6 @@ function RouteInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [to, primary]);
 
-  // Always stop speech when leaving the page.
   useEffect(() => () => stopSpeech(), []);
 
   function toggleSpeak() {
@@ -99,7 +98,7 @@ function RouteInner() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="map" />
-      <main style={{ flex: 1, maxWidth: 1000, width: '100%', margin: '0 auto', padding: '1.2em 1.25em 3em' }}>
+      <main style={{ flex: 1, width: '100%', maxWidth: 900, margin: '0 auto', padding: '1.2em 1.25em 3em' }}>
         <Link href={to ? `/point/${to}` : '/map'} className="sc-foc" style={{ color: 'var(--sc-primary)', fontWeight: 700, textDecoration: 'none', fontSize: '0.9em' }}>
           ‹ Назад
         </Link>
@@ -120,31 +119,34 @@ function RouteInner() {
         )}
 
         {status === 'ready' && (
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '1em', alignItems: 'flex-start' }}>
-            <div style={{ flex: '1 1 340px', height: 440, minWidth: 280 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '1em' }}>
+            {/* Map on top, full width */}
+            <div style={{ width: '100%', height: 'min(50vh, 420px)', minHeight: 280 }}>
               <MapView points={[]} center={dest ? [dest.lng, dest.lat] : LVIV} onSelect={() => {}} line={line} />
             </div>
-            <div style={{ flex: '1 1 300px', minWidth: 260, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', marginBottom: '0.8em', flexWrap: 'wrap' }}>
-                {summary ? (
-                  <span style={{ fontWeight: 800 }}>
-                    {distanceLabel(summary.distance)} · {Math.round(summary.duration / 60)} хв
-                  </span>
-                ) : null}
-                <Button variant={speaking ? 'secondary' : 'accent'} onClick={toggleSpeak} style={{ marginLeft: 'auto' }}>
-                  {speaking ? 'Зупинити' : 'Озвучити'}
-                </Button>
-              </div>
-              <ol style={{ listStyle: 'none', margin: 0, padding: 0, background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', overflowY: 'auto', maxHeight: '60vh' }}>
-                {steps.map((s, i) => (
-                  <li key={i} style={{ display: 'flex', gap: '0.7em', padding: '0.7em 0.9em', borderTop: i ? 'var(--sc-bw) solid var(--sc-border)' : 'none' }}>
-                    <span aria-hidden style={{ width: '1.7em', height: '1.7em', flexShrink: 0, borderRadius: '50%', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '0.8em' }}>{i + 1}</span>
-                    <span style={{ flex: 1, fontSize: '0.92em' }}>{s.instruction}</span>
-                    <span style={{ color: 'var(--sc-muted)', fontSize: '0.8em', whiteSpace: 'nowrap' }}>{distanceLabel(s.distance)}</span>
-                  </li>
-                ))}
-              </ol>
+
+            {/* Summary + audio, under the map */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>
+              {summary ? (
+                <span style={{ fontWeight: 800 }}>
+                  {distanceLabel(summary.distance)} · {Math.round(summary.duration / 60)} хв
+                </span>
+              ) : null}
+              <Button variant={speaking ? 'secondary' : 'accent'} onClick={toggleSpeak} style={{ marginLeft: 'auto' }}>
+                {speaking ? 'Зупинити' : 'Озвучити'}
+              </Button>
             </div>
+
+            {/* Steps */}
+            <ol style={{ listStyle: 'none', margin: 0, padding: 0, background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', overflow: 'hidden' }}>
+              {steps.map((s, i) => (
+                <li key={i} style={{ display: 'flex', gap: '0.7em', padding: '0.7em 0.9em', borderTop: i ? 'var(--sc-bw) solid var(--sc-border)' : 'none' }}>
+                  <span aria-hidden style={{ width: '1.7em', height: '1.7em', flexShrink: 0, borderRadius: '50%', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '0.8em' }}>{i + 1}</span>
+                  <span style={{ flex: 1, fontSize: '0.92em' }}>{s.instruction}</span>
+                  <span style={{ color: 'var(--sc-muted)', fontSize: '0.8em', whiteSpace: 'nowrap' }}>{distanceLabel(s.distance)}</span>
+                </li>
+              ))}
+            </ol>
           </div>
         )}
       </main>
