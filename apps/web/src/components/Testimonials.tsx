@@ -11,7 +11,7 @@ function Card({ q, hidden }: { q: (typeof QUOTES)[number]; hidden?: boolean }) {
     <figure
       aria-hidden={hidden}
       style={{
-        margin: 0, width: 320, flexShrink: 0, marginRight: '1em',
+        margin: 0, width: 'min(72vw, 320px)', flexShrink: 0, marginRight: '1em',
         background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)',
         borderRadius: '1em', padding: '1.1em 1.2em', boxShadow: 'var(--sc-shadow-1)',
       }}

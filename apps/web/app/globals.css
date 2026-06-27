@@ -41,7 +41,12 @@
    width. Lives inside a max-width container, so a group is always wider than the
    visible box → seamless, never a gap. Pauses on hover/focus; stops at reduced-motion. */
 @keyframes sc-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
-.sc-marquee { overflow: hidden; }
+.sc-marquee {
+  overflow: hidden;
+  /* Fade cards in/out at the edges instead of a hard clip. */
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+  mask-image: linear-gradient(to right, transparent, #000 7%, #000 93%, transparent);
+}
 .sc-marquee-track { display: flex; width: max-content; animation: sc-marquee 45s linear infinite; }
 .sc-marquee:hover .sc-marquee-track,
 .sc-marquee:focus-within .sc-marquee-track { animation-play-state: paused; }
