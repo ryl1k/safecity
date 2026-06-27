@@ -2,9 +2,10 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { SlidersHorizontal, Type, Check } from 'lucide-react';
+import { SlidersHorizontal, Check } from 'lucide-react';
 import type { ThemeName } from '@safecity/design-tokens';
 import { useTheme } from '@/theme/ThemeProvider';
+import { FontSizeSlider } from '@/components/FontSizeSlider';
 
 const THEMES: { key: ThemeName; label: string }[] = [
   { key: 'standard', label: 'Стандартна' },
@@ -14,7 +15,7 @@ const THEMES: { key: ThemeName; label: string }[] = [
 
 /** Compact appearance popover (theme + text size) — keeps wide controls out of the header. */
 export function AccessibilityMenu() {
-  const { theme, big, setTheme, toggleBig } = useTheme();
+  const { theme, setTheme } = useTheme();
   const [open, setOpen] = useState(false);
 
   return (
@@ -71,22 +72,7 @@ export function AccessibilityMenu() {
             </div>
 
             <div style={sectionLabel}>Розмір тексту</div>
-            <button
-              className="sc-foc"
-              role="switch"
-              aria-checked={big === '1'}
-              onClick={toggleBig}
-              style={{
-                display: 'flex', alignItems: 'center', gap: '0.5em', width: '100%', minHeight: '2.6em', padding: '0 0.7em',
-                borderRadius: '0.6em', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700,
-                border: `var(--sc-bw) solid ${big === '1' ? 'var(--sc-primary)' : 'var(--sc-border)'}`,
-                background: big === '1' ? 'var(--sc-primary-tint)' : 'var(--sc-surface)',
-                color: big === '1' ? 'var(--sc-primary)' : 'var(--sc-text)',
-              }}
-            >
-              <Type size={16} aria-hidden /> Збільшений (200%)
-              <span style={{ marginLeft: 'auto', fontSize: '0.85em' }}>{big === '1' ? 'Увімк.' : 'Вимк.'}</span>
-            </button>
+            <FontSizeSlider />
 
             <Link href="/settings" className="sc-foc" onClick={() => setOpen(false)} style={{ display: 'block', marginTop: '0.9em', color: 'var(--sc-primary)', fontWeight: 700, fontSize: '0.85em', textDecoration: 'none' }}>
               Більше налаштувань →

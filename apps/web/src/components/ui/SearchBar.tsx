@@ -33,6 +33,7 @@ export function SearchBar({ value, onChange, placeholder, ariaLabel, onVoice }: 
         onChange={(e) => onChange(e.target.value)}
         style={{
           flex: 1,
+          minWidth: 0,
           border: 'none',
           background: 'transparent',
           fontFamily: 'inherit',

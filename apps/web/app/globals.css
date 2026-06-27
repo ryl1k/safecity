@@ -3,19 +3,19 @@
 @tailwind utilities;
 
 @layer base {
-  html {
-    /* Base font scale follows the active theme (--sc-scale) + 200% toggle (data-big). */
-    font-size: calc(16px * var(--sc-scale, 1));
-  }
-  html[data-big='1'] {
-    font-size: calc(16px * var(--sc-scale, 1) * 2);
-  }
+  /* Root font-size is set in design-tokens themes.css via [data-sc-root]
+     (per-theme scale × user font-size slider). */
   body {
     background: var(--sc-bg);
     color: var(--sc-text);
     -webkit-font-smoothing: antialiased;
     margin: 0;
+    /* Let long words wrap at large font sizes / narrow screens instead of overflowing. */
+    overflow-wrap: break-word;
+    word-break: break-word;
   }
+  /* Headings are the most likely to overflow when text is scaled up. */
+  h1, h2, h3 { overflow-wrap: break-word; hyphens: auto; }
   /* Global visible focus — never remove (KB 11). */
   :where(a, button, input, select, textarea, [tabindex]):focus-visible {
     outline: 3px solid var(--sc-focus);
@@ -35,6 +35,18 @@
 .sc-animate-in { animation: sc-fade-in-up 0.45s ease backwards; }
 @media (prefers-reduced-motion: reduce) {
   .sc-animate-in { animation: none; }
+}
+
+/* Looping reviews marquee. Two identical groups; translateX(-50%) loops one group
+   width. Lives inside a max-width container, so a group is always wider than the
+   visible box → seamless, never a gap. Pauses on hover/focus; stops at reduced-motion. */
+@keyframes sc-marquee { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.sc-marquee { overflow: hidden; }
+.sc-marquee-track { display: flex; width: max-content; animation: sc-marquee 45s linear infinite; }
+.sc-marquee:hover .sc-marquee-track,
+.sc-marquee:focus-within .sc-marquee-track { animation-play-state: paused; }
+@media (prefers-reduced-motion: reduce) {
+  .sc-marquee-track { animation: none; }
 }
 
 /* Hide non-essential labels on small screens (icon-only nav) */

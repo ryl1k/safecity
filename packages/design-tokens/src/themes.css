@@ -73,9 +73,8 @@
   --sc-shadow-2: 0 6px 18px rgba(0, 0, 0, .5);
 }
 
-/* Base text scale uses --sc-scale; data-big doubles it for the 200% toggle. */
-[data-sc-root] { font-size: calc(16px * var(--sc-scale, 1)); }
-[data-sc-root][data-big="1"] { font-size: calc(16px * var(--sc-scale, 1) * 2); }
+/* Base text scale = per-theme scale × the user's font-size slider (--sc-user-scale). */
+[data-sc-root] { font-size: calc(16px * var(--sc-scale, 1) * var(--sc-user-scale, 1)); }
 
 /* Visible focus ring — never remove. */
 .sc-foc:focus-visible { outline: 3px solid var(--sc-focus); outline-offset: 2px; border-radius: 4px; }
