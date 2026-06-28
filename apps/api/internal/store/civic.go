@@ -68,6 +68,36 @@ func (s *Store) CreatePetition(ctx context.Context, userID string, in NewPetitio
 	return p, classify(err)
 }
 
+// LngLat is a coordinate pair (lng, lat).
+type LngLat struct {
+	Lng float64 `json:"lng"`
+	Lat float64 `json:"lat"`
+}
+
+const barriersInBBoxSQL = `
+select lng, lat from problems_in_bbox($1, $2, $3, $4)
+where status::text in ('confirmed', 'escalated')`
+
+// BarriersInBBox returns the locations of confirmed/escalated problems in a box —
+// the live barriers the router should avoid. Public read (no RLS round-trip).
+func (s *Store) BarriersInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]LngLat, error) {
+	rows, err := s.db.Pool.Query(ctx, barriersInBBoxSQL, minLng, minLat, maxLng, maxLat)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []LngLat{}
+	for rows.Next() {
+		var p LngLat
+		if err := rows.Scan(&p.Lng, &p.Lat); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
 // SignResult is the petition signature tally after signing.
 type SignResult struct {
 	Signatures int `json:"signatures"`

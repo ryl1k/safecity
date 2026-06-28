@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/safecity/api/internal/auth"
+	"github.com/safecity/api/internal/geo"
 	"github.com/safecity/api/internal/httpx"
 	"github.com/safecity/api/internal/ratelimit"
 	"github.com/safecity/api/internal/store"
@@ -35,6 +36,14 @@ type DataStore interface {
 	ConfirmProblem(ctx context.Context, userID, problemID string) (store.ConfirmResult, error)
 	CreatePetition(ctx context.Context, userID string, in store.NewPetition) (store.Petition, error)
 	SignPetition(ctx context.Context, userID, petitionID string) (store.SignResult, error)
+	// routing support
+	BarriersInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.LngLat, error)
+}
+
+// GeoService proxies routing + geocoding (ORS / Nominatim).
+type GeoService interface {
+	Route(ctx context.Context, in geo.RouteInput) (geo.RouteResult, error)
+	Geocode(ctx context.Context, query string, limit int) ([]geo.Place, error)
 }
 
 // Deps are the dependencies wired into the server. Log is required; the rest are
@@ -46,6 +55,7 @@ type Deps struct {
 	Roles    auth.RoleResolver           // resolves application role for RequireRole
 	Limiter  *ratelimit.Limiter          // throttles writes/proxies; nil disables limiting
 	Store    DataStore                   // data access; nil disables data routes
+	Geo      GeoService                  // routing/geocoding proxy; nil disables proxy routes
 }
 
 // Server holds the router and dependencies shared by handlers.
@@ -57,6 +67,7 @@ type Server struct {
 	roles    auth.RoleResolver
 	limiter  *ratelimit.Limiter
 	store    DataStore
+	geo      GeoService
 }
 
 // New builds a Server with base middleware and routes registered.
@@ -73,7 +84,7 @@ func New(d Deps) *Server {
 		r.Use(auth.Authenticate(d.Verifier))
 	}
 
-	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles, limiter: d.Limiter, store: d.Store}
+	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles, limiter: d.Limiter, store: d.Store, geo: d.Geo}
 	s.routes()
 	return s
 }
@@ -101,6 +112,15 @@ func (s *Server) routes() {
 		})
 	}
 
+	// Public, rate-limited proxy surface (guests route + geocode).
+	if s.geo != nil {
+		s.router.Group(func(r chi.Router) {
+			s.limited(r)
+			r.Post("/route", s.handleRoute)
+			r.Get("/geocode", s.handleGeocode)
+		})
+	}
+
 	// Authenticated, rate-limited surface.
 	s.router.Group(func(r chi.Router) {
 		s.authed(r)
@@ -114,12 +134,17 @@ func (s *Server) routes() {
 	})
 }
 
-// authed applies the auth + rate-limit middleware to a route group.
-func (s *Server) authed(r chi.Router) {
-	r.Use(auth.RequireUser)
+// limited applies the rate-limit middleware to a route group (if configured).
+func (s *Server) limited(r chi.Router) {
 	if s.limiter != nil {
 		r.Use(s.limiter.Middleware(s.rateKey))
 	}
+}
+
+// authed applies auth + rate-limit middleware to a route group.
+func (s *Server) authed(r chi.Router) {
+	r.Use(auth.RequireUser)
+	s.limited(r)
 }
 
 // storeError maps store sentinel errors to HTTP responses. conflictMsg/notFoundMsg

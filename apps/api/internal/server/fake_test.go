@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 
+	"github.com/safecity/api/internal/geo"
 	"github.com/safecity/api/internal/store"
 )
 
@@ -54,6 +55,10 @@ type fakeStore struct {
 	gotSignID string
 	sign      store.SignResult
 	signErr   error
+
+	// BarriersInBBox
+	barriers    []store.LngLat
+	barriersErr error
 }
 
 func (f *fakeStore) CreateProblem(_ context.Context, userID string, in store.NewProblem) (store.Problem, error) {
@@ -105,4 +110,31 @@ func (f *fakeStore) SignPetition(_ context.Context, userID, petitionID string) (
 	f.gotUser = userID
 	f.gotSignID = petitionID
 	return f.sign, f.signErr
+}
+
+func (f *fakeStore) BarriersInBBox(_ context.Context, _, _, _, _ float64) ([]store.LngLat, error) {
+	return f.barriers, f.barriersErr
+}
+
+// fakeGeo is a configurable GeoService for handler unit tests.
+type fakeGeo struct {
+	gotRoute geo.RouteInput
+	route    geo.RouteResult
+	routeErr error
+
+	gotGeoQuery string
+	gotGeoLimit int
+	places      []geo.Place
+	geoErr      error
+}
+
+func (f *fakeGeo) Route(_ context.Context, in geo.RouteInput) (geo.RouteResult, error) {
+	f.gotRoute = in
+	return f.route, f.routeErr
+}
+
+func (f *fakeGeo) Geocode(_ context.Context, query string, limit int) ([]geo.Place, error) {
+	f.gotGeoQuery = query
+	f.gotGeoLimit = limit
+	return f.places, f.geoErr
 }

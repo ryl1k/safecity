@@ -16,6 +16,7 @@ import (
 	"github.com/safecity/api/internal/auth"
 	"github.com/safecity/api/internal/config"
 	"github.com/safecity/api/internal/db"
+	"github.com/safecity/api/internal/geo"
 	"github.com/safecity/api/internal/ratelimit"
 	"github.com/safecity/api/internal/server"
 	"github.com/safecity/api/internal/store"
@@ -53,6 +54,8 @@ func main() {
 	defer close(stopJanitor)
 	limiter.StartJanitor(stopJanitor)
 
+	geoClient := geo.New(cfg.ORSAPIKey, cfg.ORSBaseURL, cfg.NominatimURL, 15*time.Second)
+
 	srv := server.New(server.Deps{
 		Log:      logger,
 		Ready:    database.Ping,
@@ -60,6 +63,7 @@ func main() {
 		Roles:    database.Role,
 		Limiter:  limiter,
 		Store:    store.New(database),
+		Geo:      geoClient,
 	})
 	httpSrv := &http.Server{
 		Addr:              ":" + cfg.Port,

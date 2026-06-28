@@ -39,6 +39,17 @@ directly. See board epic **M10 · Go API backend**.
 
 Photo uploads stay client→Supabase Storage direct; the API only records the resulting URLs.
 Note: petition signatures have no DB count trigger, so the API returns the live `count(*)`.
+
+### Proxies (public, rate-limited; keys stay server-side)
+- `POST /route` — OpenRouteService proxy. Body: `from` `[lng,lat]`, `to` `[lng,lat]` (required),
+  `profile?` (`wheelchair` default | `blind`→foot), `params?` (`maxIncline`/`maxSlopedKerb`/`minWidth`).
+  Wheelchair falls back to foot-walking when ORS finds no path. **avoid_polygons are built
+  server-side** from confirmed/escalated problems in the route corridor (the client no longer
+  needs to). Returns `{profile, fallback, avoided, coordinates, steps, summary}`. 503 if no ORS key.
+- `GET /geocode?q=&limit=` — Nominatim proxy (cached 10 min, sends a required User-Agent).
+  Returns `[{id, label, lng, lat}]`; empty for queries under 3 chars.
+
+Base URLs are configurable (`ORS_BASE_URL`, `NOMINATIM_URL`) so ORS/Nominatim can be self-hosted.
 - `POST /problems` — authenticated; report a problem. Body: `title` (required),
   `description?`, `category?`, `severity?` (1–3), and either `point_id` or `lat`+`lng`
   (dropped pin). Returns the created row (201). `created_by` is forced to the caller
