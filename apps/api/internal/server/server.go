@@ -80,7 +80,9 @@ type Server struct {
 func New(d Deps) *Server {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
+	// NOTE: chi's RealIP is deprecated (X-Forwarded-For is spoofable). We key the
+	// rate limiter off RemoteAddr directly; add trusted-proxy parsing if deployed
+	// behind a load balancer.
 	if len(d.CORSOrigins) > 0 {
 		// Browser clients (web/mobile) are cross-origin; tokens ride in the
 		// Authorization header (not cookies), so no credentials needed.
@@ -202,7 +204,6 @@ func (s *Server) rateKey(r *http.Request) string {
 }
 
 func clientIP(r *http.Request) string {
-	// chi's RealIP middleware has already normalized RemoteAddr from proxy headers.
 	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
 		return host
 	}

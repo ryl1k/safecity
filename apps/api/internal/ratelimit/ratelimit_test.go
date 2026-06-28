@@ -12,8 +12,10 @@ const perHour = 1.0 / 3600.0
 
 func TestAllowBurstThenDeny(t *testing.T) {
 	l := New(perHour, 2)
-	if !l.Allow("k") || !l.Allow("k") {
-		t.Fatal("first two requests should be allowed (burst=2)")
+	first := l.Allow("k")
+	second := l.Allow("k")
+	if !first || !second {
+		t.Fatalf("first two requests should be allowed (burst=2): %v, %v", first, second)
 	}
 	if l.Allow("k") {
 		t.Fatal("third request should be denied")
