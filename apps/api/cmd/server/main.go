@@ -17,6 +17,7 @@ import (
 	"github.com/safecity/api/internal/config"
 	"github.com/safecity/api/internal/db"
 	"github.com/safecity/api/internal/geo"
+	"github.com/safecity/api/internal/metrics"
 	"github.com/safecity/api/internal/ml"
 	"github.com/safecity/api/internal/ratelimit"
 	"github.com/safecity/api/internal/server"
@@ -78,6 +79,7 @@ func main() {
 		Limiter:  limiter,
 		Store:    store.New(database),
 		Geo:      geoClient,
+		Metrics:  metrics.New(),
 	})
 	httpSrv := &http.Server{
 		Addr:              ":" + cfg.Port,

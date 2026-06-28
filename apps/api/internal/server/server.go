@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"regexp"
+	"runtime/debug"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -16,6 +17,7 @@ import (
 	"github.com/safecity/api/internal/auth"
 	"github.com/safecity/api/internal/geo"
 	"github.com/safecity/api/internal/httpx"
+	"github.com/safecity/api/internal/metrics"
 	"github.com/safecity/api/internal/ratelimit"
 	"github.com/safecity/api/internal/store"
 )
@@ -56,6 +58,7 @@ type Deps struct {
 	Limiter  *ratelimit.Limiter          // throttles writes/proxies; nil disables limiting
 	Store    DataStore                   // data access; nil disables data routes
 	Geo      GeoService                  // routing/geocoding proxy; nil disables proxy routes
+	Metrics  *metrics.Metrics            // Prometheus hook; nil disables /metrics
 }
 
 // Server holds the router and dependencies shared by handlers.
@@ -68,6 +71,7 @@ type Server struct {
 	limiter  *ratelimit.Limiter
 	store    DataStore
 	geo      GeoService
+	metrics  *metrics.Metrics
 }
 
 // New builds a Server with base middleware and routes registered.
@@ -75,8 +79,8 @@ func New(d Deps) *Server {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(requestLogger(d.Log))
-	r.Use(middleware.Recoverer)
+	r.Use(requestObserver(d.Log, d.Metrics)) // wraps RW once: logs + records metrics + in-flight
+	r.Use(recoverer(d.Log))                  // structured panic → JSON 500 (inside the observer)
 	r.Use(middleware.Timeout(30 * time.Second))
 	if d.Verifier != nil {
 		// Guest-friendly: attaches a principal when a valid bearer is present,
@@ -84,7 +88,7 @@ func New(d Deps) *Server {
 		r.Use(auth.Authenticate(d.Verifier))
 	}
 
-	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles, limiter: d.Limiter, store: d.Store, geo: d.Geo}
+	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles, limiter: d.Limiter, store: d.Store, geo: d.Geo, metrics: d.Metrics}
 	s.routes()
 	return s
 }
@@ -96,6 +100,9 @@ func (s *Server) routes() {
 	// Probes are unauthenticated and unthrottled (orchestrators poll them often).
 	s.router.Get("/healthz", s.handleHealth)
 	s.router.Get("/readyz", s.handleReady)
+	if s.metrics != nil {
+		s.router.Handle("/metrics", s.metrics.Handler())
+	}
 
 	if s.store != nil {
 		// /points mixes public reads with authenticated writes. chi mounts a
@@ -228,20 +235,68 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, map[string]string{"status": "ready"})
 }
 
-func requestLogger(log *slog.Logger) func(http.Handler) http.Handler {
+// requestObserver wraps the response writer once to emit a structured access log
+// and (if set) Prometheus metrics, tracking in-flight requests. The route label
+// is the chi pattern (e.g. /points/{id}), not the raw path, to bound cardinality.
+func requestObserver(log *slog.Logger, m *metrics.Metrics) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := time.Now()
 			ww := middleware.NewWrapResponseWriter(w, r.ProtoMajor)
+			if m != nil {
+				m.IncInFlight()
+				defer m.DecInFlight()
+			}
+
 			next.ServeHTTP(ww, r)
+
+			route := chi.RouteContext(r.Context()).RoutePattern()
+			if route == "" {
+				route = "unmatched"
+			}
+			status := ww.Status()
+			if status == 0 {
+				status = http.StatusOK // handler wrote body without an explicit header
+			}
+			dur := time.Since(start)
 			log.Info("request",
 				"method", r.Method,
 				"path", r.URL.Path,
-				"status", ww.Status(),
+				"route", route,
+				"status", status,
 				"bytes", ww.BytesWritten(),
-				"dur_ms", time.Since(start).Milliseconds(),
+				"dur_ms", dur.Milliseconds(),
 				"req_id", middleware.GetReqID(r.Context()),
 			)
+			if m != nil {
+				m.Observe(r.Method, route, status, dur)
+			}
+		})
+	}
+}
+
+// recoverer turns a handler panic into a structured error log + a JSON 500,
+// instead of chi's default plaintext response.
+func recoverer(log *slog.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			defer func() {
+				rec := recover()
+				if rec == nil {
+					return
+				}
+				if rec == http.ErrAbortHandler { // client aborted; let the server handle it
+					panic(rec)
+				}
+				log.Error("panic recovered",
+					"err", rec,
+					"path", r.URL.Path,
+					"req_id", middleware.GetReqID(r.Context()),
+					"stack", string(debug.Stack()),
+				)
+				httpx.Error(w, http.StatusInternalServerError, "internal", "internal error")
+			}()
+			next.ServeHTTP(w, r)
 		})
 	}
 }

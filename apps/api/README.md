@@ -18,6 +18,7 @@ directly. See board epic **M10 · Go API backend**.
 ## Endpoints
 - `GET /healthz` — liveness (always 200 while the process is up)
 - `GET /readyz` — readiness; pings Postgres (503 if down)
+- `GET /metrics` — Prometheus exposition (request counts/latency, in-flight, Go runtime)
 - `GET /me` — authenticated; returns `{user_id, email, role}`
 - `GET /points/near?lng=&lat=&radius=` — public; points within `radius` m (default 1500,
   max 50000), nearest first. Each carries `features` for the client rating engine.
@@ -79,6 +80,16 @@ A request flows: chi middleware (request id, logging, recover, timeout, optional
 → handler (`internal/server`) → `httpx.Decode` validation → `internal/store` method →
 `db.WithUser` RLS-claims tx → Postgres. `store` never trusts client-supplied ownership;
 Postgres RLS policies enforce it.
+
+## Observability
+- **Structured logs:** slog (JSON in prod, text in dev). Every request logs method,
+  path, route pattern, status, bytes, duration, and request id.
+- **Request IDs:** chi `RequestID` (echoed in logs; surfaced for tracing later).
+- **Panic recovery:** a custom recoverer logs the panic + stack (structured) and
+  returns the standard JSON 500 envelope.
+- **Metrics:** Prometheus at `/metrics` (`http_requests_total`,
+  `http_request_duration_seconds`, `http_requests_in_flight` + Go/process collectors),
+  labelled by the chi route pattern to bound cardinality.
 
 ## Conventions
 - **Error shape:** every error is `{"error": {"code": "...", "message": "...", "fields": [...]}}`.
