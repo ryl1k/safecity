@@ -28,6 +28,8 @@ type Config struct {
 
 	RateRPS   float64 // per-key sustained requests/second on throttled routes
 	RateBurst int     // per-key burst allowance
+
+	CORSOrigins []string // allowed browser origins for the web/mobile clients
 }
 
 // Load reads config from the environment and fails fast on missing required vars.
@@ -46,6 +48,7 @@ func Load() (Config, error) {
 		MLGRPCAddr:        os.Getenv("ML_GRPC_URL"),
 		RateRPS:           envFloat("RATE_LIMIT_RPS", 10),
 		RateBurst:         envInt("RATE_LIMIT_BURST", 20),
+		CORSOrigins:       csv(env("CORS_ORIGINS", "http://localhost:3000")),
 	}
 
 	var missing []string
@@ -72,6 +75,17 @@ func env(key, def string) string {
 		return v
 	}
 	return def
+}
+
+// csv splits a comma-separated env value into trimmed, non-empty items.
+func csv(s string) []string {
+	var out []string
+	for _, part := range strings.Split(s, ",") {
+		if v := strings.TrimSpace(part); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
 }
 
 func envFloat(key string, def float64) float64 {

@@ -72,14 +72,15 @@ func main() {
 	}
 
 	srv := server.New(server.Deps{
-		Log:      logger,
-		Ready:    database.Ping,
-		Verifier: verifier,
-		Roles:    database.Role,
-		Limiter:  limiter,
-		Store:    store.New(database),
-		Geo:      geoClient,
-		Metrics:  metrics.New(),
+		Log:         logger,
+		Ready:       database.Ping,
+		Verifier:    verifier,
+		Roles:       database.Role,
+		Limiter:     limiter,
+		Store:       store.New(database),
+		Geo:         geoClient,
+		Metrics:     metrics.New(),
+		CORSOrigins: cfg.CORSOrigins,
 	})
 	httpSrv := &http.Server{
 		Addr:              ":" + cfg.Port,

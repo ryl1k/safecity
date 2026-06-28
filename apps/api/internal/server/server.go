@@ -13,6 +13,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/cors"
 
 	"github.com/safecity/api/internal/auth"
 	"github.com/safecity/api/internal/geo"
@@ -51,14 +52,15 @@ type GeoService interface {
 // Deps are the dependencies wired into the server. Log is required; the rest are
 // optional so tests can construct a minimal server.
 type Deps struct {
-	Log      *slog.Logger
-	Ready    func(context.Context) error // readiness check (e.g. DB ping); nil = always ready
-	Verifier *auth.Verifier              // JWT verifier; nil disables auth (public routes only)
-	Roles    auth.RoleResolver           // resolves application role for RequireRole
-	Limiter  *ratelimit.Limiter          // throttles writes/proxies; nil disables limiting
-	Store    DataStore                   // data access; nil disables data routes
-	Geo      GeoService                  // routing/geocoding proxy; nil disables proxy routes
-	Metrics  *metrics.Metrics            // Prometheus hook; nil disables /metrics
+	Log         *slog.Logger
+	Ready       func(context.Context) error // readiness check (e.g. DB ping); nil = always ready
+	Verifier    *auth.Verifier              // JWT verifier; nil disables auth (public routes only)
+	Roles       auth.RoleResolver           // resolves application role for RequireRole
+	Limiter     *ratelimit.Limiter          // throttles writes/proxies; nil disables limiting
+	Store       DataStore                   // data access; nil disables data routes
+	Geo         GeoService                  // routing/geocoding proxy; nil disables proxy routes
+	Metrics     *metrics.Metrics            // Prometheus hook; nil disables /metrics
+	CORSOrigins []string                    // allowed browser origins; empty disables CORS
 }
 
 // Server holds the router and dependencies shared by handlers.
@@ -79,6 +81,16 @@ func New(d Deps) *Server {
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
+	if len(d.CORSOrigins) > 0 {
+		// Browser clients (web/mobile) are cross-origin; tokens ride in the
+		// Authorization header (not cookies), so no credentials needed.
+		r.Use(cors.Handler(cors.Options{
+			AllowedOrigins: d.CORSOrigins,
+			AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodOptions},
+			AllowedHeaders: []string{"Authorization", "Content-Type"},
+			MaxAge:         300,
+		}))
+	}
 	r.Use(requestObserver(d.Log, d.Metrics)) // wraps RW once: logs + records metrics + in-flight
 	r.Use(recoverer(d.Log))                  // structured panic → JSON 500 (inside the observer)
 	r.Use(middleware.Timeout(30 * time.Second))
