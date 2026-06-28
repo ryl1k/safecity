@@ -19,6 +19,7 @@ type createProblemRequest struct {
 	PointID     string   `json:"point_id" validate:"omitempty,uuid"`
 	Lat         *float64 `json:"lat" validate:"omitempty,latitude"`
 	Lng         *float64 `json:"lng" validate:"omitempty,longitude"`
+	Photos      []string `json:"photos" validate:"omitempty,max=10,dive,url"`
 }
 
 // handleCreateProblem: client → auth (RequireUser) → validate → RLS-claims tx →
@@ -56,6 +57,7 @@ func (s *Server) handleCreateProblem(w http.ResponseWriter, r *http.Request) {
 		PointID:     req.PointID,
 		Lat:         req.Lat,
 		Lng:         req.Lng,
+		Photos:      req.Photos,
 	})
 	if err != nil {
 		s.log.Error("create problem", "err", err, "user", p.UserID)
