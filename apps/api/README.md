@@ -111,6 +111,15 @@ curl localhost:8080/healthz
 go test ./...
 ```
 
+## Docker
+Multi-stage build (Go → `distroless/static:nonroot`). Build context is the repo root:
+```
+docker build -f apps/api/Dockerfile -t safecity-api .
+docker run --rm -p 8080:8080 --env-file .env safecity-api
+```
+The image is static, non-root, and ships CA certs for outbound TLS. CD builds it
+per `.github/workflows/cd.yml` (`context: .`, `file: apps/api/Dockerfile`).
+
 ## Notes
 - **Auth:** Supabase issues asymmetric JWTs — verified via the JWKS endpoint (no shared secret).
 - **DB authz:** keep Postgres RLS by running each request in a transaction that sets
