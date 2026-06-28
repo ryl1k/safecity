@@ -1,20 +1,35 @@
 # @safecity/mobile
 
-React Native via **Expo + dev client** (config plugins for vision-camera, MapLibre, ML Kit).
+React Native via **Expo SDK 52 + dev client** (native modules → **not Expo Go**).
+expo-router, MapLibre RN, Supabase (AsyncStorage). Reuses `@safecity/shared`
+(types + `computeRating`) and `@safecity/design-tokens`.
 
 ```
-app/                 expo-router routes:
-                       (onboarding)/ · (tabs)/ · point/[id] · problem/[id]
-                       petition/[id] · route/ · walk/ (CV mode) · auth/
+app/                 expo-router routes
+  _layout.tsx          root stack (gesture handler + safe area)
+  index.tsx            → redirect to /places
+  (tabs)/              Мапа (map) · Місця (places list)
 src/
-  features/          onboarding, map, points, routing, cv-tts, civic, account
-  components/        platform UI (consumes @safecity/design-tokens)
-  theme/             profile-aware theming — the UI-mode swap engine lives here
-  lib/               supabase, api-client, i18n, tts, haptics, permissions
-  state/             stores: accessibilityProfile, filters
-app.config.ts        Expo config + native plugins
-eas.json             build profiles
+  lib/               env, supabase(AsyncStorage), api (Go API client), points, catalog, format
+  components/        PointsMap (MapLibre), PointRow, RatingBadge, Centered
+  theme/             theme.ts (token palette + RN scales; full provider TBD)
+app.config.ts        Expo config + plugins (expo-router, dev-client, expo-location)
+metro.config.js      monorepo (watch workspace root, resolve @safecity/*)
+eas.json             dev/preview/production build profiles
 ```
 
-The **onboarding spine** drives theme + which features are offered. Accessible by default
-(bootstrap rule). KB: `03 · Onboarding`, `02 · Map`, `06 · CV + TTS`, `11 · A11y`.
+## Run (needs a dev client — not Expo Go)
+```
+cp .env.example .env        # set EXPO_PUBLIC_API_URL (LAN IP, not localhost) + Supabase
+pnpm --filter @safecity/mobile exec expo run:android   # or run:ios — builds the dev client
+pnpm --filter @safecity/mobile start                   # then start Metro
+```
+The map + nearby list read from the Go API (`EXPO_PUBLIC_API_URL`); unset → Supabase-direct.
+
+## Status
+Scaffold + shared-lib port + **map + nearby-list** (reads the Go API; ratings via
+`computeRating`). Type-checks; runtime verified on device/emulator only.
+**Next:** theme/profile providers (AsyncStorage) → onboarding spine → point detail →
+civic → routing → CV walk mode (vision-camera + ML Kit, blind profile, disclaimer).
+
+KB: `15 · Mobile Build Plan`, `10 · Architecture`, `02 · Map`, `03 · Onboarding`, `06 · CV+TTS`, `11 · A11y`.
