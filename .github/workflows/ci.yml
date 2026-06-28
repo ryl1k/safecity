@@ -10,6 +10,9 @@ concurrency:
 
 permissions:
   contents: read
+  pull-requests: read # required by the reusable changes.yml (paths-filter on PRs);
+  # a called workflow can't request more than the caller grants, or the run
+  # fails at startup (startup_failure).
 
 jobs:
   # Pre-flight: which services changed?
