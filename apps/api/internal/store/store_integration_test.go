@@ -11,25 +11,32 @@ import (
 	"github.com/safecity/api/internal/db"
 )
 
-// TestCreateProblemIntegration exercises the full write path against the real
-// Supabase Postgres: store → RLS-via-claims tx → insert with created_by =
-// auth.uid() → PostGIS geom round-trip. Skipped when DATABASE_URL is unset (CI
-// without a DB); the dedicated testcontainers task adds hermetic coverage.
-func TestCreateProblemIntegration(t *testing.T) {
+// dialTestDB connects to the real Supabase Postgres for integration tests, or
+// skips when DATABASE_URL is unset (CI without a DB). The dedicated
+// testcontainers task adds hermetic coverage.
+func dialTestDB(t *testing.T, ctx context.Context) *db.DB {
+	t.Helper()
 	_ = godotenv.Load("../../../../.env") // repo-root .env for local runs
 	dsn := os.Getenv("DATABASE_URL")
 	if dsn == "" {
 		t.Skip("DATABASE_URL not set; skipping DB integration test")
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
 	database, err := db.New(ctx, dsn)
 	if err != nil {
 		t.Fatalf("db.New: %v", err)
 	}
-	defer database.Close()
+	t.Cleanup(database.Close)
+	return database
+}
+
+// TestCreateProblemIntegration exercises the full write path against the real
+// Supabase Postgres: store → RLS-via-claims tx → insert with created_by =
+// auth.uid() → PostGIS geom round-trip.
+func TestCreateProblemIntegration(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	database := dialTestDB(t, ctx)
 
 	var uid string
 	if err := database.Pool.QueryRow(ctx,

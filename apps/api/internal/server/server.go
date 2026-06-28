@@ -22,6 +22,9 @@ import (
 // unit-tested with a fake.
 type DataStore interface {
 	CreateProblem(ctx context.Context, userID string, in store.NewProblem) (store.Problem, error)
+	PointsNear(ctx context.Context, lng, lat, radiusM float64) ([]store.PointSummary, error)
+	PointsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.PointSummary, error)
+	PointDetail(ctx context.Context, id string) (*store.PointDetail, error)
 }
 
 // Deps are the dependencies wired into the server. Log is required; the rest are
@@ -72,6 +75,15 @@ func (s *Server) routes() {
 	// Probes are unauthenticated and unthrottled (orchestrators poll them often).
 	s.router.Get("/healthz", s.handleHealth)
 	s.router.Get("/readyz", s.handleReady)
+
+	// Public, guest-first reads (no auth) — high-volume map queries.
+	if s.store != nil {
+		s.router.Route("/points", func(r chi.Router) {
+			r.Get("/near", s.handlePointsNear)
+			r.Get("/bbox", s.handlePointsBBox)
+			r.Get("/{id}", s.handlePointDetail)
+		})
+	}
 
 	// Authenticated surface — writes and the like get rate limited.
 	s.router.Group(func(r chi.Router) {

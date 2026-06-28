@@ -13,19 +13,6 @@ import (
 	"github.com/safecity/api/internal/store"
 )
 
-type fakeStore struct {
-	gotUser string
-	got     store.NewProblem
-	ret     store.Problem
-	err     error
-}
-
-func (f *fakeStore) CreateProblem(_ context.Context, userID string, in store.NewProblem) (store.Problem, error) {
-	f.gotUser = userID
-	f.got = in
-	return f.ret, f.err
-}
-
 func problemServer(fs DataStore) *Server {
 	return New(Deps{Log: slog.New(slog.NewTextHandler(io.Discard, nil)), Store: fs})
 }

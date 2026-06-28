@@ -19,6 +19,10 @@ directly. See board epic **M10 · Go API backend**.
 - `GET /healthz` — liveness (always 200 while the process is up)
 - `GET /readyz` — readiness; pings Postgres (503 if down)
 - `GET /me` — authenticated; returns `{user_id, email, role}`
+- `GET /points/near?lng=&lat=&radius=` — public; points within `radius` m (default 1500,
+  max 50000), nearest first. Each carries `features` for the client rating engine.
+- `GET /points/bbox?min_lng=&min_lat=&max_lng=&max_lat=` — public; points in a bounding box.
+- `GET /points/{id}` — public; full point detail (adds `description`, `photos`). 404 if absent.
 - `POST /problems` — authenticated; report a problem. Body: `title` (required),
   `description?`, `category?`, `severity?` (1–3), and either `point_id` or `lat`+`lng`
   (dropped pin). Returns the created row (201). `created_by` is forced to the caller
