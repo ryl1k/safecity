@@ -55,6 +55,17 @@ Base URLs are configurable (`ORS_BASE_URL`, `NOMINATIM_URL`) so ORS/Nominatim ca
   (dropped pin). Returns the created row (201). `created_by` is forced to the caller
   via RLS — the client cannot set it.
 
+## Importers (ETL CLIs, idempotent on `osm_id`)
+Run from `apps/api` (they load the repo-root `.env`). Admin jobs — they use the
+privileged pool connection and bypass RLS, like the original Node scripts.
+```
+go run ./cmd/import-osm                 # OSM Overpass (LVIV_BBOX="S,W,N,E" to override)
+go run ./cmd/import-mymaps <file.kml> [category]   # Google MyMaps KML
+go run ./cmd/dedupe [--apply]           # merge proximity+name duplicates (dry-run default)
+```
+Logic lives in `internal/importer` (pure mapping/dedupe is unit-tested; KML upsert
+idempotency is covered by a real-DB integration test).
+
 ## Layers
 A request flows: chi middleware (request id, logging, recover, timeout, optional auth)
 → handler (`internal/server`) → `httpx.Decode` validation → `internal/store` method →
