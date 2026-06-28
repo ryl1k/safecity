@@ -23,6 +23,22 @@ directly. See board epic **M10 · Go API backend**.
   max 50000), nearest first. Each carries `features` for the client rating engine.
 - `GET /points/bbox?min_lng=&min_lat=&max_lng=&max_lat=` — public; points in a bounding box.
 - `GET /points/{id}` — public; full point detail (adds `description`, `photos`). 404 if absent.
+
+### Writes (authenticated, rate-limited; `created_by`/`user_id` forced to the caller)
+- `POST /points` — add a point. Body: `name`, `category`, `lat`, `lng` (required), `address?`,
+  `description?`, `features?` (key→`yes|no|unknown`), `photos?` (Storage URLs). → 201 `{id}`.
+- `POST /points/{id}/reviews` — create/replace the caller's review for one profile (upsert on
+  point+user+profile). Body: `profile` (`wheelchair|blind`), `stars` (1–5), `text?`, `photos?`.
+- `POST /problems` — report a problem (see above).
+- `POST /problems/{id}/confirm` — confirm a problem. 409 if already confirmed, 404 if missing.
+  Returns `{confirmations, status}`.
+- `POST /petitions` — create a petition. Body: `problem_id`, `title` (required), `scope?`
+  (`internal` default | `official`), `body?`, `official_url?`. → 201 petition.
+- `POST /petitions/{id}/sign` — sign a petition. 409 if already signed, 404 if missing.
+  Returns `{signatures}` (live count).
+
+Photo uploads stay client→Supabase Storage direct; the API only records the resulting URLs.
+Note: petition signatures have no DB count trigger, so the API returns the live `count(*)`.
 - `POST /problems` — authenticated; report a problem. Body: `title` (required),
   `description?`, `category?`, `severity?` (1–3), and either `point_id` or `lat`+`lng`
   (dropped pin). Returns the created row (201). `created_by` is forced to the caller

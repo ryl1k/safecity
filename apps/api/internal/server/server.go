@@ -3,9 +3,11 @@ package server
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"net"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -21,10 +23,18 @@ import (
 // paths migrate to the API; defined here (consumer side) so handlers can be
 // unit-tested with a fake.
 type DataStore interface {
-	CreateProblem(ctx context.Context, userID string, in store.NewProblem) (store.Problem, error)
+	// reads (public)
 	PointsNear(ctx context.Context, lng, lat, radiusM float64) ([]store.PointSummary, error)
 	PointsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.PointSummary, error)
 	PointDetail(ctx context.Context, id string) (*store.PointDetail, error)
+	// contribution writes
+	AddPoint(ctx context.Context, userID string, in store.NewPoint) (string, error)
+	UpsertReview(ctx context.Context, userID, pointID string, in store.NewReview) (store.Review, error)
+	// civic writes
+	CreateProblem(ctx context.Context, userID string, in store.NewProblem) (store.Problem, error)
+	ConfirmProblem(ctx context.Context, userID, problemID string) (store.ConfirmResult, error)
+	CreatePetition(ctx context.Context, userID string, in store.NewPetition) (store.Petition, error)
+	SignPetition(ctx context.Context, userID, petitionID string) (store.SignResult, error)
 }
 
 // Deps are the dependencies wired into the server. Log is required; the rest are
@@ -76,26 +86,67 @@ func (s *Server) routes() {
 	s.router.Get("/healthz", s.handleHealth)
 	s.router.Get("/readyz", s.handleReady)
 
-	// Public, guest-first reads (no auth) — high-volume map queries.
 	if s.store != nil {
+		// /points mixes public reads with authenticated writes. chi mounts a
+		// subrouter for the prefix, so every /points route lives inside it.
 		s.router.Route("/points", func(r chi.Router) {
 			r.Get("/near", s.handlePointsNear)
 			r.Get("/bbox", s.handlePointsBBox)
 			r.Get("/{id}", s.handlePointDetail)
+			r.Group(func(r chi.Router) {
+				s.authed(r)
+				r.Post("/", s.handleAddPoint)
+				r.Post("/{id}/reviews", s.handleAddReview)
+			})
 		})
 	}
 
-	// Authenticated surface — writes and the like get rate limited.
+	// Authenticated, rate-limited surface.
 	s.router.Group(func(r chi.Router) {
-		r.Use(auth.RequireUser)
-		if s.limiter != nil {
-			r.Use(s.limiter.Middleware(s.rateKey))
-		}
+		s.authed(r)
 		r.Get("/me", s.handleMe)
 		if s.store != nil {
 			r.Post("/problems", s.handleCreateProblem)
+			r.Post("/problems/{id}/confirm", s.handleConfirmProblem)
+			r.Post("/petitions", s.handleCreatePetition)
+			r.Post("/petitions/{id}/sign", s.handleSignPetition)
 		}
 	})
+}
+
+// authed applies the auth + rate-limit middleware to a route group.
+func (s *Server) authed(r chi.Router) {
+	r.Use(auth.RequireUser)
+	if s.limiter != nil {
+		r.Use(s.limiter.Middleware(s.rateKey))
+	}
+}
+
+// storeError maps store sentinel errors to HTTP responses. conflictMsg/notFoundMsg
+// tailor the 409/404 text; everything else is a 500 logged under op.
+func (s *Server) storeError(w http.ResponseWriter, op, conflictMsg, notFoundMsg string, err error) {
+	switch {
+	case errors.Is(err, store.ErrConflict):
+		httpx.Error(w, http.StatusConflict, "conflict", conflictMsg)
+	case errors.Is(err, store.ErrNotFound):
+		httpx.Error(w, http.StatusNotFound, "not_found", notFoundMsg)
+	case errors.Is(err, store.ErrInvalid):
+		httpx.Error(w, http.StatusUnprocessableEntity, "invalid", "a value was rejected by a database constraint")
+	default:
+		s.log.Error(op, "err", err)
+		httpx.Error(w, http.StatusInternalServerError, "internal", "internal error")
+	}
+}
+
+// principal pulls the authenticated caller from context (RequireUser guarantees
+// it; this stays defensive and 401s otherwise).
+func (s *Server) principal(w http.ResponseWriter, r *http.Request) (*auth.Principal, bool) {
+	p, ok := auth.PrincipalFrom(r.Context())
+	if !ok {
+		httpx.Error(w, http.StatusUnauthorized, "unauthorized", "authentication required")
+		return nil, false
+	}
+	return p, true
 }
 
 // rateKey throttles per authenticated user when known, else per client IP.
@@ -113,6 +164,10 @@ func clientIP(r *http.Request) string {
 	}
 	return r.RemoteAddr
 }
+
+var uuidRe = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
+
+func isUUID(s string) bool { return uuidRe.MatchString(s) }
 
 // handleMe returns the caller's identity (and application role, if resolvable).
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
