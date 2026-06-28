@@ -17,6 +17,7 @@ import (
 	"github.com/safecity/api/internal/config"
 	"github.com/safecity/api/internal/db"
 	"github.com/safecity/api/internal/geo"
+	"github.com/safecity/api/internal/ml"
 	"github.com/safecity/api/internal/ratelimit"
 	"github.com/safecity/api/internal/server"
 	"github.com/safecity/api/internal/store"
@@ -55,6 +56,19 @@ func main() {
 	limiter.StartJanitor(stopJanitor)
 
 	geoClient := geo.New(cfg.ORSAPIKey, cfg.ORSBaseURL, cfg.NominatimURL, 15*time.Second)
+
+	// ML gRPC client (optional; connection is lazy so this never blocks startup).
+	if cfg.MLGRPCAddr != "" {
+		mlClient, err := ml.Dial(cfg.MLGRPCAddr)
+		if err != nil {
+			logger.Error("ml client init failed", "err", err)
+			os.Exit(1)
+		}
+		defer func() { _ = mlClient.Close() }()
+		logger.Info("ml client ready", "addr", cfg.MLGRPCAddr)
+		// TODO: pass mlClient to the server once photo-analysis endpoints land.
+		_ = mlClient
+	}
 
 	srv := server.New(server.Deps{
 		Log:      logger,

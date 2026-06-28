@@ -66,6 +66,14 @@ go run ./cmd/dedupe [--apply]           # merge proximity+name duplicates (dry-r
 Logic lives in `internal/importer` (pure mapping/dedupe is unit-tested; KML upsert
 idempotency is covered by a real-DB integration test).
 
+## ML gRPC client
+`internal/ml` is the Go client for the Python ML service (`apps/ml`), using stubs
+generated from `packages/proto/ml.proto` into `internal/mlpb`. It exposes
+`ModeratePhoto` / `DescribeScene` / `InferFeatures` plus `AnalyzePhoto`, which fans
+moderation + feature inference out concurrently. Configure with `ML_GRPC_URL`
+(the client connects lazily, so an absent ML service never blocks API startup).
+Regenerate stubs via `packages/proto` (`buf generate`).
+
 ## Layers
 A request flows: chi middleware (request id, logging, recover, timeout, optional auth)
 → handler (`internal/server`) → `httpx.Decode` validation → `internal/store` method →
