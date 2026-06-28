@@ -1,5 +1,6 @@
-// Place/address search via Nominatim (OpenStreetMap). Free, no key, matches our
-// OSM data attribution. Biased toward the user's region but not city-locked.
+// Place/address search. Prefers the Go API (/geocode, server-side Nominatim with
+// caching); falls back to Nominatim-direct when the API isn't configured.
+import { api, apiEnabled, qs } from './api';
 
 export interface GeoPlace {
   id: string;
@@ -22,6 +23,9 @@ interface NominatimRow {
 export async function geocodePlaces(query: string, limit = 5, signal?: AbortSignal): Promise<GeoPlace[]> {
   const q = query.trim();
   if (q.length < 3) return [];
+  if (apiEnabled) {
+    return api.get<GeoPlace[]>(`/geocode${qs({ q, limit })}`, { signal });
+  }
   const url =
     'https://nominatim.openstreetmap.org/search' +
     `?format=jsonv2&q=${encodeURIComponent(q)}` +
