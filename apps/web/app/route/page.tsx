@@ -12,6 +12,7 @@ import { Button, LoadingState, ErrorState } from '@/components/ui';
 import { useProfile } from '@/profile/ProfileProvider';
 import { pointById, pointsInBbox } from '@/lib/points';
 import { problemsInBbox } from '@/lib/civic';
+import { api, apiEnabled } from '@/lib/api';
 import { getCatalog } from '@/lib/catalog';
 import { categoryLabel, distanceLabel } from '@/lib/format';
 import { speak, stopSpeech } from '@/lib/tts';
@@ -83,33 +84,49 @@ function RouteInner() {
       const start = await getStart();
       const dest: [number, number] = [point.lng, point.lat];
 
-      // Live-barrier avoidance: confirmed/escalated problems in the start↔dest area.
-      const box = {
-        minLng: Math.min(start[0], dest[0]) - 0.003,
-        minLat: Math.min(start[1], dest[1]) - 0.003,
-        maxLng: Math.max(start[0], dest[0]) + 0.003,
-        maxLat: Math.max(start[1], dest[1]) + 0.003,
-      };
-      let avoid: number[][][][] = [];
-      try {
-        const probs = await problemsInBbox(box.minLng, box.minLat, box.maxLng, box.maxLat);
-        avoid = probs
-          .filter((p) => p.status === 'confirmed' || p.status === 'escalated')
-          .map((p) => avoidSquare(p.lng, p.lat));
-      } catch {
-        /* avoidance is best-effort */
-      }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let data: any;
+      if (apiEnabled) {
+        // The Go API builds avoid_polygons from confirmed problems server-side.
+        try {
+          data = await api.post(
+            '/route',
+            { from: start, to: dest, profile: primary },
+            { auth: false },
+          );
+        } catch {
+          setStatus('error');
+          return;
+        }
+      } else {
+        // Live-barrier avoidance: confirmed/escalated problems in the start↔dest area.
+        const box = {
+          minLng: Math.min(start[0], dest[0]) - 0.003,
+          minLat: Math.min(start[1], dest[1]) - 0.003,
+          maxLng: Math.max(start[0], dest[0]) + 0.003,
+          maxLat: Math.max(start[1], dest[1]) + 0.003,
+        };
+        let avoid: number[][][][] = [];
+        try {
+          const probs = await problemsInBbox(box.minLng, box.minLat, box.maxLng, box.maxLat);
+          avoid = probs
+            .filter((p) => p.status === 'confirmed' || p.status === 'escalated')
+            .map((p) => avoidSquare(p.lng, p.lat));
+        } catch {
+          /* avoidance is best-effort */
+        }
 
-      const res = await fetch('/api/route', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ from: start, to: dest, profile: primary, avoid }),
-      });
-      if (!res.ok) {
-        setStatus('error');
-        return;
+        const res = await fetch('/api/route', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ from: start, to: dest, profile: primary, avoid }),
+        });
+        if (!res.ok) {
+          setStatus('error');
+          return;
+        }
+        data = await res.json();
       }
-      const data = await res.json();
       const coords: [number, number][] = data.coordinates ?? [];
       setLine(coords);
       setSteps(data.steps);

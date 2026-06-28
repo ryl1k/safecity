@@ -8,10 +8,10 @@ version = "0.0.0"
 description = "SafeCity ML / CV gRPC microservices (server-side)"
 readme = "README.md"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = ["grpcio>=1.60", "protobuf>=4.25"]
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6"]
+dev = ["pytest>=8", "ruff>=0.6", "grpcio-tools>=1.60"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/safecity_ml"]
@@ -19,6 +19,8 @@ packages = ["src/safecity_ml"]
 [tool.ruff]
 line-length = 100
 target-version = "py311"
+# Generated protobuf/gRPC stubs — don't lint machine output.
+extend-exclude = ["src/safecity_ml/genpb"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

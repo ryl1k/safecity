@@ -18,12 +18,6 @@ importers:
         specifier: ^5.4.0
         version: 5.9.3
 
-  apps/api:
-    dependencies:
-      '@safecity/shared':
-        specifier: workspace:*
-        version: link:../../packages/shared
-
   apps/ml: {}
 
   apps/mobile:

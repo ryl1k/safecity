@@ -1,4 +1,5 @@
 import type { PointSummary } from '@safecity/shared';
+import { api, ApiError, apiEnabled, qs } from './api';
 import { supabase } from './supabase';
 
 interface NearRow {
@@ -37,6 +38,9 @@ export async function pointsNear(
   lat: number,
   radiusM = 1500,
 ): Promise<PointSummary[]> {
+  if (apiEnabled) {
+    return api.get<PointSummary[]>(`/points/near${qs({ lng, lat, radius: radiusM })}`);
+  }
   const { data, error } = await supabase.rpc('points_near', { lng, lat, radius_m: radiusM });
   if (error) throw error;
   return ((data ?? []) as NearRow[]).map(mapRow);
@@ -60,6 +64,11 @@ export async function pointsInBbox(
   maxLng: number,
   maxLat: number,
 ): Promise<PointSummary[]> {
+  if (apiEnabled) {
+    return api.get<PointSummary[]>(
+      `/points/bbox${qs({ min_lng: minLng, min_lat: minLat, max_lng: maxLng, max_lat: maxLat })}`,
+    );
+  }
   const { data, error } = await supabase.rpc('points_in_bbox', {
     min_lng: minLng,
     min_lat: minLat,
@@ -95,6 +104,14 @@ export async function searchPointsByName(query: string, limit = 6): Promise<Poin
 
 /** A single point by id (coords + feature values), or null. */
 export async function pointById(id: string): Promise<PointSummary | null> {
+  if (apiEnabled) {
+    try {
+      return await api.get<PointSummary>(`/points/${id}`);
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) return null;
+      throw e;
+    }
+  }
   const { data, error } = await supabase.rpc('point_detail', { p_id: id });
   if (error) throw error;
   const r = ((data ?? []) as NearRow[])[0];

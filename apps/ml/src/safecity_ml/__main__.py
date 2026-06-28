@@ -1,10 +1,10 @@
-"""Entrypoint placeholder for the SafeCity ML service."""
+"""Entrypoint for the SafeCity ML gRPC service."""
 
-from . import __version__
+from .server import serve
 
 
 def main() -> None:
-    print(f"safecity-ml {__version__} — service placeholder")
+    serve()
 
 
 if __name__ == "__main__":

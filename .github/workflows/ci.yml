@@ -2,8 +2,7 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches: [main]
+  push: # all branches — CI runs everywhere; CD (cd.yml) runs on main only
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -47,35 +46,50 @@ jobs:
       - name: Build
         run: pnpm --filter @safecity/web run build
 
-  # api — tests, build, lint, check (types)
+  # api — Go service (vet, lint, test, build). Guarded so CI stays green during the
+  # TypeScript→Go transition: Go steps only run once apps/api/go.mod exists.
   api:
     needs: changes
     if: ${{ needs.changes.outputs.api == 'true' }}
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        node-version: ['20', '22']
+    defaults:
+      run:
+        working-directory: apps/api
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - name: Detect Go module
+        id: gomod
+        run: |
+          if [ -f go.mod ]; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::apps/api has no go.mod yet — Go CI activates once the Go service lands."
+          fi
+      - uses: actions/setup-go@v5
+        if: steps.gomod.outputs.exists == 'true'
         with:
-          version: 9
-      - uses: actions/setup-node@v4
+          go-version: stable
+      - name: Verify modules
+        if: steps.gomod.outputs.exists == 'true'
+        run: go mod verify
+      - name: Vet
+        if: steps.gomod.outputs.exists == 'true'
+        run: go vet ./...
+      - name: Lint (golangci-lint)
+        if: steps.gomod.outputs.exists == 'true'
+        uses: golangci/golangci-lint-action@v6
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - name: Lint
-        run: pnpm --filter @safecity/api run lint
-      - name: Check (types)
-        run: pnpm --filter @safecity/api run type-check
+          version: latest
+          working-directory: apps/api
       - name: Test
-        run: pnpm --filter @safecity/api run test
+        if: steps.gomod.outputs.exists == 'true'
+        run: go test -race ./...
       - name: Build
-        run: pnpm --filter @safecity/api run build
+        if: steps.gomod.outputs.exists == 'true'
+        run: go build ./...
 
-  # mobile — tests + lint on CI (build happens on CD, main only)
+  # mobile — tests + lint on CI (production EAS build happens on CD, main only)
   mobile:
     needs: changes
     if: ${{ needs.changes.outputs.mobile == 'true' }}

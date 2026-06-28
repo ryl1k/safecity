@@ -8,6 +8,7 @@ import { Footer } from '@/components/Footer';
 import { Button, Field, Segmented, LoadingState } from '@/components/ui';
 import { PhotoInput } from '@/components/PhotoInput';
 import { supabase } from '@/lib/supabase';
+import { api, apiEnabled } from '@/lib/api';
 import { uploadPhotos } from '@/lib/storage';
 import { pointById } from '@/lib/points';
 
@@ -60,20 +61,33 @@ function NewProblemInner() {
         return;
       }
       const photoUrls = await uploadPhotos(photos, 'problems');
-      const { data, error } = await supabase
-        .from('problems')
-        .insert({
+      let newId: string;
+      if (apiEnabled) {
+        const res = await api.post<{ id: string }>('/problems', {
           point_id: pointId,
           title,
-          description: description || null,
+          description,
           severity: Number(severity),
           photos: photoUrls,
-          created_by: auth.user.id,
-        })
-        .select('id')
-        .single();
-      if (error) throw error;
-      router.push(`/problem/${data.id}`);
+        });
+        newId = res.id;
+      } else {
+        const { data, error } = await supabase
+          .from('problems')
+          .insert({
+            point_id: pointId,
+            title,
+            description: description || null,
+            severity: Number(severity),
+            photos: photoUrls,
+            created_by: auth.user.id,
+          })
+          .select('id')
+          .single();
+        if (error) throw error;
+        newId = data.id;
+      }
+      router.push(`/problem/${newId}`);
     } catch (err: any) {
       setError(err?.message ?? 'Не вдалося надіслати');
     } finally {
