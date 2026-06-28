@@ -1,4 +1,5 @@
 import type { Profile } from '@safecity/shared';
+import { api, apiEnabled } from './api';
 import { supabase } from './supabase';
 
 export interface ReviewRow {
@@ -17,6 +18,10 @@ export async function addReview(
   text: string,
   photos: string[] = [],
 ): Promise<void> {
+  if (apiEnabled) {
+    await api.post(`/points/${pointId}/reviews`, { profile, stars, text, photos });
+    return;
+  }
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error('not-authenticated');
   const { error } = await supabase.from('reviews').upsert(

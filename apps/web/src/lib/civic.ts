@@ -1,4 +1,5 @@
 import type { ProblemStatus } from '@safecity/shared';
+import { api, apiEnabled } from './api';
 import { supabase } from './supabase';
 
 export interface ProblemRow {
@@ -101,6 +102,25 @@ export async function createPetition(
   title: string,
   body: string,
 ): Promise<PetitionRow> {
+  if (apiEnabled) {
+    const p = await api.post<{
+      id: string;
+      scope: 'internal' | 'official';
+      title: string;
+      status: string;
+      internal_signatures: number;
+    }>('/petitions', { problem_id: problemId, title, body });
+    return {
+      id: p.id,
+      scope: p.scope,
+      title: p.title,
+      body: body || null,
+      officialUrl: null,
+      internalSignatures: p.internal_signatures,
+      officialSignatureCount: null,
+      status: p.status,
+    };
+  }
   const { data: auth } = await supabase.auth.getUser();
   if (!auth.user) throw new Error('not-authenticated');
   const { data, error } = await supabase

@@ -9,6 +9,7 @@ import { StatusPill } from '@/components/StatusPill';
 import { Button, LoadingState, ErrorState } from '@/components/ui';
 import { PhotoGallery } from '@/components/PhotoGallery';
 import { problemById, createPetition, type ProblemRow, type PetitionRow } from '@/lib/civic';
+import { api, apiEnabled, ApiError } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 
 const PETITION_GOAL = 250;
@@ -79,6 +80,19 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
   async function confirm() {
     const uid = await requireUser();
     if (!uid) return;
+    if (apiEnabled) {
+      try {
+        const res = await api.post<{ confirmations: number; status: string }>(
+          `/problems/${params.id}/confirm`,
+        );
+        setConfirms(res.confirmations);
+      } catch (e) {
+        // 409 = already confirmed → treat as success; anything else is a genuine error.
+        if (!(e instanceof ApiError && e.status === 409)) return;
+      }
+      setConfirmed(true);
+      return;
+    }
     const { error } = await supabase.from('problem_confirmations').insert({ problem_id: params.id, user_id: uid });
     // No error = a new confirmation. Duplicate = the user already confirmed (treat as success, no extra count).
     if (!error) setConfirms((c) => c + 1);
@@ -116,6 +130,15 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
     if (!petition) return;
     const uid = await requireUser();
     if (!uid) return;
+    if (apiEnabled) {
+      try {
+        await api.post(`/petitions/${petition.id}/sign`);
+      } catch (e) {
+        if (!(e instanceof ApiError && e.status === 409)) return; // 409 = already signed
+      }
+      setSigned(true);
+      return;
+    }
     const { error } = await supabase.from('petition_signatures').insert({ petition_id: petition.id, user_id: uid });
     if (error && !isDuplicate(error.message)) return;
     setSigned(true);
