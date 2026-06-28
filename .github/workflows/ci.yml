@@ -45,6 +45,12 @@ jobs:
       - name: Test
         run: pnpm --filter @safecity/web run test --if-present
       - name: Build
+        # The build is a compile/prerender check — no real backend needed. These
+        # placeholders satisfy the Supabase client constructor during prerender;
+        # real values are injected per-deploy (Vercel/Docker build args).
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: placeholder-anon-key
         run: pnpm --filter @safecity/web run build
 
   # api — Go service (vet, lint, test, build). Guarded so CI stays green during the
