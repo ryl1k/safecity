@@ -19,6 +19,16 @@ directly. See board epic **M10 · Go API backend**.
 - `GET /healthz` — liveness (always 200 while the process is up)
 - `GET /readyz` — readiness; pings Postgres (503 if down)
 - `GET /me` — authenticated; returns `{user_id, email, role}`
+- `POST /problems` — authenticated; report a problem. Body: `title` (required),
+  `description?`, `category?`, `severity?` (1–3), and either `point_id` or `lat`+`lng`
+  (dropped pin). Returns the created row (201). `created_by` is forced to the caller
+  via RLS — the client cannot set it.
+
+## Layers
+A request flows: chi middleware (request id, logging, recover, timeout, optional auth)
+→ handler (`internal/server`) → `httpx.Decode` validation → `internal/store` method →
+`db.WithUser` RLS-claims tx → Postgres. `store` never trusts client-supplied ownership;
+Postgres RLS policies enforce it.
 
 ## Conventions
 - **Error shape:** every error is `{"error": {"code": "...", "message": "...", "fields": [...]}}`.

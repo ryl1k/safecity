@@ -18,6 +18,7 @@ import (
 	"github.com/safecity/api/internal/db"
 	"github.com/safecity/api/internal/ratelimit"
 	"github.com/safecity/api/internal/server"
+	"github.com/safecity/api/internal/store"
 )
 
 func main() {
@@ -58,6 +59,7 @@ func main() {
 		Verifier: verifier,
 		Roles:    database.Role,
 		Limiter:  limiter,
+		Store:    store.New(database),
 	})
 	httpSrv := &http.Server{
 		Addr:              ":" + cfg.Port,

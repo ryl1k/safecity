@@ -14,7 +14,15 @@ import (
 	"github.com/safecity/api/internal/auth"
 	"github.com/safecity/api/internal/httpx"
 	"github.com/safecity/api/internal/ratelimit"
+	"github.com/safecity/api/internal/store"
 )
+
+// DataStore is the subset of the data layer the handlers need. It grows as more
+// paths migrate to the API; defined here (consumer side) so handlers can be
+// unit-tested with a fake.
+type DataStore interface {
+	CreateProblem(ctx context.Context, userID string, in store.NewProblem) (store.Problem, error)
+}
 
 // Deps are the dependencies wired into the server. Log is required; the rest are
 // optional so tests can construct a minimal server.
@@ -24,6 +32,7 @@ type Deps struct {
 	Verifier *auth.Verifier              // JWT verifier; nil disables auth (public routes only)
 	Roles    auth.RoleResolver           // resolves application role for RequireRole
 	Limiter  *ratelimit.Limiter          // throttles writes/proxies; nil disables limiting
+	Store    DataStore                   // data access; nil disables data routes
 }
 
 // Server holds the router and dependencies shared by handlers.
@@ -34,6 +43,7 @@ type Server struct {
 	verifier *auth.Verifier
 	roles    auth.RoleResolver
 	limiter  *ratelimit.Limiter
+	store    DataStore
 }
 
 // New builds a Server with base middleware and routes registered.
@@ -50,7 +60,7 @@ func New(d Deps) *Server {
 		r.Use(auth.Authenticate(d.Verifier))
 	}
 
-	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles, limiter: d.Limiter}
+	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles, limiter: d.Limiter, store: d.Store}
 	s.routes()
 	return s
 }
@@ -70,6 +80,9 @@ func (s *Server) routes() {
 			r.Use(s.limiter.Middleware(s.rateKey))
 		}
 		r.Get("/me", s.handleMe)
+		if s.store != nil {
+			r.Post("/problems", s.handleCreateProblem)
+		}
 	})
 }
 
