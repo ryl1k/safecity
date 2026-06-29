@@ -8,7 +8,13 @@ import { useTheme } from '@/theme/theme';
 const LVIV: [number, number] = [24.0316, 49.8419];
 
 /** MapLibre map with OSM raster tiles + a pin per point. */
-export function PointsMap({ points }: { points: PointSummary[] }) {
+export function PointsMap({
+  points,
+  onSelect,
+}: {
+  points: PointSummary[];
+  onSelect?: (id: string) => void;
+}) {
   const { palette } = useTheme();
   const mapStyle = useMemo(
     () =>
@@ -31,7 +37,12 @@ export function PointsMap({ points }: { points: PointSummary[] }) {
     <MapView style={styles.map} mapStyle={mapStyle}>
       <Camera defaultSettings={{ centerCoordinate: LVIV, zoomLevel: 13 }} />
       {points.map((p) => (
-        <PointAnnotation key={p.id} id={p.id} coordinate={[p.lng, p.lat]}>
+        <PointAnnotation
+          key={p.id}
+          id={p.id}
+          coordinate={[p.lng, p.lat]}
+          onSelected={() => onSelect?.(p.id)}
+        >
           <View
             style={[styles.pin, { backgroundColor: palette.primary, borderColor: palette.onPrimary }]}
           />

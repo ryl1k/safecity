@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import type { PointSummary } from '@safecity/shared';
 import { Centered } from '@/components/Centered';
 import { PointsMap } from '@/components/PointsMap';
@@ -11,6 +12,7 @@ const BBOX = { minLng: 23.9, minLat: 49.78, maxLng: 24.15, maxLat: 49.92 };
 
 export default function MapScreen() {
   const { palette } = useTheme();
+  const router = useRouter();
   const [points, setPoints] = useState<PointSummary[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
@@ -41,7 +43,7 @@ export default function MapScreen() {
 
   return (
     <View style={styles.fill}>
-      <PointsMap points={points} />
+      <PointsMap points={points} onSelect={(id) => router.push(`/point/${id}`)} />
       {status === 'loading' ? (
         <View style={[styles.overlay, { backgroundColor: palette.surface }]} pointerEvents="none">
           <ActivityIndicator color={palette.primary} />

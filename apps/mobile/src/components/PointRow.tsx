@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import type { AccessibilityFeature, PointSummary, Profile } from '@safecity/shared';
 import { computeRating } from '@safecity/shared';
 import { categoryLabel, distanceLabel, featureSummary } from '@/lib/format';
@@ -11,9 +12,10 @@ interface Props {
   profile: Profile;
 }
 
-/** One accessible-place row: name, category·distance, rating, present features. */
+/** One accessible-place row → opens the point detail. */
 export function PointRow({ point, catalog, profile }: Props) {
   const { palette, baseScale } = useTheme();
+  const router = useRouter();
   const rating = computeRating(point.features, catalog, point.category, profile);
   const summary = featureSummary(point, catalog, profile);
   const meta = [categoryLabel[point.category], distanceLabel(point.distanceM)]
@@ -21,10 +23,14 @@ export function PointRow({ point, catalog, profile }: Props) {
     .join(' · ');
 
   return (
-    <View
-      accessible
+    <Pressable
+      accessibilityRole="button"
       accessibilityLabel={`${point.name}. ${meta}.`}
-      style={[styles.row, { backgroundColor: palette.surface, borderColor: palette.border }]}
+      onPress={() => router.push(`/point/${point.id}`)}
+      style={({ pressed }) => [
+        styles.row,
+        { backgroundColor: palette.surface, borderColor: palette.border, opacity: pressed ? 0.85 : 1 },
+      ]}
     >
       <View style={styles.head}>
         <Text style={[styles.name, { color: palette.text, fontSize: 16 * baseScale }]} numberOfLines={1}>
@@ -38,7 +44,7 @@ export function PointRow({ point, catalog, profile }: Props) {
           {summary}
         </Text>
       ) : null}
-    </View>
+    </Pressable>
   );
 }
 
