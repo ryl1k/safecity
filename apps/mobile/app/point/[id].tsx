@@ -131,6 +131,19 @@ export default function PointDetail() {
           {point.address ? ` · ${point.address}` : ''}
         </Text>
         <RatingBadge rating={rating} />
+
+        <View style={styles.actions}>
+          <Button title="Маршрут сюди" onPress={() => router.push(`/route?to=${id}`)} style={styles.actionBtn} />
+          <Button
+            title="Повідомити про проблему"
+            variant="secondary"
+            onPress={() =>
+              authed ? router.push(`/problem/new?point=${id}`) : router.push(`/auth?next=/problem/new?point=${id}`)
+            }
+            style={styles.actionBtn}
+          />
+        </View>
+
         {point.description ? (
           <Text style={{ color: palette.text, fontSize: 15 * baseScale, lineHeight: 22 * baseScale }}>
             {point.description}
@@ -233,6 +246,8 @@ const styles = StyleSheet.create({
   section: { fontWeight: '800' },
   photo: { width: 140, height: 110, borderRadius: radii.md, backgroundColor: '#0001' },
   linkBtn: { minHeight: 44, justifyContent: 'center' },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
+  actionBtn: { flexGrow: 1, flexBasis: '45%' },
   reviewsHead: { gap: space.sm },
   stars: { flexDirection: 'row', gap: space.sm, marginVertical: space.sm },
   formActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: space.sm },

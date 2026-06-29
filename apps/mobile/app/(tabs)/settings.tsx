@@ -1,6 +1,9 @@
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useRouter } from 'expo-router';
 import type { Profile } from '@safecity/shared';
+import { Button } from '@/components/ui';
+import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/state/ProfileProvider';
 import { radii, space, useTheme, type ThemeName } from '@/theme/theme';
 
@@ -18,6 +21,16 @@ const PROFILE_LABEL: Record<Profile, string> = {
 export default function SettingsScreen() {
   const { palette, baseScale, themeName, setTheme, fontScale, setFontScale } = useTheme();
   const { needs, primary, setPrimary } = useProfile();
+  const router = useRouter();
+  const [email, setEmail] = useState<string | null>(null);
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => {
+      setEmail(session?.user?.email ?? null);
+    });
+    return () => sub.subscription.unsubscribe();
+  }, []);
 
   return (
     <ScrollView style={{ backgroundColor: palette.bg }} contentContainerStyle={styles.content}>
@@ -58,6 +71,26 @@ export default function SettingsScreen() {
           </View>
         </Section>
       ) : null}
+
+      <Section title="Налаштування потреб" palette={palette} scale={baseScale}>
+        <Button title="Пройти онбординг знову" variant="secondary" onPress={() => router.push('/onboarding')} />
+      </Section>
+
+      <Section title="Акаунт" palette={palette} scale={baseScale}>
+        {email ? (
+          <>
+            <Text style={{ color: palette.muted, fontSize: 14 * baseScale }}>Ви увійшли як {email}</Text>
+            <Button title="Вийти" variant="danger" onPress={() => void supabase.auth.signOut()} />
+          </>
+        ) : (
+          <>
+            <Text style={{ color: palette.muted, fontSize: 14 * baseScale }}>
+              Акаунт потрібен лише, щоб додавати місця, відгуки та підтримувати петиції.
+            </Text>
+            <Button title="Увійти" onPress={() => router.push('/auth?next=/settings')} />
+          </>
+        )}
+      </Section>
     </ScrollView>
   );
 }

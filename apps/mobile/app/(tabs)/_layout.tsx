@@ -16,6 +16,8 @@ export default function TabsLayout() {
     >
       <Tabs.Screen name="index" options={{ title: 'Мапа' }} />
       <Tabs.Screen name="places" options={{ title: 'Місця' }} />
+      <Tabs.Screen name="civic" options={{ title: 'Громада' }} />
+      <Tabs.Screen name="contribute" options={{ title: 'Додати' }} />
       <Tabs.Screen name="settings" options={{ title: 'Профіль' }} />
     </Tabs>
   );
