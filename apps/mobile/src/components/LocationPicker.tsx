@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { Camera, MapView, PointAnnotation } from '@maplibre/maplibre-react-native';
+import { Camera, Map, Marker } from '@maplibre/maplibre-react-native';
 import { MAP_TILE_URL } from '@/lib/env';
 import { radii, space, useTheme } from '@/theme/theme';
 
@@ -31,22 +31,21 @@ export function LocationPicker({
   return (
     <View>
       <View style={[styles.box, { borderColor: palette.borderStrong }]}>
-        <MapView
+        <Map
           style={styles.map}
           mapStyle={mapStyle}
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          onPress={(e: any) => {
-            const c = e?.geometry?.coordinates;
+          onPress={(e) => {
+            const c = e.nativeEvent.lngLat;
             if (Array.isArray(c) && c.length === 2) onChange(c[0], c[1]);
           }}
         >
-          <Camera defaultSettings={{ centerCoordinate: center, zoomLevel: 14 }} />
+          <Camera initialViewState={{ center, zoom: 14 }} />
           {value ? (
-            <PointAnnotation id="picked" coordinate={value}>
+            <Marker id="picked" lngLat={value}>
               <View style={[styles.pin, { backgroundColor: palette.accent, borderColor: palette.onPrimary }]} />
-            </PointAnnotation>
+            </Marker>
           ) : null}
-        </MapView>
+        </Map>
       </View>
       <Text style={{ color: palette.muted, fontSize: 13 * baseScale, marginTop: space.xs }}>
         {value

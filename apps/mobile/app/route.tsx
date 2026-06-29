@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera, LineLayer, MapView, PointAnnotation, ShapeSource } from '@maplibre/maplibre-react-native';
+import { Camera, GeoJSONSource, Layer, Map, Marker } from '@maplibre/maplibre-react-native';
 import type { PointSummary } from '@safecity/shared';
 import { Button, ErrorState, LoadingState } from '@/components/ui';
 import { MAP_TILE_URL } from '@/lib/env';
@@ -153,20 +153,21 @@ export default function RouteScreen() {
         ) : null}
 
         <View style={[styles.mapBox, { borderColor: palette.border }]}>
-          <MapView style={styles.map} mapStyle={mapStyle}>
-            <Camera defaultSettings={{ centerCoordinate: [dest.lng, dest.lat], zoomLevel: 14 }} />
+          <Map style={styles.map} mapStyle={mapStyle}>
+            <Camera initialViewState={{ center: [dest.lng, dest.lat], zoom: 14 }} />
             {line.length > 1 ? (
-              <ShapeSource id="route" shape={lineGeoJSON}>
-                <LineLayer
+              <GeoJSONSource id="route" data={lineGeoJSON}>
+                <Layer
                   id="route-line"
+                  type="line"
                   style={{ lineColor: palette.primary, lineWidth: 5, lineCap: 'round', lineJoin: 'round' }}
                 />
-              </ShapeSource>
+              </GeoJSONSource>
             ) : null}
-            <PointAnnotation id="dest" coordinate={[dest.lng, dest.lat]}>
+            <Marker id="dest" lngLat={[dest.lng, dest.lat]}>
               <View style={[styles.pin, { backgroundColor: palette.accent, borderColor: palette.onPrimary }]} />
-            </PointAnnotation>
-          </MapView>
+            </Marker>
+          </Map>
         </View>
 
         <View style={styles.summaryRow}>

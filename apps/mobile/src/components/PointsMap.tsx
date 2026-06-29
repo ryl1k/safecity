@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Camera, MapView, PointAnnotation } from '@maplibre/maplibre-react-native';
+import { Camera, Map, Marker } from '@maplibre/maplibre-react-native';
 import type { PointSummary } from '@safecity/shared';
 import { MAP_TILE_URL } from '@/lib/env';
 import { useTheme } from '@/theme/theme';
@@ -34,21 +34,16 @@ export function PointsMap({
   );
 
   return (
-    <MapView style={styles.map} mapStyle={mapStyle}>
-      <Camera defaultSettings={{ centerCoordinate: LVIV, zoomLevel: 13 }} />
+    <Map style={styles.map} mapStyle={mapStyle}>
+      <Camera initialViewState={{ center: LVIV, zoom: 13 }} />
       {points.map((p) => (
-        <PointAnnotation
-          key={p.id}
-          id={p.id}
-          coordinate={[p.lng, p.lat]}
-          onSelected={() => onSelect?.(p.id)}
-        >
+        <Marker key={p.id} id={p.id} lngLat={[p.lng, p.lat]} onPress={() => onSelect?.(p.id)}>
           <View
             style={[styles.pin, { backgroundColor: palette.primary, borderColor: palette.onPrimary }]}
           />
-        </PointAnnotation>
+        </Marker>
       ))}
-    </MapView>
+    </Map>
   );
 }
 

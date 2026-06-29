@@ -12,7 +12,6 @@ const config: ExpoConfig = {
   version: '0.0.0',
   orientation: 'portrait',
   userInterfaceStyle: 'automatic',
-  newArchEnabled: true,
   assetBundlePatterns: ['**/*'],
   ios: {
     supportsTablet: true,
