@@ -4,12 +4,13 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, LineLayer, MapView, PointAnnotation, ShapeSource } from '@maplibre/maplibre-react-native';
 import type { PointSummary } from '@safecity/shared';
-import { ErrorState, LoadingState } from '@/components/ui';
+import { Button, ErrorState, LoadingState } from '@/components/ui';
 import { MAP_TILE_URL } from '@/lib/env';
 import { distanceLabel } from '@/lib/format';
 import { getCurrentLocation } from '@/lib/location';
 import { pointById } from '@/lib/points';
 import { getRoute, RoutingUnavailableError, type RouteStep } from '@/lib/routing';
+import { speak, stopSpeech } from '@/lib/tts';
 import { useProfile } from '@/state/ProfileProvider';
 import { radii, space, useTheme } from '@/theme/theme';
 
@@ -26,6 +27,7 @@ export default function RouteScreen() {
   const [summary, setSummary] = useState<{ distance: number; duration: number } | null>(null);
   const [fallback, setFallback] = useState(false);
   const [avoided, setAvoided] = useState(0);
+  const [speaking, setSpeaking] = useState(false);
 
   async function plan() {
     if (!to) {
@@ -57,6 +59,22 @@ export default function RouteScreen() {
     void plan();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [to, primary]);
+
+  useEffect(() => () => stopSpeech(), []);
+
+  function toggleSpeak() {
+    if (speaking) {
+      stopSpeech();
+      setSpeaking(false);
+      return;
+    }
+    if (steps.length === 0) return;
+    setSpeaking(true);
+    speak(steps.map((s) => s.instruction).join('. '), {
+      onend: () => setSpeaking(false),
+      onerror: () => setSpeaking(false),
+    });
+  }
 
   const mapStyle = useMemo(
     () =>
@@ -151,11 +169,22 @@ export default function RouteScreen() {
           </MapView>
         </View>
 
-        {summary ? (
-          <Text style={{ color: palette.text, fontWeight: '800', fontSize: 16 * baseScale }}>
-            {distanceLabel(summary.distance)} · {Math.round(summary.duration / 60)} хв
-          </Text>
-        ) : null}
+        <View style={styles.summaryRow}>
+          {summary ? (
+            <Text style={{ color: palette.text, fontWeight: '800', fontSize: 16 * baseScale }}>
+              {distanceLabel(summary.distance)} · {Math.round(summary.duration / 60)} хв
+            </Text>
+          ) : null}
+          {steps.length > 0 ? (
+            <Button
+              title={speaking ? '⏹ Зупинити' : '🔊 Озвучити'}
+              variant={speaking ? 'primary' : 'accent'}
+              onPress={toggleSpeak}
+              accessibilityLabel={speaking ? 'Зупинити озвучення' : 'Озвучити маршрут'}
+              style={{ marginLeft: 'auto' }}
+            />
+          ) : null}
+        </View>
 
         <View style={[styles.steps, { backgroundColor: palette.surface, borderColor: palette.border }]}>
           {steps.length === 0 ? (
@@ -175,10 +204,6 @@ export default function RouteScreen() {
             ))
           )}
         </View>
-
-        <Text style={{ color: palette.muted, fontSize: 12 * baseScale }}>
-          Голосове озвучення маршруту з’явиться в наступному оновленні.
-        </Text>
       </ScrollView>
     </View>
   );
@@ -191,6 +216,7 @@ const styles = StyleSheet.create({
   content: { padding: space.lg, gap: space.md },
   h1: { fontWeight: '800' },
   banner: { borderWidth: 1, borderRadius: radii.md, padding: space.md },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, flexWrap: 'wrap' },
   mapBox: { height: 280, borderRadius: radii.md, borderWidth: 1, overflow: 'hidden' },
   map: { flex: 1 },
   pin: { width: 18, height: 18, borderRadius: 9, borderWidth: 3 },

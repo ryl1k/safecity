@@ -5,13 +5,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { AccessibilityFeature, PointSummary } from '@safecity/shared';
 import { computeRating } from '@safecity/shared';
 import { Button, Card, ErrorState, Field, LoadingState } from '@/components/ui';
+import { PhotoInput } from '@/components/PhotoInput';
 import { RatingBadge } from '@/components/RatingBadge';
 import { ChecklistRow } from '@/components/ui/ChecklistRow';
 import { ReviewItem } from '@/components/ui/ReviewItem';
 import { getCatalog } from '@/lib/catalog';
 import { categoryLabel } from '@/lib/format';
+import { successFeedback } from '@/lib/haptics';
 import { pointById } from '@/lib/points';
 import { addReview, reviewsFor, type ReviewRow } from '@/lib/reviews';
+import { uploadPhotos } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { useProfile } from '@/state/ProfileProvider';
 import { radii, space, useTheme } from '@/theme/theme';
@@ -33,6 +36,7 @@ export default function PointDetail() {
   const [formOpen, setFormOpen] = useState(false);
   const [stars, setStars] = useState(0);
   const [text, setText] = useState('');
+  const [photos, setPhotos] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -72,11 +76,14 @@ export default function PointDetail() {
     setFormError(null);
     setSaving(true);
     try {
-      await addReview(id, primary, stars, text.trim());
+      const photoUrls = await uploadPhotos(photos, 'reviews');
+      await addReview(id, primary, stars, text.trim(), photoUrls);
+      successFeedback();
       setReviews(await reviewsFor(id));
       setFormOpen(false);
       setStars(0);
       setText('');
+      setPhotos([]);
     } catch (e) {
       setFormError(e instanceof Error ? e.message : 'Не вдалося надіслати відгук');
     } finally {
@@ -219,6 +226,8 @@ export default function PointDetail() {
               placeholder="Поділіться досвідом доступності цього місця"
               style={{ minHeight: 96, textAlignVertical: 'top' }}
             />
+            <Text style={{ color: palette.text, fontWeight: '700', fontSize: 14 * baseScale }}>Фото (необов’язково)</Text>
+            <PhotoInput uris={photos} onChange={setPhotos} />
             {formError ? <Text style={{ color: palette.bad }}>{formError}</Text> : null}
             <View style={styles.formActions}>
               <Button title="Скасувати" variant="ghost" onPress={() => setFormOpen(false)} />

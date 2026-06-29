@@ -2,9 +2,12 @@ import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { PhotoInput } from '@/components/PhotoInput';
 import { Button, Field, LoadingState, Segmented } from '@/components/ui';
 import { reportProblem } from '@/lib/civic';
+import { successFeedback } from '@/lib/haptics';
 import { pointById } from '@/lib/points';
+import { uploadPhotos } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { space, useTheme } from '@/theme/theme';
 
@@ -24,6 +27,7 @@ export default function NewProblem() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<'1' | '2' | '3'>('2');
+  const [photos, setPhotos] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -59,12 +63,15 @@ export default function NewProblem() {
     }
     setBusy(true);
     try {
+      const photoUrls = await uploadPhotos(photos, 'problems');
       const newId = await reportProblem({
         pointId: point,
         title: title.trim(),
         description: description.trim(),
         severity: Number(severity),
+        photos: photoUrls,
       });
+      successFeedback();
       router.replace(`/problem/${newId}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не вдалося надіслати');
@@ -133,9 +140,10 @@ export default function NewProblem() {
           <Segmented value={severity} onChange={setSeverity} options={SEVERITY} />
         </View>
 
-        <Text style={{ color: palette.muted, fontSize: 12 * baseScale }}>
-          Додавання фото з’явиться в наступному оновленні.
-        </Text>
+        <View style={{ gap: space.sm }}>
+          <Text style={{ color: palette.text, fontWeight: '700', fontSize: 14 * baseScale }}>Фото (необов’язково)</Text>
+          <PhotoInput uris={photos} onChange={setPhotos} />
+        </View>
 
         {error ? (
           <Text accessibilityRole="alert" style={{ color: palette.bad, fontWeight: '700', fontSize: 14 * baseScale }}>

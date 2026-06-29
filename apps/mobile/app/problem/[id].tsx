@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Button, Card, ErrorState, Field, LoadingState, StatusPill } from '@/components/ui';
+import { Button, ErrorState, Field, LoadingState, StatusPill } from '@/components/ui';
 import { ApiError } from '@/lib/api';
+import { successFeedback } from '@/lib/haptics';
 import {
   confirmProblem,
   createPetition,
@@ -94,6 +95,7 @@ export default function ProblemDetail() {
       const res = await confirmProblem(id);
       setConfirms(res.confirmations);
       setConfirmed(true);
+      successFeedback();
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) {
         setConfirmed(true); // already confirmed
@@ -138,6 +140,7 @@ export default function ProblemDetail() {
     try {
       await signPetition(petition.id);
       setSigned(true);
+      successFeedback();
     } catch (e) {
       if (e instanceof ApiError && e.status === 409) setSigned(true);
     } finally {

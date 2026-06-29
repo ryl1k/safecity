@@ -3,11 +3,14 @@ import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import type { AccessibilityFeature, Category, FeatureValue } from '@safecity/shared';
 import { LocationPicker } from '@/components/LocationPicker';
+import { PhotoInput } from '@/components/PhotoInput';
 import { Button, Card, Chip, Field, LoadingState, Segmented } from '@/components/ui';
 import { getCatalog } from '@/lib/catalog';
 import { categoryLabel } from '@/lib/format';
+import { successFeedback } from '@/lib/haptics';
 import { LVIV } from '@/lib/location';
 import { addPoint } from '@/lib/points';
+import { uploadPhotos } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { space, useTheme } from '@/theme/theme';
 
@@ -29,6 +32,7 @@ export default function ContributeScreen() {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<Category>('venue');
   const [loc, setLoc] = useState<[number, number] | null>(null);
+  const [photos, setPhotos] = useState<string[]>([]);
   const [values, setValues] = useState<Record<string, FeatureValue>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -68,6 +72,7 @@ export default function ContributeScreen() {
       const p = loc ?? LVIV;
       const cleaned: Record<string, FeatureValue> = {};
       for (const [k, v] of Object.entries(values)) if (v === 'yes' || v === 'no') cleaned[k] = v;
+      const photoUrls = await uploadPhotos(photos, 'points');
       const newId = await addPoint({
         name: name.trim(),
         category,
@@ -76,7 +81,9 @@ export default function ContributeScreen() {
         address: address.trim(),
         description: description.trim(),
         features: cleaned,
+        photos: photoUrls,
       });
+      successFeedback();
       router.push(`/point/${newId}`);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Не вдалося додати місце');
@@ -135,6 +142,11 @@ export default function ContributeScreen() {
         <LocationPicker value={loc} onChange={(lng, lat) => setLoc([lng, lat])} />
       </View>
 
+      <View style={{ gap: space.sm }}>
+        <Text style={[styles.label, { color: palette.text, fontSize: 14 * baseScale }]}>Фото (необов’язково)</Text>
+        <PhotoInput uris={photos} onChange={setPhotos} />
+      </View>
+
       <Card>
         <Text style={[styles.label, { color: palette.text, fontSize: 15 * baseScale, marginBottom: space.sm }]}>
           Зручності доступності
@@ -155,10 +167,6 @@ export default function ContributeScreen() {
           </View>
         ))}
       </Card>
-
-      <Text style={{ color: palette.muted, fontSize: 12 * baseScale }}>
-        Додавання фото з’явиться в наступному оновленні.
-      </Text>
 
       {error ? (
         <Text accessibilityRole="alert" style={{ color: palette.bad, fontWeight: '700', fontSize: 14 * baseScale }}>
