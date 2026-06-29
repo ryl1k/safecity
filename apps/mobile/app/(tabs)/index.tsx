@@ -4,12 +4,13 @@ import type { PointSummary } from '@safecity/shared';
 import { Centered } from '@/components/Centered';
 import { PointsMap } from '@/components/PointsMap';
 import { pointsInBbox } from '@/lib/points';
-import { space, theme } from '@/theme/theme';
+import { space, useTheme } from '@/theme/theme';
 
 // Central Lviv bounding box.
 const BBOX = { minLng: 23.9, minLat: 49.78, maxLng: 24.15, maxLat: 49.92 };
 
 export default function MapScreen() {
+  const { palette } = useTheme();
   const [points, setPoints] = useState<PointSummary[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
 
@@ -33,7 +34,7 @@ export default function MapScreen() {
   if (status === 'error') {
     return (
       <Centered>
-        <Text style={{ color: theme.muted }}>Не вдалося завантажити мапу</Text>
+        <Text style={{ color: palette.muted }}>Не вдалося завантажити мапу</Text>
       </Centered>
     );
   }
@@ -42,8 +43,8 @@ export default function MapScreen() {
     <View style={styles.fill}>
       <PointsMap points={points} />
       {status === 'loading' ? (
-        <View style={styles.overlay} pointerEvents="none">
-          <ActivityIndicator color={theme.primary} />
+        <View style={[styles.overlay, { backgroundColor: palette.surface }]} pointerEvents="none">
+          <ActivityIndicator color={palette.primary} />
         </View>
       ) : null}
     </View>
@@ -52,12 +53,5 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  overlay: {
-    position: 'absolute',
-    top: space.lg,
-    alignSelf: 'center',
-    backgroundColor: theme.surface,
-    borderRadius: 999,
-    padding: space.sm,
-  },
+  overlay: { position: 'absolute', top: space.lg, alignSelf: 'center', borderRadius: 999, padding: space.sm },
 });
