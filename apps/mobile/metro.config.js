@@ -13,8 +13,7 @@ config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
 ];
-// pnpm symlinks: let Metro follow them, and don't walk up past each package.
-config.resolver.unstable_enableSymlinks = true;
-config.resolver.disableHierarchicalLookup = true;
+// Keep Metro's default hierarchical lookup ON so it can resolve pnpm's
+// symlinked/nested deps (disabling it broke @expo/metro-runtime resolution).
 
 module.exports = config;
