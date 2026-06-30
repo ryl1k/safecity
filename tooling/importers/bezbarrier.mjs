@@ -182,20 +182,33 @@ async function main() {
       const name = (p.title || '').trim() || 'Без назви';
       const address = [p.addressThoroughfare, p.addressPostName].filter(Boolean).join(', ') || null;
       const osmId = `bezbar/${p.id}`;
+      // Compose a human description from the source fields (kind, accessibility
+      // class, score) + a source link (also satisfies CC-BY attribution).
+      const pct = Number.isFinite(p.rating) ? ` (оцінка ${Math.round(p.rating * 100)}%)` : '';
+      const cls = (p.ratingAuthority || '').trim();
+      const description =
+        [
+          (p.kind || '').trim() ? `${p.kind.trim()}.` : '',
+          cls ? `За муніципальним моніторингом — ${cls}${pct}.` : '',
+          p.url ? `Джерело: ${p.url}` : 'Джерело: Мапа безбар’єрності (data.gov.ua)',
+        ]
+          .filter(Boolean)
+          .join(' ') || null;
 
       if (samples.length < 6 && nKeys >= 2) {
-        samples.push({ name, category, address, features });
+        samples.push({ name, category, address, description, features });
       }
 
       if (APPLY) {
         const [pt] = await sql`
-          insert into points (name, category, geom, address, source, verify_status, osm_id)
+          insert into points (name, category, geom, address, description, source, verify_status, osm_id)
           values (${name}, ${category},
                   ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
-                  ${address}, 'imported', 'unverified', ${osmId})
+                  ${address}, ${description}, 'imported', 'unverified', ${osmId})
           on conflict (osm_id) where osm_id is not null
           do update set name = excluded.name, geom = excluded.geom,
-                        address = coalesce(excluded.address, points.address), updated_at = now()
+                        address = coalesce(excluded.address, points.address),
+                        description = excluded.description, updated_at = now()
           returning id`;
         totals.upserts++;
         for (const [key, value] of Object.entries(features)) {
@@ -221,6 +234,7 @@ async function main() {
   console.log('\n=== Sample mapped points ===');
   for (const s of samples) {
     console.log(`• [${s.category}] ${s.name}${s.address ? ' — ' + s.address : ''}`);
+    if (s.description) console.log(`    ${s.description}`);
     console.log(`    ${JSON.stringify(s.features)}`);
   }
   if (!APPLY) console.log('\n(DRY-RUN — re-run with --apply to write. Then run dedupe to merge with OSM.)');
