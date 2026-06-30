@@ -1,6 +1,7 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Tailwind v4: single import replaces @tailwind base/components/utilities.
+   @config keeps the existing JS preset (design-tokens → CSS-variable utilities). */
+@import 'tailwindcss';
+@config '../tailwind.config.ts';
 
 @layer base {
   /* Root font-size is set in design-tokens themes.css via [data-sc-root]

@@ -10,9 +10,8 @@ const nextConfig = {
   // Running it on every local build mutates node_modules/next and corrupts the pnpm store.
   output: process.env.NEXT_OUTPUT === 'standalone' ? 'standalone' : undefined,
   // Trace files from the monorepo root so standalone bundles workspace deps.
-  experimental: {
-    outputFileTracingRoot: path.join(__dirname, '../../'),
-  },
+  // (Next 16 moved this out of `experimental`.)
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   // Workspace packages ship raw TS/CSS — let Next transpile them.
   transpilePackages: ['@safecity/shared', '@safecity/design-tokens'],
 };

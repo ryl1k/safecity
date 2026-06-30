@@ -22,8 +22,8 @@
     "db:dedupe": "node --env-file=.env tooling/importers/dedupe.mjs"
   },
   "devDependencies": {
-    "postgres": "^3.4.4",
-    "turbo": "^2.0.0",
-    "typescript": "^5.4.0"
+    "postgres": "^3.4.9",
+    "turbo": "^2.10.1",
+    "typescript": "^6.0.3"
   }
 }
