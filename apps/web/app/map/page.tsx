@@ -21,7 +21,15 @@ const CATEGORIES: Category[] = ['venue', 'transit', 'crossing', 'toilet', 'parki
 
 const ExploreMap = dynamic(() => import('@/components/ExploreMap').then((m) => m.ExploreMap), { ssr: false });
 
-interface Bbox { minLng: number; minLat: number; maxLng: number; maxLat: number }
+interface Bbox { minLng: number; minLat: number; maxLng: number; maxLat: number; zoom: number }
+
+// Drop low-value pins first when zoomed out: none → unknown → partial → full always visible.
+function visibleRatings(zoom: number): Set<string> {
+  if (zoom >= 14) return new Set(['full', 'partial', 'unknown', 'none']);
+  if (zoom >= 12) return new Set(['full', 'partial', 'unknown']);
+  if (zoom >= 10) return new Set(['full', 'partial']);
+  return new Set(['full']);
+}
 
 function metersBetween(a: [number, number], b: [number, number]): number {
   const R = 6371000;
@@ -44,6 +52,7 @@ export default function MapPage() {
   const [problems, setProblems] = useState<ProblemMarker[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
+  const [zoom, setZoom] = useState(14);
   const [modalId, setModalId] = useState<string | null>(null);
   const [pickFromCb, setPickFromCb] = useState<((lng: number, lat: number) => void) | null>(null);
   const [routeLine, setRouteLine] = useState<[number, number][]>([]);
@@ -74,6 +83,7 @@ export default function MapPage() {
   }, []);
 
   function onMoveEnd(b: Bbox) {
+    setZoom(b.zoom);
     lastBbox.current = b;
     const center: [number, number] = [(b.minLng + b.maxLng) / 2, (b.minLat + b.maxLat) / 2];
     const radius = Math.min(9000, Math.max(800, metersBetween(center, [b.maxLng, b.maxLat])));
@@ -104,13 +114,13 @@ export default function MapPage() {
     return () => { clearTimeout(handle); ctrl.abort(); };
   }, [query]);
 
-  const markers = useMemo(
-    () => points
+  const markers = useMemo(() => {
+    const allowed = visibleRatings(zoom);
+    return points
       .filter((p) => enabled.has(p.category))
       .map((p) => ({ id: p.id, name: p.name, lng: p.lng, lat: p.lat, category: p.category, rating: computeRating(p.features, catalog, p.category, primary) as Rating }))
-      .filter((m) => (onlyAccessible ? m.rating === 'full' : true)),
-    [points, enabled, onlyAccessible, catalog, primary],
-  );
+      .filter((m) => (onlyAccessible ? m.rating === 'full' : allowed.has(m.rating)));
+  }, [points, enabled, onlyAccessible, catalog, primary, zoom]);
 
   function flyTo(lng: number, lat: number) { nonceRef.current += 1; setFocus({ lng, lat, nonce: nonceRef.current }); }
   async function pickPoint(id: string) { setOpen(false); setQuery(''); const p = await pointById(id).catch(() => null); if (p) flyTo(p.lng, p.lat); setModalId(id); }

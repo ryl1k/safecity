@@ -25,6 +25,7 @@ export interface Bbox {
   minLat: number;
   maxLng: number;
   maxLat: number;
+  zoom: number;
 }
 
 const ratingKey: Record<Rating, string> = { full: 'ok', partial: 'warn', none: 'bad', unknown: 'unk' };
@@ -130,6 +131,7 @@ export function ExploreMap({
           minLat: b.getSouth(),
           maxLng: b.getEast(),
           maxLat: b.getNorth(),
+          zoom: map.getZoom(),
         });
       };
       map.on('load', emit);
