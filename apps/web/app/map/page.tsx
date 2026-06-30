@@ -45,6 +45,8 @@ export default function MapPage() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
   const [modalId, setModalId] = useState<string | null>(null);
+  const [pickFromCb, setPickFromCb] = useState<((lng: number, lat: number) => void) | null>(null);
+  const [routeLine, setRouteLine] = useState<[number, number][]>([]);
   const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number } | null>(null);
   const lastBbox = useRef<Bbox | null>(null);
   const nonceRef = useRef(0);
@@ -153,7 +155,11 @@ export default function MapPage() {
         {status === 'error' ? (
           <div style={{ padding: '2em 1.25em' }}><LoadingState label="Повторне завантаження…" /></div>
         ) : (
-          <ExploreMap points={markers} problems={problems} center={LVIV} onSelect={setModalId} onSelectProblem={(id) => router.push(`/problem/${id}`)} onMoveEnd={onMoveEnd} focus={focus} />
+          <ExploreMap points={markers} problems={problems} center={LVIV} onSelect={setModalId} onSelectProblem={(id) => router.push(`/problem/${id}`)} onMoveEnd={onMoveEnd} focus={focus}
+            pickMode={pickFromCb !== null}
+            onMapClick={(lng, lat) => { pickFromCb?.(lng, lat); setPickFromCb(null); }}
+            line={routeLine}
+          />
         )}
 
         {/* Floating search (top) */}
@@ -224,7 +230,15 @@ export default function MapPage() {
           {status === 'ready' ? `${markers.length} місць` : '…'}
         </span>
 
-        {modalId && <PointDetailModal id={modalId} onClose={() => setModalId(null)} />}
+        {modalId && (
+          <PointDetailModal
+            id={modalId}
+            onClose={() => { setModalId(null); setPickFromCb(null); setRouteLine([]); }}
+            onRequestMapPick={(cb) => setPickFromCb(() => cb)}
+            onCancelMapPick={() => setPickFromCb(null)}
+            onRouteLine={setRouteLine}
+          />
+        )}
       </main>
     </div>
   );
