@@ -11,8 +11,9 @@ import { LoadingState } from '@/components/ui';
 import { getCatalog } from '@/lib/catalog';
 import { pointsNear, pointById, searchPointsByName, type PointHit } from '@/lib/points';
 import { problemsInBbox, type ProblemMarker } from '@/lib/civic';
+import { reviewStats, type ReviewStat } from '@/lib/reviews';
 import { geocodePlaces, type GeoPlace } from '@/lib/geocode';
-import { featuresForCategories, isAccessible, suggestFilters } from '@/lib/filters';
+import { declutter, featuresForCategories, isAccessible, suggestFilters } from '@/lib/filters';
 import { categoryLabel } from '@/lib/format';
 
 const LVIV: [number, number] = [24.0316, 49.8419];
@@ -36,12 +37,14 @@ export default function MapPage() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
   const [points, setPoints] = useState<PointSummary[]>([]);
+  const [stats, setStats] = useState<Record<string, ReviewStat>>({});
   const [showInaccessible, setShowInaccessible] = useState(false);
   const [features, setFeatures] = useState<Set<string>>(new Set());
   const [enabled, setEnabled] = useState<Set<Category>>(new Set(CATEGORIES));
   const [showProblems, setShowProblems] = useState(false);
   const [problems, setProblems] = useState<ProblemMarker[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [view, setView] = useState<Bbox | null>(null);
   const [modalId, setModalId] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number } | null>(null);
   const lastBbox = useRef<Bbox | null>(null);
@@ -66,11 +69,13 @@ export default function MapPage() {
 
   useEffect(() => {
     void getCatalog().then(setCatalog).catch(() => setCatalog([]));
+    void reviewStats().then(setStats).catch(() => {});
     void loadNear(LVIV[0], LVIV[1], 2500);
   }, []);
 
   function onMoveEnd(b: Bbox) {
     lastBbox.current = b;
+    setView(b); // re-declutter for the new viewport
     const center: [number, number] = [(b.minLng + b.maxLng) / 2, (b.minLat + b.maxLat) / 2];
     const radius = Math.min(9000, Math.max(800, metersBetween(center, [b.maxLng, b.maxLat])));
     if (bboxTimer.current) clearTimeout(bboxTimer.current);
@@ -100,7 +105,8 @@ export default function MapPage() {
     return () => { clearTimeout(handle); ctrl.abort(); };
   }, [query]);
 
-  const markers = useMemo(() => {
+  // All points matching the filters (the count shown to the user).
+  const matching = useMemo(() => {
     const keys = [...features];
     return points
       .filter((p) => enabled.has(p.category))
@@ -119,6 +125,12 @@ export default function MapPage() {
         accessible: isAccessible(p, catalog),
       }));
   }, [points, enabled, features, showInaccessible, catalog]);
+
+  // Decluttered subset actually drawn — one per grid cell, accessible ones win.
+  const markers = useMemo(
+    () => (view ? declutter(matching, view, 13, (m) => (m.accessible ? 1 : 0)) : matching.slice(0, 160)),
+    [matching, view],
+  );
 
   function flyTo(lng: number, lat: number) { nonceRef.current += 1; setFocus({ lng, lat, nonce: nonceRef.current }); }
   async function pickPoint(id: string) { setOpen(false); setQuery(''); const p = await pointById(id).catch(() => null); if (p) flyTo(p.lng, p.lat); setModalId(id); }
@@ -216,7 +228,8 @@ export default function MapPage() {
                 {pointHits.map((p, i) => (
                   <li key={p.id} id={`map-opt-${i}`} role="option" aria-selected={activeIndex === i} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setActiveIndex(i)} onClick={() => void pickPoint(p.id)} style={{ ...resultRow, background: activeIndex === i ? 'var(--sc-primary-tint)' : 'transparent' }}>
                     <MapPinIcon size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
-                    <span style={{ minWidth: 0 }}><span style={resultTitle}>{p.name}</span><span style={resultSub}>{categoryLabel[p.category]}{p.address ? ` · ${p.address}` : ''}</span></span>
+                    <span style={{ minWidth: 0, flex: 1 }}><span style={resultTitle}>{p.name}</span><span style={resultSub}>{categoryLabel[p.category]}{p.address ? ` · ${p.address}` : ''}</span></span>
+                    {((s) => (s ? <span style={{ flexShrink: 0, fontSize: '0.8em', fontWeight: 800, color: 'var(--sc-warn)' }}>★ {s.avg.toFixed(1)}</span> : null))(stats[p.id])}
                   </li>
                 ))}
                 {placeHits.length > 0 && <li style={resultHead} aria-hidden>Адреси та місця</li>}
@@ -266,7 +279,7 @@ export default function MapPage() {
 
         {/* Count (bottom-right) */}
         <span aria-live="polite" style={{ position: 'absolute', right: '0.8em', bottom: '0.8em', fontSize: '0.8em', fontWeight: 700, color: 'var(--sc-text)', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', padding: '0.3em 0.7em', boxShadow: 'var(--sc-shadow-1)' }}>
-          {status === 'ready' ? `${markers.length} місць` : '…'}
+          {status === 'ready' ? `${matching.length} місць` : '…'}
         </span>
       </main>
 

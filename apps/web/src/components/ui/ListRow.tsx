@@ -8,6 +8,8 @@ export interface ListRowProps {
   rating?: RatingKey;
   /** Leading icon (category) shown when the rating is hidden. */
   icon?: ReactNode;
+  /** Average review stars (1–5) — shown only when the point has reviews. */
+  stars?: number;
   /** e.g. "Кафе · 40 м · на 2 годині · без сходів, туалет" */
   meta: string;
   /** Optional explicit screen-reader phrase; composed from props if omitted. */
@@ -19,10 +21,11 @@ export interface ListRowProps {
  * The audio-first list primitive. Carries a rich aria-label so a screen reader
  * announces name + status + distance + direction in one pass (KB 02 blind list).
  */
-export function ListRow({ name, rating: r, icon, meta, ariaLabel, onClick }: ListRowProps) {
+export function ListRow({ name, rating: r, icon, stars, meta, ariaLabel, onClick }: ListRowProps) {
   const hasRating = !!r && r !== 'unknown';
   const meta_ = hasRating ? rating[r] : null;
-  const label = ariaLabel ?? (meta_ ? `${name}, ${meta_.label}, ${meta}` : `${name}, ${meta}`);
+  const starText = stars != null ? `, ${stars.toFixed(1)} з 5 зірок` : '';
+  const label = ariaLabel ?? (meta_ ? `${name}, ${meta_.label}${starText}, ${meta}` : `${name}${starText}, ${meta}`);
   const btn: CSSProperties = {
     display: 'flex',
     width: '100%',
@@ -52,6 +55,11 @@ export function ListRow({ name, rating: r, icon, meta, ariaLabel, onClick }: Lis
           <span style={{ fontWeight: 800, fontSize: '1.02em' }}>{name}</span>
           {meta_ ? (
             <span style={{ fontSize: '0.78em', fontWeight: 800, color: `var(--sc-${meta_.key})` }}>{meta_.label}</span>
+          ) : null}
+          {stars != null ? (
+            <span aria-hidden style={{ fontSize: '0.8em', fontWeight: 800, color: 'var(--sc-warn)' }}>
+              ★ {stars.toFixed(1)}
+            </span>
           ) : null}
         </span>
         <span style={{ display: 'block', color: 'var(--sc-muted)', fontSize: '0.85em', marginTop: '0.15em' }}>

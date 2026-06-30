@@ -85,6 +85,39 @@ export function filterPoints(
   });
 }
 
+export interface Bbox {
+  minLng: number;
+  minLat: number;
+  maxLng: number;
+  maxLat: number;
+}
+
+/**
+ * Map declutter (Google-Maps style): over the visible bbox, keep at most one item
+ * per grid cell — the highest-scoring (most useful) one. Items outside the bbox
+ * are dropped. `gridN` controls density (≈ gridN² markers max). Zooming in shrinks
+ * the bbox, so cells cover less ground and more points become visible.
+ */
+export function declutter<T extends { lng: number; lat: number }>(
+  items: T[],
+  bbox: Bbox,
+  gridN: number,
+  score: (t: T) => number,
+): T[] {
+  const w = (bbox.maxLng - bbox.minLng) / gridN;
+  const h = (bbox.maxLat - bbox.minLat) / gridN;
+  if (!(w > 0) || !(h > 0)) return items;
+  const best = new Map<string, { item: T; s: number }>();
+  for (const it of items) {
+    if (it.lng < bbox.minLng || it.lng > bbox.maxLng || it.lat < bbox.minLat || it.lat > bbox.maxLat) continue;
+    const key = `${Math.floor((it.lng - bbox.minLng) / w)}:${Math.floor((it.lat - bbox.minLat) / h)}`;
+    const s = score(it);
+    const cur = best.get(key);
+    if (!cur || s > cur.s) best.set(key, { item: it, s });
+  }
+  return Array.from(best.values(), (v) => v.item);
+}
+
 /** Smart search: categories (by keyword) + wheelchair features (by label) matching the query. */
 export function suggestFilters(
   query: string,

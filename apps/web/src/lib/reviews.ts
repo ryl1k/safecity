@@ -31,6 +31,27 @@ export async function addReview(
   if (error) throw error;
 }
 
+export interface ReviewStat {
+  avg: number;
+  count: number;
+}
+
+/** Average stars + count per point that has reviews. Fetches all reviews (the
+ *  table is small — user-generated only) and aggregates client-side. */
+export async function reviewStats(): Promise<Record<string, ReviewStat>> {
+  const { data, error } = await supabase.from('reviews').select('point_id, stars');
+  if (error || !data) return {};
+  const acc: Record<string, { sum: number; count: number }> = {};
+  for (const r of data as { point_id: string; stars: number }[]) {
+    const a = (acc[r.point_id] ??= { sum: 0, count: 0 });
+    a.sum += r.stars;
+    a.count += 1;
+  }
+  const out: Record<string, ReviewStat> = {};
+  for (const [id, a] of Object.entries(acc)) out[id] = { avg: a.sum / a.count, count: a.count };
+  return out;
+}
+
 export async function reviewsFor(pointId: string): Promise<ReviewRow[]> {
   const { data, error } = await supabase
     .from('reviews')

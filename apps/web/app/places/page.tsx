@@ -20,6 +20,7 @@ import {
   type FilterState,
 } from '@/lib/filters';
 import { pointsNear } from '@/lib/points';
+import { reviewStats, type ReviewStat } from '@/lib/reviews';
 import { categoryLabel, distanceLabel, featureSummary } from '@/lib/format';
 import { speak, stopSpeech } from '@/lib/tts';
 
@@ -36,6 +37,7 @@ export default function PlacesPage() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [points, setPoints] = useState<PointSummary[]>([]);
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
+  const [stats, setStats] = useState<Record<string, ReviewStat>>({});
   const [query, setQuery] = useState('');
   const [categories, setCategories] = useState<Set<Category>>(new Set());
   const [features, setFeatures] = useState<Set<string>>(new Set());
@@ -45,9 +47,14 @@ export default function PlacesPage() {
   async function load() {
     setStatus('loading');
     try {
-      const [cat, pts] = await Promise.all([getCatalog(), pointsNear(LVIV[0], LVIV[1], 4000)]);
+      const [cat, pts, rs] = await Promise.all([
+        getCatalog(),
+        pointsNear(LVIV[0], LVIV[1], 4000),
+        reviewStats().catch(() => ({})),
+      ]);
       setCatalog(cat);
       setPoints(pts);
+      setStats(rs);
       setStatus('ready');
     } catch {
       setStatus('error');
@@ -195,6 +202,7 @@ export default function PlacesPage() {
                     name={point.name}
                     rating={ratingOf(point, catalog)}
                     icon={<PlaceIcon category={point.category} name={point.name} size={20} />}
+                    stars={stats[point.id]?.avg}
                     meta={meta}
                     onClick={() => router.push(`/point/${point.id}`)}
                   />
