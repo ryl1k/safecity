@@ -96,6 +96,19 @@ const MATCHERS = [
   { re: /пониження бордюрного каменю/, keys: ['dropped_curb'] },
 ];
 
+// Short UA labels for the mapped feature keys (used to compose readable descriptions).
+const FEATURE_LABELS = {
+  step_free_entrance: 'вхід без сходів', ramp: 'пандус', ramp_slope_ok: 'пологий пандус', door_width: 'широкий вхід',
+  elevator: 'ліфт', accessible_toilet: 'доступний туалет', level_interior: 'рівна підлога',
+  accessible_parking_near: 'паркування для людей з інвалідністю', tactile_guidance_entrance: 'тактильна навігація',
+  braille_signage: 'шрифт Брайля', staff_assistance: 'допомога персоналу', good_lighting: 'добре освітлення',
+  guide_dog_welcome: 'із собакою-поводирем', level_boarding: 'посадка врівень', step_free_to_stop: 'підхід без сходів',
+  low_floor_vehicles: 'низькопідлоговий транспорт', tactile_paving: 'тактильна плитка', audio_announcements: 'аудіооголошення',
+  high_contrast_edge: 'контрастний край', dropped_curb: 'занижений бордюр', acoustic_signal: 'звуковий сигнал',
+  accessible_stall: 'доступна кабіна', grab_bars: 'поручні', turning_space: 'місце для розвороту',
+  emergency_cord: 'тривожна кнопка', disabled_bay: 'місце для авто', bay_width: 'широке місце', near_entrance: 'біля входу',
+};
+
 const norm = (s) => (s || '').toLowerCase().replace(/[ʼ’]/g, "'").trim();
 const VAL = { так: 'yes', ні: 'no', 'не застосовується': null };
 
@@ -182,18 +195,20 @@ async function main() {
       const name = (p.title || '').trim() || 'Без назви';
       const address = [p.addressThoroughfare, p.addressPostName].filter(Boolean).join(', ') || null;
       const osmId = `bezbar/${p.id}`;
-      // Compose a human description from the source fields (kind, accessibility
-      // class, score) + a source link (also satisfies CC-BY attribution).
-      const pct = Number.isFinite(p.rating) ? ` (оцінка ${Math.round(p.rating * 100)}%)` : '';
+      // Compose a readable description: place type + the actual wheelchair
+      // amenities present (fallback to the monitoring class when none are known).
+      const present = Object.entries(features)
+        .filter(([, v]) => v === 'yes')
+        .map(([k]) => FEATURE_LABELS[k])
+        .filter(Boolean);
+      const kindStr = (p.kind || '').trim();
       const cls = (p.ratingAuthority || '').trim();
-      const description =
-        [
-          (p.kind || '').trim() ? `${p.kind.trim()}.` : '',
-          cls ? `За муніципальним моніторингом — ${cls}${pct}.` : '',
-          p.url ? `Джерело: ${p.url}` : 'Джерело: Мапа безбар’єрності (data.gov.ua)',
-        ]
-          .filter(Boolean)
-          .join(' ') || null;
+      const a11y = present.length
+        ? `Зручності для крісла колісного: ${present.slice(0, 5).join(', ')}.`
+        : cls
+          ? `${cls.charAt(0).toUpperCase()}${cls.slice(1)}.`
+          : '';
+      const description = [kindStr ? `${kindStr}.` : '', a11y].filter(Boolean).join(' ') || null;
 
       if (samples.length < 6 && nKeys >= 2) {
         samples.push({ name, category, address, description, features });
