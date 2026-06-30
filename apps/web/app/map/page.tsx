@@ -8,12 +8,11 @@ import type { AccessibilityFeature, Category, PointSummary } from '@safecity/sha
 import { AppHeader } from '@/components/AppHeader';
 import { PointDetailModal } from '@/components/PointDetailModal';
 import { LoadingState } from '@/components/ui';
-import { useProfile } from '@/profile/ProfileProvider';
 import { getCatalog } from '@/lib/catalog';
 import { pointsNear, pointById, searchPointsByName, type PointHit } from '@/lib/points';
 import { problemsInBbox, type ProblemMarker } from '@/lib/civic';
 import { geocodePlaces, type GeoPlace } from '@/lib/geocode';
-import { isAccessible, MOBILITY_FILTERS, suggestFilters } from '@/lib/filters';
+import { featuresForCategories, isAccessible, suggestFilters } from '@/lib/filters';
 import { categoryLabel } from '@/lib/format';
 
 const LVIV: [number, number] = [24.0316, 49.8419];
@@ -33,7 +32,6 @@ function metersBetween(a: [number, number], b: [number, number]): number {
 }
 
 export default function MapPage() {
-  const { primary } = useProfile();
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
@@ -103,14 +101,14 @@ export default function MapPage() {
   }, [query]);
 
   const markers = useMemo(() => {
-    const feats = MOBILITY_FILTERS.filter((f) => features.has(f.id));
+    const keys = [...features];
     return points
       .filter((p) => enabled.has(p.category))
       .filter((p) => {
         // Feature chips act as the accessibility filter; otherwise default hides
         // non-accessible points unless "show inaccessible" is on.
-        if (feats.length) return feats.every((f) => f.keys.some((k) => p.features[k] === 'yes'));
-        return showInaccessible || isAccessible(p, catalog, primary);
+        if (keys.length) return keys.every((k) => p.features[k] === 'yes');
+        return showInaccessible || isAccessible(p, catalog);
       })
       .map((p) => ({
         id: p.id,
@@ -118,9 +116,9 @@ export default function MapPage() {
         lng: p.lng,
         lat: p.lat,
         category: p.category,
-        accessible: isAccessible(p, catalog, primary),
+        accessible: isAccessible(p, catalog),
       }));
-  }, [points, enabled, features, showInaccessible, catalog, primary]);
+  }, [points, enabled, features, showInaccessible, catalog]);
 
   function flyTo(lng: number, lat: number) { nonceRef.current += 1; setFocus({ lng, lat, nonce: nonceRef.current }); }
   async function pickPoint(id: string) { setOpen(false); setQuery(''); const p = await pointById(id).catch(() => null); if (p) flyTo(p.lng, p.lat); setModalId(id); }
@@ -141,7 +139,8 @@ export default function MapPage() {
   }
   const hasResults = pointHits.length > 0 || placeHits.length > 0;
   const placeBase = pointHits.length;
-  const filterSugs = suggestFilters(query);
+  const filterSugs = suggestFilters(query, catalog);
+  const featureChips = featuresForCategories(catalog, enabled);
 
   function toggleCat(c: Category) { setEnabled((prev) => { const n = new Set(prev); n.has(c) ? n.delete(c) : n.add(c); return n; }); }
   function toggleFeature(id: string) { setFeatures((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
@@ -195,11 +194,11 @@ export default function MapPage() {
                     ))}
                     {filterSugs.features.map((f) => (
                       <li
-                        key={`ff-${f.id}`}
+                        key={`ff-${f.key}`}
                         role="option"
                         aria-selected={false}
                         onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => { toggleFeature(f.id); setOpen(false); setQuery(''); }}
+                        onClick={() => { toggleFeature(f.key); setOpen(false); setQuery(''); }}
                         style={resultRow}
                       >
                         <SlidersHorizontal size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
@@ -249,8 +248,8 @@ export default function MapPage() {
                 <ToggleRow checked={showProblems} onChange={() => setShowProblems((v) => !v)} label="Показати проблеми" />
                 <div style={{ height: 1, background: 'var(--sc-border)', margin: '0.5em 0' }} />
                 <div style={{ fontSize: '0.72em', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--sc-muted)', marginBottom: '0.3em' }}>Зручності</div>
-                {MOBILITY_FILTERS.map((f) => (
-                  <ToggleRow key={f.id} checked={features.has(f.id)} onChange={() => toggleFeature(f.id)} label={f.label} />
+                {featureChips.map((f) => (
+                  <ToggleRow key={f.key} checked={features.has(f.key)} onChange={() => toggleFeature(f.key)} label={f.label} />
                 ))}
                 <div style={{ height: 1, background: 'var(--sc-border)', margin: '0.5em 0' }} />
                 <div style={{ fontSize: '0.72em', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--sc-muted)', marginBottom: '0.3em' }}>Категорії</div>

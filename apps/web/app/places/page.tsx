@@ -8,13 +8,12 @@ import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { SearchBar, Chip, ListRow, LoadingState, ErrorState, EmptyState } from '@/components/ui';
 import { CategoryIcon } from '@/components/CategoryIcon';
-import { useProfile } from '@/profile/ProfileProvider';
 import { getCatalog } from '@/lib/catalog';
 import {
   CATEGORIES,
   categoryColor,
+  featuresForCategories,
   filterPoints,
-  MOBILITY_FILTERS,
   ratingOf,
   suggestFilters,
   type FilterState,
@@ -32,7 +31,6 @@ const RATING_WORD: Record<Rating, string> = {
 };
 
 export default function PlacesPage() {
-  const { primary } = useProfile();
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [points, setPoints] = useState<PointSummary[]>([]);
@@ -61,18 +59,19 @@ export default function PlacesPage() {
 
   const st: FilterState = { query, categories, features, showInaccessible };
   const filtered = useMemo(
-    () => filterPoints(points, catalog, primary, st),
+    () => filterPoints(points, catalog, st),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [points, catalog, primary, query, categories, features, showInaccessible],
+    [points, catalog, query, categories, features, showInaccessible],
   );
+  const featureChips = useMemo(() => featuresForCategories(catalog, categories), [catalog, categories]);
 
   const suggestions = useMemo(() => {
-    const s = suggestFilters(query);
+    const s = suggestFilters(query, catalog);
     return {
       categories: s.categories.filter((c) => !categories.has(c)),
-      features: s.features.filter((f) => !features.has(f.id)),
+      features: s.features.filter((f) => !features.has(f.key)),
     };
-  }, [query, categories, features]);
+  }, [query, catalog, categories, features]);
 
   function toggle<T>(set: Set<T>, val: T): Set<T> {
     const next = new Set(set);
@@ -88,8 +87,8 @@ export default function PlacesPage() {
       return;
     }
     const items = filtered.slice(0, 8).map((p, i) => {
-      const summary = featureSummary(p, catalog, primary);
-      return `${i + 1}. ${p.name}, ${categoryLabel[p.category]}, ${distanceLabel(p.distanceM)}, ${RATING_WORD[ratingOf(p, catalog, primary)]}${summary ? `, ${summary}` : ''}.`;
+      const summary = featureSummary(p, catalog, 'wheelchair');
+      return `${i + 1}. ${p.name}, ${categoryLabel[p.category]}, ${distanceLabel(p.distanceM)}, ${RATING_WORD[ratingOf(p, catalog)]}${summary ? `, ${summary}` : ''}.`;
     });
     setSpeaking(true);
     speak(`Знайдено ${filtered.length} місць. ${items.join(' ')}`, {
@@ -124,7 +123,7 @@ export default function PlacesPage() {
               </Chip>
             ))}
             {suggestions.features.map((f) => (
-              <Chip key={`s-${f.id}`} pressed={false} onToggle={() => { setFeatures((s) => toggle(s, f.id)); setQuery(''); }}>
+              <Chip key={`s-${f.key}`} pressed={false} onToggle={() => { setFeatures((s) => toggle(s, f.key)); setQuery(''); }}>
                 + {f.label}
               </Chip>
             ))}
@@ -143,10 +142,10 @@ export default function PlacesPage() {
           ))}
         </div>
 
-        {/* Mobility feature filters */}
+        {/* Mobility feature filters — adapt to the selected category */}
         <div style={chipRow}>
-          {MOBILITY_FILTERS.map((f) => (
-            <Chip key={f.id} pressed={features.has(f.id)} onToggle={() => setFeatures((s) => toggle(s, f.id))}>
+          {featureChips.map((f) => (
+            <Chip key={f.key} pressed={features.has(f.key)} onToggle={() => setFeatures((s) => toggle(s, f.key))}>
               {f.label}
             </Chip>
           ))}
@@ -187,13 +186,13 @@ export default function PlacesPage() {
         {status === 'ready' && filtered.length > 0 && (
           <ul style={{ listStyle: 'none', margin: 0, padding: 0, background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', overflow: 'hidden' }}>
             {filtered.map((point, i) => {
-              const summary = featureSummary(point, catalog, primary);
+              const summary = featureSummary(point, catalog, 'wheelchair');
               const meta = [categoryLabel[point.category], distanceLabel(point.distanceM), summary || 'немає даних'].join(' · ');
               return (
                 <li key={point.id} style={{ borderTop: i ? 'var(--sc-bw) solid var(--sc-border)' : 'none' }}>
                   <ListRow
                     name={point.name}
-                    rating={ratingOf(point, catalog, primary)}
+                    rating={ratingOf(point, catalog)}
                     icon={<CategoryIcon category={point.category} size={20} />}
                     meta={meta}
                     onClick={() => router.push(`/point/${point.id}`)}

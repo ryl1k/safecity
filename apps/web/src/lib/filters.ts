@@ -1,8 +1,12 @@
-// Discovery-first filtering for the web map + places list (immobility focus).
-// Mirrors apps/mobile/src/lib/filters.ts so both platforms behave identically.
-import type { AccessibilityFeature, Category, PointSummary, Profile, Rating } from '@safecity/shared';
+// Discovery-first filtering for the web map + places list.
+// Wheelchair-first: accessibility + feature filters are computed for the
+// wheelchair profile only. Feature chips are derived per-category from the
+// catalog, so a toilet/crossing/parking shows its own relevant features.
+import type { AccessibilityFeature, Category, PointSummary, Rating } from '@safecity/shared';
 import { computeRating } from '@safecity/shared';
 import { categoryLabel } from './format';
+
+const PROFILE = 'wheelchair' as const;
 
 export const CATEGORIES: Category[] = ['venue', 'transit', 'crossing', 'toilet', 'parking'];
 
@@ -16,20 +20,9 @@ export const categoryColor: Record<Category, string> = {
 };
 
 export interface FeatureFilter {
-  id: string;
+  key: string; // catalog feature key (matched against point.features)
   label: string;
-  keys: string[]; // matched against point.features (any === 'yes')
-  keywords: string[]; // smart-search suggestions
 }
-
-// Mobility (wheelchair) feature filters — the immobility-first filter set.
-export const MOBILITY_FILTERS: FeatureFilter[] = [
-  { id: 'step_free', label: 'Без сходів', keys: ['step_free_entrance'], keywords: ['без сход', 'сход', 'рівень', 'вхід', 'step'] },
-  { id: 'ramp', label: 'Пандус', keys: ['ramp'], keywords: ['пандус', 'ramp'] },
-  { id: 'elevator', label: 'Ліфт', keys: ['elevator'], keywords: ['ліфт', 'підйомник', 'elevator', 'lift'] },
-  { id: 'toilet', label: 'Доступний туалет', keys: ['accessible_toilet', 'accessible_stall'], keywords: ['туалет', 'вбиральн', 'toilet', 'wc'] },
-  { id: 'parking', label: 'Паркування', keys: ['accessible_parking_near', 'disabled_bay'], keywords: ['паркув', 'парков', 'parking'] },
-];
 
 const CATEGORY_KEYWORDS: Record<Category, string[]> = {
   venue: ['заклад', 'кафе', 'ресторан', 'магазин', 'аптек', 'банк', 'готель', 'музей', 'пошт', 'cafe', 'shop'],
@@ -39,53 +32,77 @@ const CATEGORY_KEYWORDS: Record<Category, string[]> = {
   parking: ['паркув', 'парков', 'parking'],
 };
 
-export function ratingOf(p: PointSummary, catalog: AccessibilityFeature[], profile: Profile): Rating {
-  return computeRating(p.features, catalog, p.category, profile);
+/** Wheelchair feature filters relevant to the selected categories (critical first).
+ *  "All categories" or "none selected" defaults to venue (the common case). */
+export function featuresForCategories(catalog: AccessibilityFeature[], categories: Set<Category>): FeatureFilter[] {
+  const allOrNone = categories.size === 0 || categories.size === CATEGORIES.length;
+  const cats: Category[] = allOrNone ? ['venue'] : [...categories];
+  const picked = catalog
+    .filter((f) => f.profile === PROFILE && cats.some((c) => f.categories.includes(c)))
+    .sort((a, b) => Number(b.critical) - Number(a.critical));
+  const seen = new Set<string>();
+  const out: FeatureFilter[] = [];
+  for (const f of picked) {
+    if (!seen.has(f.key)) {
+      seen.add(f.key);
+      out.push({ key: f.key, label: f.label });
+    }
+  }
+  return out;
 }
 
-export function isAccessible(p: PointSummary, catalog: AccessibilityFeature[], profile: Profile): boolean {
-  const r = ratingOf(p, catalog, profile);
+export function ratingOf(p: PointSummary, catalog: AccessibilityFeature[]): Rating {
+  return computeRating(p.features, catalog, p.category, PROFILE);
+}
+
+export function isAccessible(p: PointSummary, catalog: AccessibilityFeature[]): boolean {
+  const r = ratingOf(p, catalog);
   return r === 'full' || r === 'partial';
-}
-
-function hasFeature(p: PointSummary, f: FeatureFilter): boolean {
-  return f.keys.some((k) => p.features[k] === 'yes');
 }
 
 export interface FilterState {
   query: string;
   categories: Set<Category>;
-  features: Set<string>; // FeatureFilter ids
+  features: Set<string>; // catalog feature keys
   showInaccessible: boolean;
 }
 
-/** Unified filter model: feature chips act as the accessibility filter when present;
- *  otherwise default hides non-accessible points unless "show inaccessible" is on. */
+/** Feature keys act as the accessibility filter when present; otherwise the
+ *  default hides non-accessible points unless "show inaccessible" is on. */
 export function filterPoints(
   points: PointSummary[],
   catalog: AccessibilityFeature[],
-  profile: Profile,
   st: FilterState,
 ): PointSummary[] {
   const q = st.query.trim().toLowerCase();
-  const feats = MOBILITY_FILTERS.filter((f) => st.features.has(f.id));
+  const keys = [...st.features];
   return points.filter((p) => {
     if (st.categories.size && !st.categories.has(p.category)) return false;
     if (q && !`${p.name} ${p.address ?? ''}`.toLowerCase().includes(q)) return false;
-    if (feats.length) return feats.every((f) => hasFeature(p, f));
-    if (!st.showInaccessible) return isAccessible(p, catalog, profile);
+    if (keys.length) return keys.every((k) => p.features[k] === 'yes');
+    if (!st.showInaccessible) return isAccessible(p, catalog);
     return true;
   });
 }
 
-/** Smart search: categories/features whose label or keywords match the query. */
-export function suggestFilters(query: string): { categories: Category[]; features: FeatureFilter[] } {
+/** Smart search: categories (by keyword) + wheelchair features (by label) matching the query. */
+export function suggestFilters(
+  query: string,
+  catalog: AccessibilityFeature[],
+): { categories: Category[]; features: FeatureFilter[] } {
   const q = query.trim().toLowerCase();
   if (q.length < 2) return { categories: [], features: [] };
-  const match = (cands: string[]) => cands.some((k) => k.includes(q) || q.includes(k));
   const categories = CATEGORIES.filter(
-    (c) => categoryLabel[c].toLowerCase().includes(q) || match(CATEGORY_KEYWORDS[c]),
+    (c) => categoryLabel[c].toLowerCase().includes(q) || CATEGORY_KEYWORDS[c].some((k) => k.includes(q) || q.includes(k)),
   );
-  const features = MOBILITY_FILTERS.filter((f) => f.label.toLowerCase().includes(q) || match(f.keywords));
+  const seen = new Set<string>();
+  const features: FeatureFilter[] = [];
+  for (const f of catalog) {
+    if (f.profile !== PROFILE || seen.has(f.key)) continue;
+    if (f.label.toLowerCase().includes(q)) {
+      seen.add(f.key);
+      features.push({ key: f.key, label: f.label });
+    }
+  }
   return { categories, features };
 }
