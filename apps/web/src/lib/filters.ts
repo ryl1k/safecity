@@ -94,11 +94,15 @@ export interface Bbox {
 
 /**
  * Map declutter (Google-Maps style): keep at most one item per grid cell — the
- * highest-scoring (most useful) one. The grid is anchored to WORLD coordinates
- * (not the moving viewport), so panning never shifts cell boundaries: the same
- * winners stay put, only edge points enter/leave. The cell size derives from the
- * viewport width, so the grid changes only on zoom. `gridN` controls density.
- * Ties break on a stable id so re-renders don't swap the visible marker.
+ * highest-scoring (most useful) one. Two properties make the visible set stable
+ * while panning:
+ *  1. Each cell's winner is chosen over ALL items (not just the in-view ones), so
+ *     scrolling more of a cell into view never swaps which point represents it.
+ *  2. Cells are world-anchored and the cell size is quantized to a power of two,
+ *     so it depends only on zoom — panning (and float jitter) can't shift the grid.
+ * Then we render only the winners that fall inside the viewport. Result: a pin
+ * for a given place stays put on pan; pins only appear/disappear at the edges and
+ * the grid only re-derives on zoom. Ties break on a stable id.
  */
 export function declutter<T extends { id: string; lng: number; lat: number }>(
   items: T[],
@@ -106,19 +110,20 @@ export function declutter<T extends { id: string; lng: number; lat: number }>(
   gridN: number,
   score: (t: T) => number,
 ): T[] {
-  const w = (bbox.maxLng - bbox.minLng) / gridN;
-  const h = (bbox.maxLat - bbox.minLat) / gridN;
-  if (!(w > 0) || !(h > 0)) return items;
+  const raw = (bbox.maxLng - bbox.minLng) / gridN;
+  if (!(raw > 0)) return items;
+  // Quantize to a power of two so the cell size is identical across pans at one zoom.
+  const step = Math.pow(2, Math.round(Math.log2(raw)));
   const best = new Map<string, { item: T; s: number }>();
   for (const it of items) {
-    if (it.lng < bbox.minLng || it.lng > bbox.maxLng || it.lat < bbox.minLat || it.lat > bbox.maxLat) continue;
-    // World-anchored cell (independent of pan).
-    const key = `${Math.floor(it.lng / w)}:${Math.floor(it.lat / h)}`;
+    const key = `${Math.floor(it.lng / step)}:${Math.floor(it.lat / step)}`;
     const s = score(it);
     const cur = best.get(key);
     if (!cur || s > cur.s || (s === cur.s && it.id < cur.item.id)) best.set(key, { item: it, s });
   }
-  return Array.from(best.values(), (v) => v.item);
+  return Array.from(best.values(), (v) => v.item).filter(
+    (it) => it.lng >= bbox.minLng && it.lng <= bbox.maxLng && it.lat >= bbox.minLat && it.lat <= bbox.maxLat,
+  );
 }
 
 /** Smart search: categories (by keyword) + wheelchair features (by label) matching the query. */
