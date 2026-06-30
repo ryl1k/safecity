@@ -39,16 +39,27 @@ function shapeStyle(category: Category) {
 export function PointsMap({
   markers,
   onSelect,
+  center,
+  zoom = 13,
+  me,
 }: {
   markers: MapMarkerData[];
   onSelect?: (id: string) => void;
+  center?: [number, number];
+  zoom?: number;
+  me?: [number, number] | null;
 }) {
   const { palette, themeName } = useTheme();
   const mapStyle = useMemo(() => basemapStyle(themeName === 'dark'), [themeName]);
 
   return (
     <Map style={styles.map} mapStyle={mapStyle}>
-      <Camera initialViewState={{ center: LVIV, zoom: 13 }} />
+      <Camera initialViewState={{ center: center ?? LVIV, zoom }} />
+      {me ? (
+        <Marker id="me" lngLat={me}>
+          <View style={[styles.me, { borderColor: palette.surface, backgroundColor: palette.focus }]} />
+        </Marker>
+      ) : null}
       {markers.map((m) => {
         const color = palette[ratingColorKey[m.rating] as keyof Palette];
         const diamond = m.category === 'crossing';
@@ -87,4 +98,5 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   icon: { color: '#fff', fontWeight: '800', fontSize: 13 },
+  me: { width: 20, height: 20, borderRadius: 10, borderWidth: 3 },
 });
