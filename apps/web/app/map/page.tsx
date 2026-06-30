@@ -130,7 +130,8 @@ export default function MapPage() {
 
   // Decluttered subset actually drawn — one per grid cell, accessible ones win.
   const markers = useMemo(
-    () => (view ? declutter(matching, view, 9, (m) => (m.accessible ? 1 : 0)) : matching.slice(0, 80)),
+    // pad 0.6 → render ~0.6 screen of buffer beyond each edge so pins glide in on pan.
+    () => (view ? declutter(matching, view, 9, (m) => (m.accessible ? 1 : 0), 0.6) : matching.slice(0, 80)),
     [matching, view],
   );
 

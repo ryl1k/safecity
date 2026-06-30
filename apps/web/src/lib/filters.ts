@@ -109,8 +109,11 @@ export function declutter<T extends { id: string; lng: number; lat: number }>(
   bbox: Bbox,
   gridN: number,
   score: (t: T) => number,
+  pad = 0, // render this fraction of the viewport beyond each edge (off-screen buffer)
 ): T[] {
-  const raw = (bbox.maxLng - bbox.minLng) / gridN;
+  const bw = bbox.maxLng - bbox.minLng;
+  const bh = bbox.maxLat - bbox.minLat;
+  const raw = bw / gridN;
   if (!(raw > 0)) return items;
   // Quantize to a power of two so the cell size is identical across pans at one zoom.
   const step = Math.pow(2, Math.round(Math.log2(raw)));
@@ -121,8 +124,14 @@ export function declutter<T extends { id: string; lng: number; lat: number }>(
     const cur = best.get(key);
     if (!cur || s > cur.s || (s === cur.s && it.id < cur.item.id)) best.set(key, { item: it, s });
   }
+  // Render winners within the viewport PLUS a margin, so panning reveals pins that
+  // are already on the map instead of popping in at the edge.
+  const minLng = bbox.minLng - bw * pad;
+  const maxLng = bbox.maxLng + bw * pad;
+  const minLat = bbox.minLat - bh * pad;
+  const maxLat = bbox.maxLat + bh * pad;
   return Array.from(best.values(), (v) => v.item).filter(
-    (it) => it.lng >= bbox.minLng && it.lng <= bbox.maxLng && it.lat >= bbox.minLat && it.lat <= bbox.maxLat,
+    (it) => it.lng >= minLng && it.lng <= maxLng && it.lat >= minLat && it.lat <= maxLat,
   );
 }
 
