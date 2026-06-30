@@ -30,6 +30,7 @@ export default function PointDetail() {
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'notfound'>('loading');
   const [showAll, setShowAll] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
 
   // review form
   const [authed, setAuthed] = useState(false);
@@ -137,7 +138,21 @@ export default function PointDetail() {
           {categoryLabel[point.category]}
           {point.address ? ` · ${point.address}` : ''}
         </Text>
-        <RatingBadge rating={rating} />
+
+        {/* Photos + description first — discovery before accessibility detail */}
+        {point.photos && point.photos.length > 0 ? (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
+            {point.photos.map((uri) => (
+              <Image key={uri} source={{ uri }} style={styles.photo} accessibilityIgnoresInvertColors />
+            ))}
+          </ScrollView>
+        ) : null}
+
+        {point.description ? (
+          <Text style={{ color: palette.text, fontSize: 15 * baseScale, lineHeight: 22 * baseScale }}>
+            {point.description}
+          </Text>
+        ) : null}
 
         <View style={styles.actions}>
           <Button title="Маршрут сюди" onPress={() => router.push(`/route?to=${id}`)} />
@@ -150,41 +165,45 @@ export default function PointDetail() {
           />
         </View>
 
-        {point.description ? (
-          <Text style={{ color: palette.text, fontSize: 15 * baseScale, lineHeight: 22 * baseScale }}>
-            {point.description}
-          </Text>
-        ) : null}
-
-        {point.photos && point.photos.length > 0 ? (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
-            {point.photos.map((uri) => (
-              <Image key={uri} source={{ uri }} style={styles.photo} accessibilityIgnoresInvertColors />
-            ))}
-          </ScrollView>
-        ) : null}
-
+        {/* Accessibility — secondary, collapsed. No prominent grey badge. */}
         <Card>
-          <Text style={[styles.section, { color: palette.text, fontSize: 17 * baseScale }]}>Чому така оцінка</Text>
-          {shown.length === 0 ? (
-            <Text style={{ color: palette.muted, fontSize: 14 * baseScale }}>Поки немає даних про доступність.</Text>
-          ) : (
-            shown.map((f, i) => (
-              <ChecklistRow
-                key={f.key}
-                label={f.label}
-                value={point.features[f.key] ?? 'unknown'}
-                critical={f.critical}
-                last={i === shown.length - 1}
-              />
-            ))
-          )}
-          {applicable.length > critical.length ? (
-            <Pressable accessibilityRole="button" onPress={() => setShowAll((s) => !s)} style={styles.linkBtn}>
-              <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 14 * baseScale }}>
-                {showAll ? 'Згорнути' : `Показати всі критерії (${applicable.length})`}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ expanded: accessOpen }}
+            onPress={() => setAccessOpen((o) => !o)}
+            style={styles.accessHead}
+          >
+            <Text style={[styles.section, { color: palette.text, fontSize: 16 * baseScale }]}>Доступність</Text>
+            {rating !== 'unknown' ? <RatingBadge rating={rating} /> : null}
+            <Text style={{ marginLeft: 'auto', color: palette.muted, fontSize: 16 * baseScale }}>
+              {accessOpen ? '▾' : '▸'}
+            </Text>
+          </Pressable>
+          {accessOpen ? (
+            shown.length === 0 ? (
+              <Text style={{ color: palette.muted, fontSize: 14 * baseScale, marginTop: space.sm }}>
+                Поки немає даних про доступність.
               </Text>
-            </Pressable>
+            ) : (
+              <View style={{ marginTop: space.sm }}>
+                {shown.map((f, i) => (
+                  <ChecklistRow
+                    key={f.key}
+                    label={f.label}
+                    value={point.features[f.key] ?? 'unknown'}
+                    critical={f.critical}
+                    last={i === shown.length - 1}
+                  />
+                ))}
+                {applicable.length > critical.length ? (
+                  <Pressable accessibilityRole="button" onPress={() => setShowAll((s) => !s)} style={styles.linkBtn}>
+                    <Text style={{ color: palette.primary, fontWeight: '700', fontSize: 14 * baseScale }}>
+                      {showAll ? 'Згорнути' : `Показати всі критерії (${applicable.length})`}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            )
           ) : null}
         </Card>
 
@@ -252,8 +271,9 @@ const styles = StyleSheet.create({
   content: { padding: space.lg, gap: space.md },
   name: { fontWeight: '800' },
   section: { fontWeight: '800' },
-  photo: { width: 140, height: 110, borderRadius: radii.md, backgroundColor: '#0001' },
+  photo: { width: 220, height: 160, borderRadius: radii.md, backgroundColor: '#0001' },
   linkBtn: { minHeight: 44, justifyContent: 'center' },
+  accessHead: { flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 36 },
   actions: { gap: space.sm },
   reviewsHead: { gap: space.sm },
   stars: { flexDirection: 'row', gap: space.sm, marginVertical: space.sm },

@@ -69,7 +69,15 @@ export default function WalkScreen() {
   );
 
   const markers = useMemo<MapMarkerData[]>(
-    () => rated.map(({ point, rating }) => ({ id: point.id, lng: point.lng, lat: point.lat, category: point.category, rating })),
+    () =>
+      rated.map(({ point, rating }) => ({
+        id: point.id,
+        lng: point.lng,
+        lat: point.lat,
+        category: point.category,
+        name: point.name,
+        accessible: rating === 'full' || rating === 'partial',
+      })),
     [rated],
   );
 

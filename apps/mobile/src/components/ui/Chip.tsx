@@ -1,16 +1,22 @@
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { radii, space, useTheme } from '@/theme/theme';
+
+type MciName = keyof typeof MaterialCommunityIcons.glyphMap;
 
 export function Chip({
   label,
   selected,
   onPress,
+  icon,
 }: {
   label: string;
   selected?: boolean;
   onPress: () => void;
+  icon?: string;
 }) {
   const { palette, baseScale } = useTheme();
+  const fg = selected ? palette.onPrimary : palette.text;
   return (
     <Pressable
       accessibilityRole="button"
@@ -24,9 +30,10 @@ export function Chip({
         },
       ]}
     >
-      <Text style={{ color: selected ? palette.onPrimary : palette.text, fontWeight: '700', fontSize: 14 * baseScale }}>
-        {label}
-      </Text>
+      <View style={styles.row}>
+        {icon ? <MaterialCommunityIcons name={icon as MciName} size={16 * baseScale} color={fg} /> : null}
+        <Text style={{ color: fg, fontWeight: '700', fontSize: 14 * baseScale }}>{label}</Text>
+      </View>
     </Pressable>
   );
 }
@@ -39,4 +46,5 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radii.pill,
   },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 6 },
 });
