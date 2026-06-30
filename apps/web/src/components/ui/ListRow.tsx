@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { rating, type RatingKey } from '@safecity/design-tokens';
 import { RatingDot } from './RatingBadge';
 
@@ -6,8 +6,8 @@ export interface ListRowProps {
   name: string;
   /** Omit (or pass 'unknown') to hide the rating — discovery-first list. */
   rating?: RatingKey;
-  /** Leading glyph (category icon) shown when the rating is hidden. */
-  icon?: string;
+  /** Leading icon (category) shown when the rating is hidden. */
+  icon?: ReactNode;
   /** e.g. "Кафе · 40 м · на 2 годині · без сходів, туалет" */
   meta: string;
   /** Optional explicit screen-reader phrase; composed from props if omitted. */

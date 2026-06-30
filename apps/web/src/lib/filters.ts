@@ -6,13 +6,13 @@ import { categoryLabel } from './format';
 
 export const CATEGORIES: Category[] = ['venue', 'transit', 'crossing', 'toilet', 'parking'];
 
-// Category → glyph for map pins + chips.
-export const categoryIcon: Record<Category, string> = {
-  venue: '🏬',
-  transit: '🚌',
-  crossing: '🚶',
-  toilet: '🚻',
-  parking: '🅿️',
+// Category → distinct colour for map pins + chips/icons.
+export const categoryColor: Record<Category, string> = {
+  venue: '#0d5b66', // teal
+  transit: '#2563eb', // blue
+  crossing: '#d97706', // amber
+  toilet: '#7c3aed', // purple
+  parking: '#be185d', // magenta
 };
 
 export interface FeatureFilter {

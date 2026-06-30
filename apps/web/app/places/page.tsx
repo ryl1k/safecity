@@ -7,11 +7,12 @@ import type { AccessibilityFeature, Category, PointSummary, Rating } from '@safe
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { SearchBar, Chip, ListRow, LoadingState, ErrorState, EmptyState } from '@/components/ui';
+import { CategoryIcon } from '@/components/CategoryIcon';
 import { useProfile } from '@/profile/ProfileProvider';
 import { getCatalog } from '@/lib/catalog';
 import {
   CATEGORIES,
-  categoryIcon,
+  categoryColor,
   filterPoints,
   MOBILITY_FILTERS,
   ratingOf,
@@ -119,7 +120,7 @@ export default function PlacesPage() {
           <div style={chipRow}>
             {suggestions.categories.map((c) => (
               <Chip key={`s-${c}`} pressed={false} onToggle={() => { setCategories((s) => toggle(s, c)); setQuery(''); }}>
-                + {categoryIcon[c]} {categoryLabel[c]}
+                <span style={chipInner}>+ <CategoryIcon category={c} size={15} /> {categoryLabel[c]}</span>
               </Chip>
             ))}
             {suggestions.features.map((f) => (
@@ -134,7 +135,10 @@ export default function PlacesPage() {
         <div style={chipRow}>
           {CATEGORIES.map((c) => (
             <Chip key={c} pressed={categories.has(c)} onToggle={() => setCategories((s) => toggle(s, c))}>
-              {categoryIcon[c]} {categoryLabel[c]}
+              <span style={chipInner}>
+                <CategoryIcon category={c} size={15} color={categories.has(c) ? 'var(--sc-on-primary)' : categoryColor[c]} />
+                {categoryLabel[c]}
+              </span>
             </Chip>
           ))}
         </div>
@@ -190,7 +194,7 @@ export default function PlacesPage() {
                   <ListRow
                     name={point.name}
                     rating={ratingOf(point, catalog, primary)}
-                    icon={categoryIcon[point.category]}
+                    icon={<CategoryIcon category={point.category} size={20} />}
                     meta={meta}
                     onClick={() => router.push(`/point/${point.id}`)}
                   />
@@ -206,3 +210,4 @@ export default function PlacesPage() {
 }
 
 const chipRow = { display: 'flex', flexWrap: 'wrap', gap: '0.45em', alignItems: 'center' } as const;
+const chipInner = { display: 'inline-flex', alignItems: 'center', gap: '0.35em' } as const;

@@ -2,8 +2,27 @@
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { Bus, PersonStanding, SquareParking, Store, Toilet, type LucideIcon } from 'lucide-react';
 import type { Category } from '@safecity/shared';
-import { categoryIcon } from '@/lib/filters';
+import { categoryColor } from '@/lib/filters';
+
+// Pre-render each category's lucide icon to a white SVG string (for DOM markers).
+const CAT_ICON: Record<Category, LucideIcon> = {
+  venue: Store,
+  transit: Bus,
+  crossing: PersonStanding,
+  toilet: Toilet,
+  parking: SquareParking,
+};
+const ICON_SVG: Record<Category, string> = (Object.keys(CAT_ICON) as Category[]).reduce(
+  (acc, c) => {
+    const Icon = CAT_ICON[c];
+    acc[c] = renderToStaticMarkup(<Icon size={17} color="#fff" strokeWidth={2.5} />);
+    return acc;
+  },
+  {} as Record<Category, string>,
+);
 
 export interface ExploreMarker {
   id: string;
@@ -153,11 +172,12 @@ export function ExploreMap({
         pin.className = 'sc-foc';
         pin.type = 'button';
         pin.setAttribute('aria-label', p.name);
+        // Category colour = the pin; an outer green halo marks mobility-accessible.
         pin.style.cssText =
-          'width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:15px;line-height:1;' +
-          `background:var(--sc-surface);box-shadow:var(--sc-shadow-2);cursor:pointer;` +
-          `border:2px solid ${p.accessible ? 'var(--sc-ok)' : 'var(--sc-border-strong)'};`;
-        pin.textContent = categoryIcon[p.category];
+          'width:30px;height:30px;border-radius:50%;display:grid;place-items:center;cursor:pointer;' +
+          `background:${categoryColor[p.category]};border:2px solid var(--sc-surface);` +
+          `box-shadow:${p.accessible ? '0 0 0 2px var(--sc-ok),' : ''}var(--sc-shadow-2);`;
+        pin.innerHTML = ICON_SVG[p.category];
         pin.addEventListener('click', () => onSelectRef.current(p.id));
 
         const label = document.createElement('div');
