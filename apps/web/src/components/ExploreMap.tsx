@@ -2,7 +2,8 @@
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef } from 'react';
-import type { Category, Rating } from '@safecity/shared';
+import type { Category } from '@safecity/shared';
+import { categoryIcon } from '@/lib/filters';
 
 export interface ExploreMarker {
   id: string;
@@ -10,7 +11,7 @@ export interface ExploreMarker {
   lng: number;
   lat: number;
   category: Category;
-  rating: Rating;
+  accessible: boolean; // mobility-accessible (full/partial) for the active profile
 }
 
 export interface ExploreProblem {
@@ -27,20 +28,7 @@ export interface Bbox {
   maxLat: number;
 }
 
-const ratingKey: Record<Rating, string> = { full: 'ok', partial: 'warn', none: 'bad', unknown: 'unk' };
-const ratingIcon: Record<Rating, string> = { full: '✓', partial: '◑', none: '✕', unknown: '?' };
-
-// Category = shape (mirrors the design's pin set + MapView). Diamond via clip-path
-// so the rating glyph stays upright.
-function shapeCss(category: Category): string {
-  switch (category) {
-    case 'transit': return 'border-radius:6px;';
-    case 'crossing': return 'clip-path:polygon(50% 0,100% 50%,50% 100%,0 50%);';
-    case 'toilet': return 'clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%);';
-    case 'parking': return 'clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);';
-    default: return 'border-radius:50%;';
-  }
-}
+const LABEL_ZOOM = 15.5; // show name labels once zoomed in this far
 
 function basemapStyle(dark: boolean) {
   const variant = dark ? 'dark_all' : 'light_all';
@@ -59,8 +47,8 @@ function basemapStyle(dark: boolean) {
 }
 
 /**
- * Immersive full-viewport map for /explore. Fills its parent, reports the visible
- * bbox on pan/zoom (debounced), and flies to `focus` when it changes.
+ * Immersive full-viewport map. Category-icon pins with an accessibility ring;
+ * name labels appear once zoomed in. Reports the visible bbox on pan/zoom.
  */
 export function ExploreMap({
   points,
@@ -80,9 +68,13 @@ export function ExploreMap({
   focus?: { lng: number; lat: number; nonce: number } | null;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const markersRef = useRef<any[]>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const problemMarkersRef = useRef<any[]>([]);
+  const labelsRef = useRef<HTMLElement[]>([]);
   const observerRef = useRef<MutationObserver | null>(null);
   const onSelectRef = useRef(onSelect);
   const onSelectProblemRef = useRef(onSelectProblem);
@@ -100,7 +92,7 @@ export function ExploreMap({
       const dark = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
       const map = new maplibregl.Map({
         container: containerRef.current,
-        style: basemapStyle(dark) as any,
+        style: basemapStyle(dark) as never,
         center,
         zoom: 14,
       });
@@ -113,20 +105,23 @@ export function ExploreMap({
 
       const emit = () => {
         const b = map.getBounds();
-        onMoveEndRef.current?.({
-          minLng: b.getWest(),
-          minLat: b.getSouth(),
-          maxLng: b.getEast(),
-          maxLat: b.getNorth(),
-        });
+        onMoveEndRef.current?.({ minLng: b.getWest(), minLat: b.getSouth(), maxLng: b.getEast(), maxLat: b.getNorth() });
+      };
+      const updateLabels = () => {
+        const show = map.getZoom() >= LABEL_ZOOM;
+        for (const l of labelsRef.current) l.style.display = show ? 'block' : 'none';
       };
       map.on('load', emit);
       map.on('moveend', emit);
+      map.on('zoom', updateLabels);
 
-      // Swap the basemap (light/dark) when the app theme changes. HTML markers persist.
       observerRef.current = new MutationObserver(() => {
         const d = document.documentElement.getAttribute('data-theme') === 'dark';
-        try { map.setStyle(basemapStyle(d) as any); } catch {}
+        try {
+          map.setStyle(basemapStyle(d) as never);
+        } catch {
+          /* ignore */
+        }
       });
       observerRef.current.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     })();
@@ -148,20 +143,34 @@ export function ExploreMap({
       const map = mapRef.current;
       if (cancelled || !map) return;
       markersRef.current.forEach((m) => m.remove());
+      labelsRef.current = [];
+      const labelsVisible = map.getZoom() >= LABEL_ZOOM;
       markersRef.current = points.map((p) => {
-        const el = document.createElement('button');
-        el.className = 'sc-foc';
-        el.type = 'button';
-        el.setAttribute('aria-label', p.name);
-        el.style.cssText =
-          `width:28px;height:28px;display:grid;place-items:center;font-weight:800;color:#fff;` +
-          `border:2px solid #fff;box-shadow:var(--sc-shadow-2);cursor:pointer;background:var(--sc-${ratingKey[p.rating]});` +
-          shapeCss(p.category);
-        const inner = document.createElement('span');
-        inner.textContent = ratingIcon[p.rating];
-        el.appendChild(inner);
-        el.addEventListener('click', () => onSelectRef.current(p.id));
-        return new maplibregl.Marker({ element: el }).setLngLat([p.lng, p.lat]).addTo(map);
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
+
+        const pin = document.createElement('button');
+        pin.className = 'sc-foc';
+        pin.type = 'button';
+        pin.setAttribute('aria-label', p.name);
+        pin.style.cssText =
+          'width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font-size:15px;line-height:1;' +
+          `background:var(--sc-surface);box-shadow:var(--sc-shadow-2);cursor:pointer;` +
+          `border:2px solid ${p.accessible ? 'var(--sc-ok)' : 'var(--sc-border-strong)'};`;
+        pin.textContent = categoryIcon[p.category];
+        pin.addEventListener('click', () => onSelectRef.current(p.id));
+
+        const label = document.createElement('div');
+        label.textContent = p.name;
+        label.style.cssText =
+          `display:${labelsVisible ? 'block' : 'none'};max-width:140px;margin-top:2px;font-size:11px;font-weight:700;` +
+          'color:var(--sc-text);background:var(--sc-surface);border:var(--sc-bw) solid var(--sc-border);' +
+          'border-radius:6px;padding:1px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
+        labelsRef.current.push(label);
+
+        wrap.appendChild(pin);
+        wrap.appendChild(label);
+        return new maplibregl.Marker({ element: wrap }).setLngLat([p.lng, p.lat]).addTo(map);
       });
     })();
     return () => {
@@ -169,7 +178,7 @@ export function ExploreMap({
     };
   }, [points]);
 
-  // Sync the problems layer (distinct warning markers) when it changes.
+  // Sync the problems layer (distinct warning markers).
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -183,9 +192,9 @@ export function ExploreMap({
         el.type = 'button';
         el.setAttribute('aria-label', `Проблема: ${pr.title}`);
         el.style.cssText =
-          `width:26px;height:26px;display:grid;place-items:center;font-weight:800;color:#fff;font-size:14px;` +
-          `border:2px solid #fff;box-shadow:var(--sc-shadow-2);cursor:pointer;background:var(--sc-bad);` +
-          `clip-path:polygon(50% 0,100% 100%,0 100%);`;
+          'width:26px;height:26px;display:grid;place-items:center;font-weight:800;color:#fff;font-size:14px;' +
+          'border:2px solid #fff;box-shadow:var(--sc-shadow-2);cursor:pointer;background:var(--sc-bad);' +
+          'clip-path:polygon(50% 0,100% 100%,0 100%);';
         el.textContent = '!';
         el.addEventListener('click', () => onSelectProblemRef.current?.(pr.id));
         return new maplibregl.Marker({ element: el }).setLngLat([pr.lng, pr.lat]).addTo(map);

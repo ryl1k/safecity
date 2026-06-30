@@ -4,8 +4,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SlidersHorizontal, Check, MapPin as MapPinIcon, Search, X } from 'lucide-react';
-import type { AccessibilityFeature, Category, PointSummary, Rating } from '@safecity/shared';
-import { computeRating } from '@safecity/shared';
+import type { AccessibilityFeature, Category, PointSummary } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
 import { PointDetailModal } from '@/components/PointDetailModal';
 import { LoadingState } from '@/components/ui';
@@ -14,6 +13,7 @@ import { getCatalog } from '@/lib/catalog';
 import { pointsNear, pointById, searchPointsByName, type PointHit } from '@/lib/points';
 import { problemsInBbox, type ProblemMarker } from '@/lib/civic';
 import { geocodePlaces, type GeoPlace } from '@/lib/geocode';
+import { isAccessible, MOBILITY_FILTERS, suggestFilters } from '@/lib/filters';
 import { categoryLabel } from '@/lib/format';
 
 const LVIV: [number, number] = [24.0316, 49.8419];
@@ -38,7 +38,8 @@ export default function MapPage() {
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
   const [points, setPoints] = useState<PointSummary[]>([]);
-  const [onlyAccessible, setOnlyAccessible] = useState(false);
+  const [showInaccessible, setShowInaccessible] = useState(false);
+  const [features, setFeatures] = useState<Set<string>>(new Set());
   const [enabled, setEnabled] = useState<Set<Category>>(new Set(CATEGORIES));
   const [showProblems, setShowProblems] = useState(false);
   const [problems, setProblems] = useState<ProblemMarker[]>([]);
@@ -101,13 +102,25 @@ export default function MapPage() {
     return () => { clearTimeout(handle); ctrl.abort(); };
   }, [query]);
 
-  const markers = useMemo(
-    () => points
+  const markers = useMemo(() => {
+    const feats = MOBILITY_FILTERS.filter((f) => features.has(f.id));
+    return points
       .filter((p) => enabled.has(p.category))
-      .map((p) => ({ id: p.id, name: p.name, lng: p.lng, lat: p.lat, category: p.category, rating: computeRating(p.features, catalog, p.category, primary) as Rating }))
-      .filter((m) => (onlyAccessible ? m.rating === 'full' : true)),
-    [points, enabled, onlyAccessible, catalog, primary],
-  );
+      .filter((p) => {
+        // Feature chips act as the accessibility filter; otherwise default hides
+        // non-accessible points unless "show inaccessible" is on.
+        if (feats.length) return feats.every((f) => f.keys.some((k) => p.features[k] === 'yes'));
+        return showInaccessible || isAccessible(p, catalog, primary);
+      })
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        lng: p.lng,
+        lat: p.lat,
+        category: p.category,
+        accessible: isAccessible(p, catalog, primary),
+      }));
+  }, [points, enabled, features, showInaccessible, catalog, primary]);
 
   function flyTo(lng: number, lat: number) { nonceRef.current += 1; setFocus({ lng, lat, nonce: nonceRef.current }); }
   async function pickPoint(id: string) { setOpen(false); setQuery(''); const p = await pointById(id).catch(() => null); if (p) flyTo(p.lng, p.lat); setModalId(id); }
@@ -128,9 +141,11 @@ export default function MapPage() {
   }
   const hasResults = pointHits.length > 0 || placeHits.length > 0;
   const placeBase = pointHits.length;
+  const filterSugs = suggestFilters(query);
 
   function toggleCat(c: Category) { setEnabled((prev) => { const n = new Set(prev); n.has(c) ? n.delete(c) : n.add(c); return n; }); }
-  const activeFilters = (onlyAccessible ? 1 : 0) + (showProblems ? 1 : 0) + (CATEGORIES.length - enabled.size);
+  function toggleFeature(id: string) { setFeatures((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
+  const activeFilters = (showInaccessible ? 1 : 0) + features.size + (showProblems ? 1 : 0) + (CATEGORIES.length - enabled.size);
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column' }}>
@@ -159,6 +174,43 @@ export default function MapPage() {
             </div>
             {open && query.trim().length >= 2 && (
               <ul id="map-results" role="listbox" aria-label="Результати пошуку" style={results}>
+                {filterSugs.categories.length + filterSugs.features.length > 0 && (
+                  <>
+                    <li style={resultHead} aria-hidden>Додати фільтр</li>
+                    {filterSugs.categories.map((c) => (
+                      <li
+                        key={`fc-${c}`}
+                        role="option"
+                        aria-selected={false}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => { setEnabled(new Set([c])); setOpen(false); setQuery(''); }}
+                        style={resultRow}
+                      >
+                        <SlidersHorizontal size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
+                        <span style={{ minWidth: 0 }}>
+                          <span style={resultTitle}>{categoryLabel[c]}</span>
+                          <span style={resultSub}>Лише ця категорія</span>
+                        </span>
+                      </li>
+                    ))}
+                    {filterSugs.features.map((f) => (
+                      <li
+                        key={`ff-${f.id}`}
+                        role="option"
+                        aria-selected={false}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => { toggleFeature(f.id); setOpen(false); setQuery(''); }}
+                        style={resultRow}
+                      >
+                        <SlidersHorizontal size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
+                        <span style={{ minWidth: 0 }}>
+                          <span style={resultTitle}>{f.label}</span>
+                          <span style={resultSub}>Зручність доступності</span>
+                        </span>
+                      </li>
+                    ))}
+                  </>
+                )}
                 {searching && !hasResults && <li style={resultMuted}>Пошук…</li>}
                 {!searching && !hasResults && <li style={resultMuted}>Нічого не знайдено</li>}
                 {pointHits.length > 0 && <li style={resultHead} aria-hidden>Місця SafeCity</li>}
@@ -193,14 +245,19 @@ export default function MapPage() {
             <>
               <div onClick={() => setFiltersOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 5 }} aria-hidden />
               <div role="dialog" aria-label="Фільтри мапи" style={filterPanel}>
-                <ToggleRow checked={onlyAccessible} onChange={() => setOnlyAccessible((v) => !v)} label="Лише доступні" />
+                <ToggleRow checked={showInaccessible} onChange={() => setShowInaccessible((v) => !v)} label="Показати недоступні" />
                 <ToggleRow checked={showProblems} onChange={() => setShowProblems((v) => !v)} label="Показати проблеми" />
+                <div style={{ height: 1, background: 'var(--sc-border)', margin: '0.5em 0' }} />
+                <div style={{ fontSize: '0.72em', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--sc-muted)', marginBottom: '0.3em' }}>Зручності</div>
+                {MOBILITY_FILTERS.map((f) => (
+                  <ToggleRow key={f.id} checked={features.has(f.id)} onChange={() => toggleFeature(f.id)} label={f.label} />
+                ))}
                 <div style={{ height: 1, background: 'var(--sc-border)', margin: '0.5em 0' }} />
                 <div style={{ fontSize: '0.72em', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--sc-muted)', marginBottom: '0.3em' }}>Категорії</div>
                 {CATEGORIES.map((c) => (
                   <ToggleRow key={c} checked={enabled.has(c)} onChange={() => toggleCat(c)} label={categoryLabel[c]} />
                 ))}
-                <button type="button" className="sc-foc" onClick={() => { setOnlyAccessible(false); setShowProblems(false); setEnabled(new Set(CATEGORIES)); }} style={{ marginTop: '0.6em', background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.85em' }}>
+                <button type="button" className="sc-foc" onClick={() => { setShowInaccessible(false); setFeatures(new Set()); setShowProblems(false); setEnabled(new Set(CATEGORIES)); }} style={{ marginTop: '0.6em', background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.85em' }}>
                   Скинути фільтри
                 </button>
               </div>

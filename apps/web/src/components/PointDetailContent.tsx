@@ -29,6 +29,7 @@ export function PointDetailContent({ id }: { id: string }) {
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
   const [reviews, setReviews] = useState<ReviewRow[]>([]);
   const [showAll, setShowAll] = useState(false);
+  const [accessOpen, setAccessOpen] = useState(false);
 
   // Review form
   const [formOpen, setFormOpen] = useState(false);
@@ -114,35 +115,51 @@ export function PointDetailContent({ id }: { id: string }) {
         {categoryLabel[point.category]}
         {point.address ? ` · ${point.address}` : ''}
       </p>
-      {point.description ? <p style={{ margin: '0.8em 0 0', lineHeight: 1.55 }}>{point.description}</p> : null}
+      {/* Photos + description first — discovery before accessibility detail */}
       {point.photos && point.photos.length > 0 ? (
         <div style={{ marginTop: '1em' }}><PhotoGallery photos={point.photos} alt={point.name} /></div>
       ) : null}
+      {point.description ? <p style={{ margin: '0.9em 0 0', lineHeight: 1.55 }}>{point.description}</p> : null}
 
-      <div style={{ display: 'flex', gap: '1.4em', flexWrap: 'wrap', marginTop: '1.2em' }}>
-        {shownProfiles.map((pr) => (
-          <div key={pr} style={{ display: 'flex', flexDirection: 'column', gap: '0.4em' }}>
-            <span style={{ fontSize: '0.78em', fontWeight: 700, color: 'var(--sc-muted)' }}>
-              {shownProfiles.length === 1 ? 'Доступність' : profileLabel[pr]}
-            </span>
-            <RatingBadge rating={computeRating(point.features, catalog, point.category, pr)} />
-          </div>
-        ))}
+      {/* Actions up top */}
+      <div style={{ display: 'flex', gap: '0.8em', flexWrap: 'wrap', marginTop: '1.2em' }}>
+        <Link href={`/route?to=${point.id}`} className="sc-foc" style={actionLink('primary')}>Маршрут сюди</Link>
+        <Link href={`/problem/new?point=${point.id}`} className="sc-foc" style={actionLink('danger')}>Повідомити про проблему</Link>
       </div>
 
+      {/* Accessibility — secondary, collapsed. No prominent grey badge. */}
       <section style={card}>
-        <h2 style={cardTitle}>Чому така оцінка</h2>
-        {shown.length === 0 ? (
-          <p style={{ color: 'var(--sc-muted)', fontSize: '0.9em', margin: 0 }}>Поки що ніхто не вказав зручності тут — будьте першим.</p>
-        ) : (
-          shown.map((f, i) => (
-            <ChecklistRow key={f.key} label={f.label} value={(point.features[f.key] ?? 'unknown') as FeatureValue} critical={f.critical} last={i === shown.length - 1} />
-          ))
-        )}
-        {hasHidden && (
-          <button type="button" className="sc-foc" onClick={() => setShowAll((s) => !s)} style={{ marginTop: '0.8em', background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.9em' }}>
-            {showAll ? 'Згорнути' : `Показати всі критерії (${applicable.length})`}
-          </button>
+        <button
+          type="button"
+          className="sc-foc"
+          aria-expanded={accessOpen}
+          onClick={() => setAccessOpen((o) => !o)}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.6em', width: '100%', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', padding: 0 }}
+        >
+          <h2 style={{ ...cardTitle, margin: 0 }}>Доступність</h2>
+          <span style={{ display: 'flex', gap: '0.5em', flexWrap: 'wrap' }}>
+            {shownProfiles.map((pr) => {
+              const r = computeRating(point.features, catalog, point.category, pr);
+              return r === 'unknown' ? null : <RatingBadge key={pr} rating={r} />;
+            })}
+          </span>
+          <span aria-hidden style={{ marginLeft: 'auto', color: 'var(--sc-muted)', fontSize: '1.1em' }}>{accessOpen ? '▾' : '▸'}</span>
+        </button>
+        {accessOpen && (
+          <div style={{ marginTop: '0.8em' }}>
+            {shown.length === 0 ? (
+              <p style={{ color: 'var(--sc-muted)', fontSize: '0.9em', margin: 0 }}>Поки що ніхто не вказав зручності тут — будьте першим.</p>
+            ) : (
+              shown.map((f, i) => (
+                <ChecklistRow key={f.key} label={f.label} value={(point.features[f.key] ?? 'unknown') as FeatureValue} critical={f.critical} last={i === shown.length - 1} />
+              ))
+            )}
+            {hasHidden && (
+              <button type="button" className="sc-foc" onClick={() => setShowAll((s) => !s)} style={{ marginTop: '0.8em', background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.9em' }}>
+                {showAll ? 'Згорнути' : `Показати всі критерії (${applicable.length})`}
+              </button>
+            )}
+          </div>
         )}
       </section>
 
@@ -193,11 +210,6 @@ export function PointDetailContent({ id }: { id: string }) {
           </div>
         )}
       </section>
-
-      <div style={{ display: 'flex', gap: '0.8em', flexWrap: 'wrap', marginTop: '1.4em' }}>
-        <Link href={`/route?to=${point.id}`} className="sc-foc" style={actionLink('primary')}>Маршрут сюди</Link>
-        <Link href={`/problem/new?point=${point.id}`} className="sc-foc" style={actionLink('danger')}>Повідомити про проблему</Link>
-      </div>
     </>
   );
 }

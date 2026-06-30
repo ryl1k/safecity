@@ -4,7 +4,10 @@ import { RatingDot } from './RatingBadge';
 
 export interface ListRowProps {
   name: string;
-  rating: RatingKey;
+  /** Omit (or pass 'unknown') to hide the rating — discovery-first list. */
+  rating?: RatingKey;
+  /** Leading glyph (category icon) shown when the rating is hidden. */
+  icon?: string;
   /** e.g. "Кафе · 40 м · на 2 годині · без сходів, туалет" */
   meta: string;
   /** Optional explicit screen-reader phrase; composed from props if omitted. */
@@ -16,9 +19,10 @@ export interface ListRowProps {
  * The audio-first list primitive. Carries a rich aria-label so a screen reader
  * announces name + status + distance + direction in one pass (KB 02 blind list).
  */
-export function ListRow({ name, rating: r, meta, ariaLabel, onClick }: ListRowProps) {
-  const meta_ = rating[r];
-  const label = ariaLabel ?? `${name}, ${meta_.label}, ${meta}`;
+export function ListRow({ name, rating: r, icon, meta, ariaLabel, onClick }: ListRowProps) {
+  const hasRating = !!r && r !== 'unknown';
+  const meta_ = hasRating ? rating[r] : null;
+  const label = ariaLabel ?? (meta_ ? `${name}, ${meta_.label}, ${meta}` : `${name}, ${meta}`);
   const btn: CSSProperties = {
     display: 'flex',
     width: '100%',
@@ -36,13 +40,19 @@ export function ListRow({ name, rating: r, meta, ariaLabel, onClick }: ListRowPr
   };
   return (
     <button className="sc-foc" aria-label={label} onClick={onClick} style={btn}>
-      <RatingDot rating={r} size={2.6} />
+      {meta_ ? (
+        <RatingDot rating={r as RatingKey} size={2.6} />
+      ) : (
+        <span aria-hidden style={{ fontSize: '1.4em', width: '1.6em', textAlign: 'center', flexShrink: 0 }}>
+          {icon ?? '•'}
+        </span>
+      )}
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: '0.5em', flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 800, fontSize: '1.02em' }}>{name}</span>
-          <span style={{ fontSize: '0.78em', fontWeight: 800, color: `var(--sc-${meta_.key})` }}>
-            {meta_.label}
-          </span>
+          {meta_ ? (
+            <span style={{ fontSize: '0.78em', fontWeight: 800, color: `var(--sc-${meta_.key})` }}>{meta_.label}</span>
+          ) : null}
         </span>
         <span style={{ display: 'block', color: 'var(--sc-muted)', fontSize: '0.85em', marginTop: '0.15em' }}>
           {meta}
