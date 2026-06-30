@@ -5,9 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Camera, GeoJSONSource, Layer, Map, Marker } from '@maplibre/maplibre-react-native';
 import type { PointSummary } from '@safecity/shared';
 import { Button, ErrorState, LoadingState } from '@/components/ui';
-import { MAP_TILE_URL } from '@/lib/env';
 import { distanceLabel } from '@/lib/format';
-import { getCurrentLocation } from '@/lib/location';
+import { getCurrentLocation, LVIV, metersBetween } from '@/lib/location';
+import { basemapStyle } from '@/lib/mapStyle';
 import { pointById } from '@/lib/points';
 import { getRoute, RoutingUnavailableError, type RouteStep } from '@/lib/routing';
 import { speak, stopSpeech } from '@/lib/tts';
@@ -17,7 +17,7 @@ import { radii, space, useTheme } from '@/theme/theme';
 export default function RouteScreen() {
   const { to } = useLocalSearchParams<{ to?: string }>();
   const router = useRouter();
-  const { palette, baseScale } = useTheme();
+  const { palette, baseScale, themeName } = useTheme();
   const { primary } = useProfile();
 
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'unavailable'>('loading');
@@ -42,7 +42,10 @@ export default function RouteScreen() {
         return;
       }
       setDest(point);
-      const start = await getCurrentLocation();
+      let start = await getCurrentLocation();
+      // Guard against an emulator/denied location far from the destination (the
+      // "3000 km route" bug): if we're implausibly far, start from Lviv centre.
+      if (metersBetween(start, [point.lng, point.lat]) > 50000) start = LVIV;
       const res = await getRoute(start, [point.lng, point.lat], primary);
       setLine(res.coordinates);
       setSteps(res.steps);
@@ -76,17 +79,7 @@ export default function RouteScreen() {
     });
   }
 
-  const mapStyle = useMemo(
-    () =>
-      JSON.stringify({
-        version: 8,
-        sources: {
-          osm: { type: 'raster', tiles: [MAP_TILE_URL], tileSize: 256, attribution: '© OpenStreetMap' },
-        },
-        layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
-      }),
-    [],
-  );
+  const mapStyle = useMemo(() => basemapStyle(themeName === 'dark'), [themeName]);
 
   const lineGeoJSON = useMemo(
     () => ({ type: 'Feature' as const, properties: {}, geometry: { type: 'LineString' as const, coordinates: line } }),

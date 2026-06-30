@@ -140,14 +140,13 @@ export default function PointDetail() {
         <RatingBadge rating={rating} />
 
         <View style={styles.actions}>
-          <Button title="Маршрут сюди" onPress={() => router.push(`/route?to=${id}`)} style={styles.actionBtn} />
+          <Button title="Маршрут сюди" onPress={() => router.push(`/route?to=${id}`)} />
           <Button
             title="Повідомити про проблему"
             variant="secondary"
             onPress={() =>
               authed ? router.push(`/problem/new?point=${id}`) : router.push(`/auth?next=/problem/new?point=${id}`)
             }
-            style={styles.actionBtn}
           />
         </View>
 
@@ -255,8 +254,7 @@ const styles = StyleSheet.create({
   section: { fontWeight: '800' },
   photo: { width: 140, height: 110, borderRadius: radii.md, backgroundColor: '#0001' },
   linkBtn: { minHeight: 44, justifyContent: 'center' },
-  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  actionBtn: { flexGrow: 1, flexBasis: '45%' },
+  actions: { gap: space.sm },
   reviewsHead: { gap: space.sm },
   stars: { flexDirection: 'row', gap: space.sm, marginVertical: space.sm },
   formActions: { flexDirection: 'row', justifyContent: 'flex-end', gap: space.sm },

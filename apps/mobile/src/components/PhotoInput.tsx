@@ -56,8 +56,7 @@ export function PhotoInput({
           onPress={add}
           style={[styles.addBox, { borderColor: palette.borderStrong, backgroundColor: palette.surface }]}
         >
-          <Text style={{ color: palette.muted, fontSize: 22 * baseScale }}>＋</Text>
-          <Text style={{ color: palette.muted, fontSize: 11 * baseScale }}>Фото</Text>
+          <Text style={{ color: palette.muted, fontSize: 28 * baseScale }}>＋</Text>
         </Pressable>
       ) : null}
     </View>

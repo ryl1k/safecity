@@ -1,53 +1,90 @@
 import { useMemo } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { Camera, Map, Marker } from '@maplibre/maplibre-react-native';
-import type { PointSummary } from '@safecity/shared';
-import { MAP_TILE_URL } from '@/lib/env';
-import { useTheme } from '@/theme/theme';
+import type { Category, Rating } from '@safecity/shared';
+import { basemapStyle } from '@/lib/mapStyle';
+import { useTheme, type Palette } from '@/theme/theme';
 
 const LVIV: [number, number] = [24.0316, 49.8419];
 
-/** MapLibre map with OSM raster tiles + a pin per point. */
+export interface MapMarkerData {
+  id: string;
+  lng: number;
+  lat: number;
+  category: Category;
+  rating: Rating;
+}
+
+const ratingColorKey: Record<Rating, 'ok' | 'warn' | 'bad' | 'unk'> = {
+  full: 'ok',
+  partial: 'warn',
+  none: 'bad',
+  unknown: 'unk',
+};
+const ratingIcon: Record<Rating, string> = { full: '✓', partial: '◑', none: '✕', unknown: '?' };
+
+// Category → marker shape. Rating gives colour+icon; category gives shape (web parity).
+function shapeStyle(category: Category) {
+  switch (category) {
+    case 'transit':
+      return { borderRadius: 6 };
+    case 'crossing':
+      return { borderRadius: 4, transform: [{ rotate: '45deg' }] };
+    default:
+      return { borderRadius: 14 };
+  }
+}
+
+/** MapLibre map (CARTO basemap) with a rating-coloured, category-shaped pin per point. */
 export function PointsMap({
-  points,
+  markers,
   onSelect,
 }: {
-  points: PointSummary[];
+  markers: MapMarkerData[];
   onSelect?: (id: string) => void;
 }) {
-  const { palette } = useTheme();
-  const mapStyle = useMemo(
-    () =>
-      JSON.stringify({
-        version: 8,
-        sources: {
-          osm: {
-            type: 'raster',
-            tiles: [MAP_TILE_URL],
-            tileSize: 256,
-            attribution: '© OpenStreetMap contributors',
-          },
-        },
-        layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
-      }),
-    [],
-  );
+  const { palette, themeName } = useTheme();
+  const mapStyle = useMemo(() => basemapStyle(themeName === 'dark'), [themeName]);
 
   return (
     <Map style={styles.map} mapStyle={mapStyle}>
       <Camera initialViewState={{ center: LVIV, zoom: 13 }} />
-      {points.map((p) => (
-        <Marker key={p.id} id={p.id} lngLat={[p.lng, p.lat]} onPress={() => onSelect?.(p.id)}>
-          <View
-            style={[styles.pin, { backgroundColor: palette.primary, borderColor: palette.onPrimary }]}
-          />
-        </Marker>
-      ))}
+      {markers.map((m) => {
+        const color = palette[ratingColorKey[m.rating] as keyof Palette];
+        const diamond = m.category === 'crossing';
+        return (
+          <Marker key={m.id} id={m.id} lngLat={[m.lng, m.lat]} onPress={() => onSelect?.(m.id)}>
+            <View
+              style={[
+                styles.pin,
+                shapeStyle(m.category),
+                { backgroundColor: color, borderColor: palette.surface },
+              ]}
+            >
+              <Text style={[styles.icon, diamond && { transform: [{ rotate: '-45deg' }] }]}>
+                {ratingIcon[m.rating]}
+              </Text>
+            </View>
+          </Marker>
+        );
+      })}
     </Map>
   );
 }
 
 const styles = StyleSheet.create({
   map: { flex: 1 },
-  pin: { width: 16, height: 16, borderRadius: 8, borderWidth: 2 },
+  pin: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 1 },
+    elevation: 3,
+  },
+  icon: { color: '#fff', fontWeight: '800', fontSize: 13 },
 });

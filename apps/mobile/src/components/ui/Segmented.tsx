@@ -19,9 +19,13 @@ export function Segmented<T extends string>({ options, value, onChange }: Props<
             accessibilityRole="button"
             accessibilityState={{ selected: on }}
             onPress={() => onChange(o.value)}
-            style={[styles.item, on && { backgroundColor: palette.primary }]}
+            style={[styles.item, { minHeight: 40 * baseScale }, on && { backgroundColor: palette.primary }]}
           >
-            <Text style={{ color: on ? palette.onPrimary : palette.text, fontWeight: '700', fontSize: 14 * baseScale }}>
+            <Text
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              style={{ color: on ? palette.onPrimary : palette.text, fontWeight: '700', fontSize: 14 * baseScale, textAlign: 'center' }}
+            >
               {o.label}
             </Text>
           </Pressable>

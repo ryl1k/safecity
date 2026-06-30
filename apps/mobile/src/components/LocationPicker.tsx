@@ -1,7 +1,7 @@
 import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Camera, Map, Marker } from '@maplibre/maplibre-react-native';
-import { MAP_TILE_URL } from '@/lib/env';
+import { basemapStyle } from '@/lib/mapStyle';
 import { radii, space, useTheme } from '@/theme/theme';
 
 const LVIV: [number, number] = [24.0316, 49.8419];
@@ -14,19 +14,9 @@ export function LocationPicker({
   value: [number, number] | null;
   onChange: (lng: number, lat: number) => void;
 }) {
-  const { palette, baseScale } = useTheme();
+  const { palette, baseScale, themeName } = useTheme();
   const center = value ?? LVIV;
-  const mapStyle = useMemo(
-    () =>
-      JSON.stringify({
-        version: 8,
-        sources: {
-          osm: { type: 'raster', tiles: [MAP_TILE_URL], tileSize: 256, attribution: '© OpenStreetMap' },
-        },
-        layers: [{ id: 'osm', type: 'raster', source: 'osm' }],
-      }),
-    [],
-  );
+  const mapStyle = useMemo(() => basemapStyle(themeName === 'dark'), [themeName]);
 
   return (
     <View>

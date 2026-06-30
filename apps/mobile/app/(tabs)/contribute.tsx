@@ -151,19 +151,20 @@ export default function ContributeScreen() {
         <Text style={[styles.label, { color: palette.text, fontSize: 15 * baseScale, marginBottom: space.sm }]}>
           Зручності доступності
         </Text>
-        {features.map((f) => (
-          <View key={f.key} style={styles.featRow}>
-            <Text style={{ flex: 1, color: palette.text, fontSize: 14 * baseScale, fontWeight: '600' }}>
+        {features.map((f, i) => (
+          <View
+            key={f.key}
+            style={[styles.featRow, i > 0 && { borderTopWidth: 1, borderTopColor: palette.border }]}
+          >
+            <Text style={{ color: palette.text, fontSize: 14 * baseScale, fontWeight: '600', marginBottom: space.sm }}>
               {f.label}
               {f.critical ? <Text style={{ color: palette.accent }}> ★</Text> : null}
             </Text>
-            <View style={{ width: 170 }}>
-              <Segmented
-                value={values[f.key] ?? 'unknown'}
-                onChange={(v) => setValues((s) => ({ ...s, [f.key]: v }))}
-                options={VAL_OPTS}
-              />
-            </View>
+            <Segmented
+              value={values[f.key] ?? 'unknown'}
+              onChange={(v) => setValues((s) => ({ ...s, [f.key]: v }))}
+              options={VAL_OPTS}
+            />
           </View>
         ))}
       </Card>
@@ -184,5 +185,5 @@ const styles = StyleSheet.create({
   h1: { fontWeight: '800' },
   label: { fontWeight: '700' },
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  featRow: { flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.sm, flexWrap: 'wrap' },
+  featRow: { paddingVertical: space.md },
 });
