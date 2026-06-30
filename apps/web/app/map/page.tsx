@@ -9,7 +9,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { PointDetailModal } from '@/components/PointDetailModal';
 import { LoadingState } from '@/components/ui';
 import { getCatalog } from '@/lib/catalog';
-import { pointsNear, pointById, searchPointsByName, type PointHit } from '@/lib/points';
+import { pointsInBbox, pointById, searchPointsByName, type PointHit } from '@/lib/points';
 import { problemsInBbox, type ProblemMarker } from '@/lib/civic';
 import { reviewStats, type ReviewStat } from '@/lib/reviews';
 import { geocodePlaces, type GeoPlace } from '@/lib/geocode';
@@ -23,14 +23,8 @@ const ExploreMap = dynamic(() => import('@/components/ExploreMap').then((m) => m
 
 interface Bbox { minLng: number; minLat: number; maxLng: number; maxLat: number }
 
-function metersBetween(a: [number, number], b: [number, number]): number {
-  const R = 6371000;
-  const dLat = ((b[1] - a[1]) * Math.PI) / 180;
-  const dLng = ((b[0] - a[0]) * Math.PI) / 180;
-  const lat = ((a[1] + b[1]) / 2) * (Math.PI / 180);
-  const x = dLng * Math.cos(lat);
-  return Math.sqrt(x * x + dLat * dLat) * R;
-}
+// Whole-Lviv bounding box — loaded once so panning never changes the point set.
+const LVIV_BBOX: Bbox = { minLng: 23.85, minLat: 49.74, maxLng: 24.22, maxLat: 49.96 };
 
 export default function MapPage() {
   const router = useRouter();
@@ -48,7 +42,7 @@ export default function MapPage() {
   const [modalId, setModalId] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number } | null>(null);
   const lastBbox = useRef<Bbox | null>(null);
-  const loadedRef = useRef<{ lng: number; lat: number; radius: number } | null>(null);
+  const loadedBboxRef = useRef<Bbox | null>(null);
   const nonceRef = useRef(0);
   const bboxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -59,9 +53,10 @@ export default function MapPage() {
   const [searching, setSearching] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
 
-  async function loadNear(lng: number, lat: number, radius: number) {
+  async function loadPoints(bb: Bbox) {
     try {
-      setPoints(await pointsNear(lng, lat, radius));
+      setPoints(await pointsInBbox(bb.minLng, bb.minLat, bb.maxLng, bb.maxLat));
+      loadedBboxRef.current = bb;
       setStatus('ready');
     } catch {
       setStatus('error');
@@ -71,28 +66,25 @@ export default function MapPage() {
   useEffect(() => {
     void getCatalog().then(setCatalog).catch(() => setCatalog([]));
     void reviewStats().then(setStats).catch(() => {});
-    loadedRef.current = { lng: LVIV[0], lat: LVIV[1], radius: 3000 };
-    void loadNear(LVIV[0], LVIV[1], 3000);
+    void loadPoints(LVIV_BBOX);
   }, []);
 
   function onMoveEnd(b: Bbox) {
     lastBbox.current = b;
-    setView(b); // re-declutter from cached points — no fetch
-    const center: [number, number] = [(b.minLng + b.maxLng) / 2, (b.minLat + b.maxLat) / 2];
-    const viewRadius = metersBetween(center, [b.maxLng, b.maxLat]);
-    // Cache: skip the fetch while the already-loaded area still covers the viewport.
-    const loaded = loadedRef.current;
-    if (loaded && metersBetween(center, [loaded.lng, loaded.lat]) < loaded.radius * 0.45 && viewRadius < loaded.radius * 0.9) {
-      return;
-    }
-    // Moved out of the loaded area → fetch a generous radius and remember it.
-    const radius = Math.min(12000, Math.max(2000, viewRadius * 2));
-    loadedRef.current = { lng: center[0], lat: center[1], radius };
+    setView(b); // re-declutter from the already-loaded points — no fetch while covered
+    const loaded = loadedBboxRef.current;
+    const covered =
+      !!loaded && b.minLng >= loaded.minLng && b.maxLng <= loaded.maxLng && b.minLat >= loaded.minLat && b.maxLat <= loaded.maxLat;
     if (bboxTimer.current) clearTimeout(bboxTimer.current);
     bboxTimer.current = setTimeout(() => {
-      void loadNear(center[0], center[1], radius);
+      // Only fetch when the viewport leaves the loaded area (e.g. panning far out).
+      if (!covered) {
+        const w = b.maxLng - b.minLng;
+        const h = b.maxLat - b.minLat;
+        void loadPoints({ minLng: b.minLng - w, minLat: b.minLat - h, maxLng: b.maxLng + w, maxLat: b.maxLat + h });
+      }
       if (showProblems) problemsInBbox(b.minLng, b.minLat, b.maxLng, b.maxLat).then(setProblems).catch(() => {});
-    }, 250);
+    }, 300);
   }
 
   useEffect(() => {
