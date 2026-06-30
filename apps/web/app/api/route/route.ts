@@ -5,11 +5,9 @@ import { NextRequest } from 'next/server';
 interface RouteBody {
   from?: [number, number];
   to?: [number, number];
+  via?: [number, number][]; // intermediate waypoints in order
   profile?: string;
-  // Live-barrier avoidance: GeoJSON MultiPolygon coordinates (array of polygons,
-  // each polygon = array of linear rings of [lng,lat]). Built from confirmed problems.
   avoid?: number[][][][];
-  // Profile-based routing restrictions (wheelchair).
   params?: { maxIncline?: number; maxSlopedKerb?: number; minWidth?: number };
 }
 
@@ -23,13 +21,14 @@ export async function POST(req: NextRequest) {
   } catch {
     return Response.json({ error: 'bad request' }, { status: 400 });
   }
-  const { from, to, profile, avoid, params } = body;
+  const { from, to, via = [], profile, avoid, params } = body;
   if (!from || !to) return Response.json({ error: 'from and to required' }, { status: 400 });
+  const allCoords = [from, ...via, to];
 
   const hasAvoid = Array.isArray(avoid) && avoid.length > 0;
 
   function buildPayload(orsProfile: string) {
-    const payload: Record<string, unknown> = { coordinates: [from, to] };
+    const payload: Record<string, unknown> = { coordinates: allCoords };
     const options: Record<string, unknown> = {};
     if (hasAvoid) {
       options.avoid_polygons = { type: 'MultiPolygon', coordinates: avoid };
@@ -74,13 +73,16 @@ export async function POST(req: NextRequest) {
 
   const gj = await res.json();
   const f = gj.features?.[0];
-  const seg = f?.properties?.segments?.[0];
+  const segments: any[] = f?.properties?.segments ?? [];
+  const steps = segments.flatMap((seg: any) =>
+    (seg.steps ?? []).map((s: any) => ({ instruction: s.instruction, distance: s.distance })),
+  );
   return Response.json({
     profile: usedProfile,
     fallback: usedProfile !== wanted,
     avoided: hasAvoid ? avoid!.length : 0,
     coordinates: f?.geometry?.coordinates ?? [],
-    steps: (seg?.steps ?? []).map((s: any) => ({ instruction: s.instruction, distance: s.distance })),
-    summary: f?.properties?.summary ?? (seg ? { distance: seg.distance, duration: seg.duration } : null),
+    steps,
+    summary: f?.properties?.summary ?? null,
   });
 }

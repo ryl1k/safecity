@@ -24,9 +24,8 @@ function avoidSquare(lng: number, lat: number): number[][][] {
 
 // ── Single address field with autocomplete ─────────────────────────────────
 function AddressField({
-  icon, placeholder, value, onChange, onSelect, active, onActivate,
+  placeholder, value, onChange, onSelect, active, onActivate,
 }: {
-  icon: React.ReactNode;
   placeholder: string;
   value: string;
   onChange: (v: string) => void;
@@ -63,7 +62,6 @@ function AddressField({
         cursor: 'text',
         transition: 'border-color 0.15s, box-shadow 0.15s',
       }} onClick={onActivate}>
-        <span style={{ flexShrink: 0, display: 'grid', placeItems: 'center' }}>{icon}</span>
         <input
           value={value}
           onChange={(e) => { onChange(e.target.value); onActivate(); }}
@@ -109,12 +107,21 @@ function RouteTabContent({
   const [fromCoords, setFromCoords] = useState<[number, number] | null>(null);
   const [fromLabel, setFromLabel] = useState('');
 
+  // Intermediate stops
+  type Stop = { coords: [number, number] | null; label: string };
+  const [stops, setStops] = useState<Stop[]>([]);
+
   // TO field — pre-filled with destination
   const [toCoords, setToCoords] = useState<[number, number] | null>(null);
   const [toLabel, setToLabel] = useState('');
 
   // Which field is waiting for input; null = neither (frame removed after pick)
-  const [activeField, setActiveField] = useState<'from' | 'to' | null>(null);
+  // 'from' | 'to' | number (stop index)
+  const [activeField, setActiveField] = useState<'from' | 'to' | number | null>(null);
+
+  // Drag-to-reorder state
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
   // Route result
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
@@ -148,43 +155,85 @@ function RouteTabContent({
   useEffect(() => { onRouteLine?.(line); }, [line, onRouteLine]);
   useEffect(() => () => { onRouteLine?.([]); }, [onRouteLine]);
 
-  // Auto-route when both coords are ready
+  // Auto-route when all waypoints are ready (from + all stops filled + to)
   useEffect(() => {
-    if (fromCoords && toCoords) void plan(fromCoords, toCoords);
+    if (!fromCoords || !toCoords) return;
+    if (stops.some((s) => !s.coords)) return;
+    const via = stops.map((s) => s.coords!);
+    void plan([fromCoords, ...via, toCoords]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromCoords, toCoords, primary]);
+  }, [fromCoords, toCoords, stops, primary]);
 
-  function activateMapPick(field: 'from' | 'to') {
+  function activateMapPick(field: 'from' | 'to' | number) {
     setActiveField(field);
     onRequestMapPick?.((lng, lat) => {
       const label = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
       if (field === 'from') { setFromCoords([lng, lat]); setFromLabel(label); }
-      else { setToCoords([lng, lat]); setToLabel(label); }
-      setActiveField(null); // remove frame once pick is done
+      else if (field === 'to') { setToCoords([lng, lat]); setToLabel(label); }
+      else { setStops((prev) => prev.map((s, i) => i === field ? { coords: [lng, lat], label } : s)); }
+      setActiveField(null);
     });
   }
 
-  async function plan(start: [number, number], end: [number, number]) {
+  function handleDrop(targetIdx: number) {
+    if (dragIdx === null || dragIdx === targetIdx) { setDragIdx(null); setDragOverIdx(null); return; }
+    const items = [
+      { coords: fromCoords, label: fromLabel },
+      ...stops.map((s) => ({ coords: s.coords, label: s.label })),
+      { coords: toCoords, label: toLabel },
+    ];
+    const moved = items.splice(dragIdx, 1)[0];
+    if (!moved) return;
+    items.splice(targetIdx, 0, moved);
+    const first = items[0] ?? { coords: null, label: '' };
+    const last = items[items.length - 1] ?? { coords: null, label: '' };
+    setFromCoords(first.coords); setFromLabel(first.label);
+    setToCoords(last.coords); setToLabel(last.label);
+    setStops(items.slice(1, -1));
+    setActiveField(null); onCancelMapPick?.();
+    setDragIdx(null); setDragOverIdx(null);
+  }
+
+  function addStop() {
+    setStops((prev) => [...prev, { coords: null, label: '' }]);
+    // immediately activate pick mode for the new stop
+    const idx = stops.length;
+    setActiveField(idx);
+    onRequestMapPick?.((lng, lat) => {
+      const label = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+      setStops((prev) => prev.map((s, i) => i === idx ? { coords: [lng, lat], label } : s));
+      setActiveField(null);
+    });
+  }
+
+  function removeStop(idx: number) {
+    setStops((prev) => prev.filter((_, i) => i !== idx));
+    if (activeField === idx) { setActiveField(null); onCancelMapPick?.(); }
+  }
+
+  async function plan(waypoints: [number, number][]) {
+    if (waypoints.length < 2) return;
     stopSpeech(); setSpeaking(false);
     setStatus('loading'); setAvoided(0);
+    const [start, end] = [waypoints[0], waypoints[waypoints.length - 1]];
+    const via = waypoints.slice(1, -1);
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let data: any;
       if (apiEnabled) {
         try {
-          data = await api.post('/route', { from: start, to: end, profile: primary }, { auth: false });
+          data = await api.post('/route', { from: start, to: end, via, profile: primary }, { auth: false });
         } catch { setStatus('error'); return; }
       } else {
-        const box = {
-          minLng: Math.min(start[0], end[0]) - 0.003, minLat: Math.min(start[1], end[1]) - 0.003,
-          maxLng: Math.max(start[0], end[0]) + 0.003, maxLat: Math.max(start[1], end[1]) + 0.003,
-        };
+        const allLng = waypoints.map((p) => p[0]);
+        const allLat = waypoints.map((p) => p[1]);
+        const box = { minLng: Math.min(...allLng) - 0.003, minLat: Math.min(...allLat) - 0.003, maxLng: Math.max(...allLng) + 0.003, maxLat: Math.max(...allLat) + 0.003 };
         let avoid: number[][][][] = [];
         try {
           const probs = await problemsInBbox(box.minLng, box.minLat, box.maxLng, box.maxLat);
           avoid = probs.filter((p) => p.status === 'confirmed' || p.status === 'escalated').map((p) => avoidSquare(p.lng, p.lat));
         } catch { /* best-effort */ }
-        const res = await fetch('/api/route', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: start, to: end, profile: primary, avoid }) });
+        const res = await fetch('/api/route', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: start, to: end, via, profile: primary, avoid }) });
         if (!res.ok) { setStatus('error'); return; }
         data = await res.json();
       }
@@ -207,45 +256,87 @@ function RouteTabContent({
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7em' }}>
 
       {/* Map pick hint — only shown when a field is active */}
-      {activeField && (
+      {activeField !== null && (
         <p style={{ margin: 0, fontSize: '0.82em', color: 'var(--sc-primary)', fontWeight: 600 }}>
-          📍 {activeField === 'from' ? 'Клікніть на мапі, щоб вибрати початок' : 'Клікніть на мапі, щоб вибрати кінець'}
+          📍 {activeField === 'from' ? 'Клікніть на мапі, щоб вибрати початок'
+            : activeField === 'to' ? 'Клікніть на мапі, щоб вибрати кінець'
+            : `Клікніть на мапі, щоб вибрати зупинку ${Number(activeField) + 1}`}
         </p>
       )}
 
-      {/* FROM field */}
-      <AddressField
-        icon={<span style={{ width: 12, height: 12, borderRadius: '50%', border: '2.5px solid var(--sc-muted)', display: 'inline-block' }} />}
-        placeholder="Звідки…"
-        value={fromLabel}
-        onChange={setFromLabel}
-        onSelect={(coords, label) => { setFromCoords(coords); setFromLabel(label); setActiveField(null); onCancelMapPick?.(); }}
-        active={activeField === 'from'}
-        onActivate={() => activateMapPick('from')}
-      />
+      {/* Unified draggable waypoint list */}
+      {(() => {
+        const allItems = [
+          { coords: fromCoords, label: fromLabel },
+          ...stops.map((s) => ({ coords: s.coords, label: s.label })),
+          { coords: toCoords, label: toLabel },
+        ];
+        const lastI = allItems.length - 1;
+        return allItems.map((item, i) => {
+          const isFirst = i === 0;
+          const isLast = i === lastI;
+          const stopIdx = isFirst || isLast ? -1 : i - 1;
+          const fieldId: 'from' | 'to' | number = isFirst ? 'from' : isLast ? 'to' : stopIdx;
+          const dot = isFirst
+            ? <span style={{ width: 12, height: 12, borderRadius: '50%', border: '2.5px solid var(--sc-muted)', display: 'inline-block', flexShrink: 0 }} />
+            : isLast
+            ? <span style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--sc-bad)', display: 'inline-block', flexShrink: 0 }} />
+            : <span style={{ width: 12, height: 12, borderRadius: '3px', border: '2.5px solid var(--sc-muted)', display: 'inline-block', flexShrink: 0 }} />;
+          return (
+            <div key={i}
+              onDragOver={(e) => { e.preventDefault(); setDragOverIdx(i); }}
+              onDragLeave={() => setDragOverIdx((prev) => (prev === i ? null : prev))}
+              onDrop={(e) => { e.preventDefault(); handleDrop(i); }}
+              style={{ display: 'flex', alignItems: 'center', gap: '0.4em', opacity: dragIdx === i ? 0.4 : 1, transition: 'opacity 0.15s', borderTop: dragOverIdx === i && dragIdx !== null && dragIdx !== i ? '2px solid var(--sc-primary)' : '2px solid transparent' }}
+            >
+              <span draggable
+                onDragStart={(e) => { e.dataTransfer.effectAllowed = 'move'; setDragIdx(i); }}
+                onDragEnd={() => { setDragIdx(null); setDragOverIdx(null); }}
+                style={{ cursor: 'grab', flexShrink: 0, display: 'grid', placeItems: 'center', padding: '0.25em', touchAction: 'none' }}
+                aria-label="Перетягнути">
+                {dot}
+              </span>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <AddressField
+                  placeholder={isFirst ? 'Звідки…' : isLast ? 'Куди…' : `Зупинка ${stopIdx + 1}…`}
+                  value={item.label}
+                  onChange={(v) => {
+                    if (isFirst) setFromLabel(v);
+                    else if (isLast) setToLabel(v);
+                    else setStops((prev) => prev.map((s, si) => si === stopIdx ? { ...s, label: v } : s));
+                  }}
+                  onSelect={(coords, label) => {
+                    if (isFirst) { setFromCoords(coords); setFromLabel(label); }
+                    else if (isLast) { setToCoords(coords); setToLabel(label); }
+                    else setStops((prev) => prev.map((s, si) => si === stopIdx ? { coords, label } : s));
+                    setActiveField(null); onCancelMapPick?.();
+                  }}
+                  active={activeField === fieldId}
+                  onActivate={() => activateMapPick(fieldId)}
+                />
+              </div>
+              {!isFirst && !isLast && (
+                <button type="button" onClick={() => removeStop(stopIdx)} aria-label="Видалити зупинку"
+                  style={{ flexShrink: 0, width: '2em', height: '2em', border: 'none', background: 'none', cursor: 'pointer', color: 'var(--sc-muted)', fontSize: '1.2em', display: 'grid', placeItems: 'center' }}>
+                  ×
+                </button>
+              )}
+            </div>
+          );
+        });
+      })()}
 
-      {/* Divider with swap hint */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.4em', padding: '0 0.4em' }}>
-        <div style={{ flex: 1, height: 1, background: 'var(--sc-border)' }} />
-        <span style={{ fontSize: '0.75em', color: 'var(--sc-muted)' }}>↕</span>
-        <div style={{ flex: 1, height: 1, background: 'var(--sc-border)' }} />
-      </div>
-
-      {/* TO field */}
-      <AddressField
-        icon={<span style={{ width: 12, height: 12, borderRadius: '50%', background: 'var(--sc-bad)', display: 'inline-block' }} />}
-        placeholder="Куди…"
-        value={toLabel}
-        onChange={setToLabel}
-        onSelect={(coords, label) => { setToCoords(coords); setToLabel(label); setActiveField(null); onCancelMapPick?.(); }}
-        active={activeField === 'to'}
-        onActivate={() => activateMapPick('to')}
-      />
+      {/* Add stop button */}
+      <button type="button" onClick={addStop}
+        style={{ display: 'flex', alignItems: 'center', gap: '0.5em', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sc-primary)', fontFamily: 'inherit', fontSize: '0.88em', fontWeight: 700, padding: '0.1em 0', alignSelf: 'flex-start' }}>
+        <span style={{ width: '1.4em', height: '1.4em', borderRadius: '50%', border: '2px solid var(--sc-primary)', display: 'grid', placeItems: 'center', fontSize: '1em', lineHeight: 1 }}>+</span>
+        Додати зупинку
+      </button>
 
       {/* Route result */}
       {status === 'loading' && <LoadingState label="Прокладання маршруту" />}
-      {status === 'error' && fromCoords && toCoords && (
-        <ErrorState title="Не вдалося прокласти маршрут" onRetry={() => void plan(fromCoords, toCoords)} />
+      {status === 'error' && fromCoords && toCoords && !stops.some((s) => !s.coords) && (
+        <ErrorState title="Не вдалося прокласти маршрут" onRetry={() => void plan([fromCoords, ...stops.map((s) => s.coords!), toCoords])} />
       )}
 
       {status === 'ready' && (
