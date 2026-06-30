@@ -19,6 +19,7 @@
     "db:seed-users": "node --env-file=.env apps/web/scripts/seed-users.mjs",
     "db:import-osm": "node --env-file=.env tooling/importers/osm-overpass.mjs",
     "db:import-mymaps": "node --env-file=.env tooling/importers/mymaps-kml.mjs",
+    "db:import-bezbar": "node --env-file=.env tooling/importers/bezbarrier.mjs",
     "db:dedupe": "node --env-file=.env tooling/importers/dedupe.mjs"
   },
   "devDependencies": {

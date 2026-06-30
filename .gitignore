@@ -4,6 +4,9 @@ node_modules/
 tmp/
 .playwright-mcp/
 
+# importer download caches (bulk GeoJSON/PBF — re-downloaded on demand)
+.bezbar-data/
+
 # builds
 dist/
 .next/
