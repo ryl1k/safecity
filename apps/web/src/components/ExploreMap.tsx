@@ -39,8 +39,6 @@ export interface Bbox {
   maxLat: number;
 }
 
-const LABEL_ZOOM = 15.5; // show name labels once zoomed in this far
-
 function basemapStyle(dark: boolean) {
   const variant = dark ? 'dark_all' : 'light_all';
   return {
@@ -57,9 +55,39 @@ function basemapStyle(dark: boolean) {
   };
 }
 
+function buildMarkerEl(p: ExploreMarker, onSelect: (id: string) => void): HTMLElement {
+  const kind = placeKind(p.category, p.name);
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
+
+  const pin = document.createElement('button');
+  pin.className = 'sc-foc';
+  pin.type = 'button';
+  pin.setAttribute('aria-label', p.name);
+  pin.style.cssText =
+    'width:30px;height:30px;border-radius:50%;display:grid;place-items:center;cursor:pointer;' +
+    `background:${PLACE_META[kind].color};border:2px solid var(--sc-surface);` +
+    `box-shadow:${p.accessible ? '0 0 0 2px var(--sc-ok),' : ''}var(--sc-shadow-2);`;
+  pin.innerHTML = ICON_SVG[kind];
+  pin.addEventListener('click', () => onSelect(p.id));
+
+  const label = document.createElement('div');
+  label.textContent = p.name;
+  label.style.cssText =
+    'max-width:130px;margin-top:2px;font-size:11px;font-weight:700;line-height:1.15;' +
+    'color:var(--sc-text);background:var(--sc-surface);border:var(--sc-bw) solid var(--sc-border);' +
+    'border-radius:6px;padding:1px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;' +
+    'box-shadow:var(--sc-shadow-1);';
+
+  wrap.appendChild(pin);
+  wrap.appendChild(label);
+  return wrap;
+}
+
 /**
- * Immersive full-viewport map. Category-icon pins with an accessibility ring;
- * name labels appear once zoomed in. Reports the visible bbox on pan/zoom.
+ * Immersive full-viewport map. Category/sub-type-coloured pins with always-on
+ * text labels. Markers are reconciled by id (existing pins stay put on pan —
+ * only new ones are added and gone ones removed), so panning never flickers.
  */
 export function ExploreMap({
   points,
@@ -82,10 +110,9 @@ export function ExploreMap({
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mapRef = useRef<any>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const markersRef = useRef<any[]>([]);
+  const markersById = useRef<Map<string, any>>(new Map());
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const problemMarkersRef = useRef<any[]>([]);
-  const labelsRef = useRef<HTMLElement[]>([]);
   const observerRef = useRef<MutationObserver | null>(null);
   const onSelectRef = useRef(onSelect);
   const onSelectProblemRef = useRef(onSelectProblem);
@@ -118,13 +145,8 @@ export function ExploreMap({
         const b = map.getBounds();
         onMoveEndRef.current?.({ minLng: b.getWest(), minLat: b.getSouth(), maxLng: b.getEast(), maxLat: b.getNorth() });
       };
-      const updateLabels = () => {
-        const show = map.getZoom() >= LABEL_ZOOM;
-        for (const l of labelsRef.current) l.style.display = show ? 'block' : 'none';
-      };
       map.on('load', emit);
       map.on('moveend', emit);
-      map.on('zoom', updateLabels);
 
       observerRef.current = new MutationObserver(() => {
         const d = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -146,45 +168,25 @@ export function ExploreMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Sync markers when points change.
+  // Reconcile markers by id — add new, remove gone, leave existing untouched.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const maplibregl = (await import('maplibre-gl')).default;
       const map = mapRef.current;
       if (cancelled || !map) return;
-      markersRef.current.forEach((m) => m.remove());
-      labelsRef.current = [];
-      const labelsVisible = map.getZoom() >= LABEL_ZOOM;
-      markersRef.current = points.map((p) => {
-        const wrap = document.createElement('div');
-        wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
-
-        const kind = placeKind(p.category, p.name);
-        const pin = document.createElement('button');
-        pin.className = 'sc-foc';
-        pin.type = 'button';
-        pin.setAttribute('aria-label', p.name);
-        // Place-kind colour = the pin; an outer green halo marks mobility-accessible.
-        pin.style.cssText =
-          'width:30px;height:30px;border-radius:50%;display:grid;place-items:center;cursor:pointer;' +
-          `background:${PLACE_META[kind].color};border:2px solid var(--sc-surface);` +
-          `box-shadow:${p.accessible ? '0 0 0 2px var(--sc-ok),' : ''}var(--sc-shadow-2);`;
-        pin.innerHTML = ICON_SVG[kind];
-        pin.addEventListener('click', () => onSelectRef.current(p.id));
-
-        const label = document.createElement('div');
-        label.textContent = p.name;
-        label.style.cssText =
-          `display:${labelsVisible ? 'block' : 'none'};max-width:140px;margin-top:2px;font-size:11px;font-weight:700;` +
-          'color:var(--sc-text);background:var(--sc-surface);border:var(--sc-bw) solid var(--sc-border);' +
-          'border-radius:6px;padding:1px 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;';
-        labelsRef.current.push(label);
-
-        wrap.appendChild(pin);
-        wrap.appendChild(label);
-        return new maplibregl.Marker({ element: wrap }).setLngLat([p.lng, p.lat]).addTo(map);
-      });
+      const incoming = new Set(points.map((p) => p.id));
+      for (const [id, marker] of markersById.current) {
+        if (!incoming.has(id)) {
+          marker.remove();
+          markersById.current.delete(id);
+        }
+      }
+      for (const p of points) {
+        if (markersById.current.has(p.id)) continue;
+        const el = buildMarkerEl(p, (id) => onSelectRef.current(id));
+        markersById.current.set(p.id, new maplibregl.Marker({ element: el }).setLngLat([p.lng, p.lat]).addTo(map));
+      }
     })();
     return () => {
       cancelled = true;

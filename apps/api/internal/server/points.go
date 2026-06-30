@@ -12,6 +12,9 @@ import (
 const (
 	defaultRadiusM = 1500
 	maxRadiusM     = 50000
+	// Public point reads change infrequently — let browsers/CDN cache identical
+	// GETs so repeated map views don't re-hit the DB. Short window keeps it fresh.
+	readCacheControl = "public, max-age=60, stale-while-revalidate=120"
 )
 
 // handlePointsNear: GET /points/near?lng=&lat=&radius= — public map read.
@@ -43,6 +46,7 @@ func (s *Server) handlePointsNear(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "internal", "could not load points")
 		return
 	}
+	w.Header().Set("Cache-Control", readCacheControl)
 	httpx.JSON(w, http.StatusOK, res)
 }
 
@@ -68,6 +72,7 @@ func (s *Server) handlePointsBBox(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "internal", "could not load points")
 		return
 	}
+	w.Header().Set("Cache-Control", readCacheControl)
 	httpx.JSON(w, http.StatusOK, res)
 }
 
@@ -88,6 +93,7 @@ func (s *Server) handlePointDetail(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusNotFound, "not_found", "point not found")
 		return
 	}
+	w.Header().Set("Cache-Control", readCacheControl)
 	httpx.JSON(w, http.StatusOK, p)
 }
 

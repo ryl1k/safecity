@@ -93,12 +93,14 @@ export interface Bbox {
 }
 
 /**
- * Map declutter (Google-Maps style): over the visible bbox, keep at most one item
- * per grid cell — the highest-scoring (most useful) one. Items outside the bbox
- * are dropped. `gridN` controls density (≈ gridN² markers max). Zooming in shrinks
- * the bbox, so cells cover less ground and more points become visible.
+ * Map declutter (Google-Maps style): keep at most one item per grid cell — the
+ * highest-scoring (most useful) one. The grid is anchored to WORLD coordinates
+ * (not the moving viewport), so panning never shifts cell boundaries: the same
+ * winners stay put, only edge points enter/leave. The cell size derives from the
+ * viewport width, so the grid changes only on zoom. `gridN` controls density.
+ * Ties break on a stable id so re-renders don't swap the visible marker.
  */
-export function declutter<T extends { lng: number; lat: number }>(
+export function declutter<T extends { id: string; lng: number; lat: number }>(
   items: T[],
   bbox: Bbox,
   gridN: number,
@@ -110,10 +112,11 @@ export function declutter<T extends { lng: number; lat: number }>(
   const best = new Map<string, { item: T; s: number }>();
   for (const it of items) {
     if (it.lng < bbox.minLng || it.lng > bbox.maxLng || it.lat < bbox.minLat || it.lat > bbox.maxLat) continue;
-    const key = `${Math.floor((it.lng - bbox.minLng) / w)}:${Math.floor((it.lat - bbox.minLat) / h)}`;
+    // World-anchored cell (independent of pan).
+    const key = `${Math.floor(it.lng / w)}:${Math.floor(it.lat / h)}`;
     const s = score(it);
     const cur = best.get(key);
-    if (!cur || s > cur.s) best.set(key, { item: it, s });
+    if (!cur || s > cur.s || (s === cur.s && it.id < cur.item.id)) best.set(key, { item: it, s });
   }
   return Array.from(best.values(), (v) => v.item);
 }

@@ -48,6 +48,7 @@ export default function MapPage() {
   const [modalId, setModalId] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number } | null>(null);
   const lastBbox = useRef<Bbox | null>(null);
+  const loadedRef = useRef<{ lng: number; lat: number; radius: number } | null>(null);
   const nonceRef = useRef(0);
   const bboxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -70,14 +71,23 @@ export default function MapPage() {
   useEffect(() => {
     void getCatalog().then(setCatalog).catch(() => setCatalog([]));
     void reviewStats().then(setStats).catch(() => {});
-    void loadNear(LVIV[0], LVIV[1], 2500);
+    loadedRef.current = { lng: LVIV[0], lat: LVIV[1], radius: 3000 };
+    void loadNear(LVIV[0], LVIV[1], 3000);
   }, []);
 
   function onMoveEnd(b: Bbox) {
     lastBbox.current = b;
-    setView(b); // re-declutter for the new viewport
+    setView(b); // re-declutter from cached points — no fetch
     const center: [number, number] = [(b.minLng + b.maxLng) / 2, (b.minLat + b.maxLat) / 2];
-    const radius = Math.min(9000, Math.max(800, metersBetween(center, [b.maxLng, b.maxLat])));
+    const viewRadius = metersBetween(center, [b.maxLng, b.maxLat]);
+    // Cache: skip the fetch while the already-loaded area still covers the viewport.
+    const loaded = loadedRef.current;
+    if (loaded && metersBetween(center, [loaded.lng, loaded.lat]) < loaded.radius * 0.45 && viewRadius < loaded.radius * 0.9) {
+      return;
+    }
+    // Moved out of the loaded area → fetch a generous radius and remember it.
+    const radius = Math.min(12000, Math.max(2000, viewRadius * 2));
+    loadedRef.current = { lng: center[0], lat: center[1], radius };
     if (bboxTimer.current) clearTimeout(bboxTimer.current);
     bboxTimer.current = setTimeout(() => {
       void loadNear(center[0], center[1], radius);
@@ -128,7 +138,7 @@ export default function MapPage() {
 
   // Decluttered subset actually drawn — one per grid cell, accessible ones win.
   const markers = useMemo(
-    () => (view ? declutter(matching, view, 13, (m) => (m.accessible ? 1 : 0)) : matching.slice(0, 160)),
+    () => (view ? declutter(matching, view, 9, (m) => (m.accessible ? 1 : 0)) : matching.slice(0, 80)),
     [matching, view],
   );
 
