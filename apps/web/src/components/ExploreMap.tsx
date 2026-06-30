@@ -3,25 +3,17 @@
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { Bus, PersonStanding, SquareParking, Store, Toilet, type LucideIcon } from 'lucide-react';
 import type { Category } from '@safecity/shared';
-import { categoryColor } from '@/lib/filters';
+import { PLACE_META, placeKind, type PlaceKind } from '@/lib/placeKind';
 
-// Pre-render each category's lucide icon to a white SVG string (for DOM markers).
-const CAT_ICON: Record<Category, LucideIcon> = {
-  venue: Store,
-  transit: Bus,
-  crossing: PersonStanding,
-  toilet: Toilet,
-  parking: SquareParking,
-};
-const ICON_SVG: Record<Category, string> = (Object.keys(CAT_ICON) as Category[]).reduce(
-  (acc, c) => {
-    const Icon = CAT_ICON[c];
-    acc[c] = renderToStaticMarkup(<Icon size={17} color="#fff" strokeWidth={2.5} />);
+// Pre-render every place-kind's lucide icon to a white SVG string (for DOM markers).
+const ICON_SVG: Record<PlaceKind, string> = (Object.keys(PLACE_META) as PlaceKind[]).reduce(
+  (acc, k) => {
+    const Icon = PLACE_META[k].Icon;
+    acc[k] = renderToStaticMarkup(<Icon size={17} color="#fff" strokeWidth={2.5} />);
     return acc;
   },
-  {} as Record<Category, string>,
+  {} as Record<PlaceKind, string>,
 );
 
 export interface ExploreMarker {
@@ -168,16 +160,17 @@ export function ExploreMap({
         const wrap = document.createElement('div');
         wrap.style.cssText = 'display:flex;flex-direction:column;align-items:center;';
 
+        const kind = placeKind(p.category, p.name);
         const pin = document.createElement('button');
         pin.className = 'sc-foc';
         pin.type = 'button';
         pin.setAttribute('aria-label', p.name);
-        // Category colour = the pin; an outer green halo marks mobility-accessible.
+        // Place-kind colour = the pin; an outer green halo marks mobility-accessible.
         pin.style.cssText =
           'width:30px;height:30px;border-radius:50%;display:grid;place-items:center;cursor:pointer;' +
-          `background:${categoryColor[p.category]};border:2px solid var(--sc-surface);` +
+          `background:${PLACE_META[kind].color};border:2px solid var(--sc-surface);` +
           `box-shadow:${p.accessible ? '0 0 0 2px var(--sc-ok),' : ''}var(--sc-shadow-2);`;
-        pin.innerHTML = ICON_SVG[p.category];
+        pin.innerHTML = ICON_SVG[kind];
         pin.addEventListener('click', () => onSelectRef.current(p.id));
 
         const label = document.createElement('div');

@@ -8,6 +8,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { SearchBar, Chip, ListRow, LoadingState, ErrorState, EmptyState } from '@/components/ui';
 import { CategoryIcon } from '@/components/CategoryIcon';
+import { PlaceIcon } from '@/components/PlaceIcon';
 import { getCatalog } from '@/lib/catalog';
 import {
   CATEGORIES,
@@ -193,7 +194,7 @@ export default function PlacesPage() {
                   <ListRow
                     name={point.name}
                     rating={ratingOf(point, catalog)}
-                    icon={<CategoryIcon category={point.category} size={20} />}
+                    icon={<PlaceIcon category={point.category} name={point.name} size={20} />}
                     meta={meta}
                     onClick={() => router.push(`/point/${point.id}`)}
                   />
