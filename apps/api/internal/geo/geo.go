@@ -141,7 +141,7 @@ func (c *Client) Route(ctx context.Context, in RouteInput) (RouteResult, error) 
 		if len(f.Properties.Segments) > 0 {
 			seg := f.Properties.Segments[0]
 			for _, s := range seg.Steps {
-				res.Steps = append(res.Steps, Step{Instruction: s.Instruction, Distance: s.Distance})
+				res.Steps = append(res.Steps, Step{Instruction: uaInstruction(s.Type, s.Name), Distance: s.Distance})
 			}
 			if res.Summary == nil {
 				res.Summary = &Summary{Distance: seg.Distance, Duration: seg.Duration}
@@ -211,10 +211,65 @@ type orsGeoJSON struct {
 				Steps    []struct {
 					Instruction string  `json:"instruction"`
 					Distance    float64 `json:"distance"`
+					Type        int     `json:"type"`
+					Name        string  `json:"name"`
 				} `json:"steps"`
 			} `json:"segments"`
 		} `json:"properties"`
 	} `json:"features"`
+}
+
+// uaInstruction renders a Ukrainian turn-by-turn line from ORS's maneuver type
+// + way name (the public ORS API has no Ukrainian instruction language, and
+// street names already come back in Ukrainian from OSM).
+func uaInstruction(t int, name string) string {
+	if name == "-" { // ORS uses "-" for unnamed ways
+		name = ""
+	}
+	on := func(v string) string {
+		if name != "" {
+			return v + " на " + name
+		}
+		return v
+	}
+	switch t {
+	case 0:
+		return on("Поверніть ліворуч")
+	case 1:
+		return on("Поверніть праворуч")
+	case 2:
+		return on("Крутий поворот ліворуч")
+	case 3:
+		return on("Крутий поворот праворуч")
+	case 4:
+		return on("Тримайтеся трохи лівіше")
+	case 5:
+		return on("Тримайтеся трохи правіше")
+	case 6:
+		if name != "" {
+			return "Прямо по " + name
+		}
+		return "Прямо"
+	case 7:
+		return "Заїзд на кільце"
+	case 8:
+		return "З’їзд з кільця"
+	case 9:
+		return "Розворот"
+	case 10:
+		return "Прибуття до місця призначення"
+	case 11:
+		if name != "" {
+			return "Рушайте по " + name
+		}
+		return "Рушайте"
+	case 12:
+		return on("Тримайтеся лівіше")
+	case 13:
+		return on("Тримайтеся правіше")
+	default:
+		return "Продовжуйте рух"
+	}
 }
 
 // AvoidSquares turns barrier points into ~30 m square avoidance polygons (a
@@ -317,7 +372,7 @@ func (c *Client) Reverse(ctx context.Context, lng, lat float64) (*Place, error) 
 		return &v[0], nil
 	}
 
-	u := fmt.Sprintf("%s/reverse?format=jsonv2&lon=%s&lat=%s&accept-language=uk&zoom=18",
+	u := fmt.Sprintf("%s/reverse?format=jsonv2&lon=%s&lat=%s&accept-language=uk&zoom=18&addressdetails=1",
 		c.nominatimURL,
 		strconv.FormatFloat(lng, 'f', -1, 64), strconv.FormatFloat(lat, 'f', -1, 64))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
@@ -336,23 +391,63 @@ func (c *Client) Reverse(ctx context.Context, lng, lat float64) (*Place, error) 
 		return nil, fmt.Errorf("nominatim reverse status %d", resp.StatusCode)
 	}
 	var row struct {
-		PlaceID int    `json:"place_id"`
-		Display string `json:"display_name"`
-		Lon     string `json:"lon"`
-		Lat     string `json:"lat"`
+		PlaceID int               `json:"place_id"`
+		Display string            `json:"display_name"`
+		Name    string            `json:"name"`
+		Lon     string            `json:"lon"`
+		Lat     string            `json:"lat"`
+		Address map[string]string `json:"address"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&row); err != nil {
 		return nil, fmt.Errorf("decode nominatim reverse: %w", err)
 	}
-	if strings.TrimSpace(row.Display) == "" {
+	label := shortAddress(row.Name, row.Address, row.Display)
+	if strings.TrimSpace(label) == "" {
 		c.geoCache.set(cacheKey, []Place{}) // cache the "no result" too
 		return nil, nil
 	}
 	rlng, _ := strconv.ParseFloat(row.Lon, 64)
 	rlat, _ := strconv.ParseFloat(row.Lat, 64)
-	p := Place{ID: fmt.Sprintf("osm-%d", row.PlaceID), Label: row.Display, Lng: rlng, Lat: rlat}
+	p := Place{ID: fmt.Sprintf("osm-%d", row.PlaceID), Label: label, Lng: rlng, Lat: rlat}
 	c.geoCache.set(cacheKey, []Place{p})
 	return &p, nil
+}
+
+// shortAddress builds a compact label — street + house number (+ the feature's
+// own name), or a locality when there's no street (rural). Drops city/oblast/
+// postcode/country noise. Falls back to the full display name if nothing usable.
+func shortAddress(name string, a map[string]string, fallback string) string {
+	if a == nil {
+		return fallback
+	}
+	road := a["road"]
+	if road == "" {
+		road = a["pedestrian"]
+	}
+	street := road
+	if road != "" {
+		if hn := a["house_number"]; hn != "" {
+			street = road + ", " + hn
+		}
+	} else {
+		for _, k := range []string{"suburb", "neighbourhood", "city_district", "hamlet", "village", "town", "city"} {
+			if v := a[k]; v != "" {
+				street = v
+				break
+			}
+		}
+	}
+	parts := make([]string, 0, 2)
+	if name != "" && name != road {
+		parts = append(parts, name)
+	}
+	if street != "" {
+		parts = append(parts, street)
+	}
+	if len(parts) == 0 {
+		return fallback
+	}
+	return strings.Join(parts, ", ")
 }
 
 func truncate(s string, n int) string {

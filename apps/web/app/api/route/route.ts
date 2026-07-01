@@ -11,6 +11,30 @@ interface RouteBody {
   params?: { maxIncline?: number; maxSlopedKerb?: number; minWidth?: number };
 }
 
+// Ukrainian turn-by-turn from ORS maneuver type + way name (public ORS has no
+// Ukrainian instruction language; street names already arrive in Ukrainian).
+function uaInstruction(type: number, name?: string): string {
+  if (name === '-') name = undefined; // ORS uses "-" for unnamed ways
+  const on = (v: string) => (name ? `${v} на ${name}` : v);
+  switch (type) {
+    case 0: return on('Поверніть ліворуч');
+    case 1: return on('Поверніть праворуч');
+    case 2: return on('Крутий поворот ліворуч');
+    case 3: return on('Крутий поворот праворуч');
+    case 4: return on('Тримайтеся трохи лівіше');
+    case 5: return on('Тримайтеся трохи правіше');
+    case 6: return name ? `Прямо по ${name}` : 'Прямо';
+    case 7: return 'Заїзд на кільце';
+    case 8: return 'З’їзд з кільця';
+    case 9: return 'Розворот';
+    case 10: return 'Прибуття до місця призначення';
+    case 11: return name ? `Рушайте по ${name}` : 'Рушайте';
+    case 12: return on('Тримайтеся лівіше');
+    case 13: return on('Тримайтеся правіше');
+    default: return 'Продовжуйте рух';
+  }
+}
+
 export async function POST(req: NextRequest) {
   const key = process.env.ORS_API_KEY?.trim();
   if (!key) return Response.json({ error: 'ORS key missing on server' }, { status: 500 });
@@ -75,7 +99,7 @@ export async function POST(req: NextRequest) {
   const f = gj.features?.[0];
   const segments: any[] = f?.properties?.segments ?? [];
   const steps = segments.flatMap((seg: any) =>
-    (seg.steps ?? []).map((s: any) => ({ instruction: s.instruction, distance: s.distance })),
+    (seg.steps ?? []).map((s: any) => ({ instruction: uaInstruction(s.type, s.name), distance: s.distance })),
   );
   return Response.json({
     profile: usedProfile,

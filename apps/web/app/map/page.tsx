@@ -305,14 +305,18 @@ export default function MapPage() {
                 <ToggleRow checked={showProblems} onChange={() => setShowProblems((v) => !v)} label="Показати проблеми" />
                 <div style={{ height: 1, background: 'var(--sc-border)', margin: '0.5em 0' }} />
                 <div style={{ fontSize: '0.72em', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--sc-muted)', marginBottom: '0.3em' }}>Зручності</div>
-                {featureChips.map((f) => (
-                  <ToggleRow key={f.key} checked={features.has(f.key)} onChange={() => toggleFeature(f.key)} label={f.label} />
-                ))}
+                <div style={grid2}>
+                  {featureChips.map((f) => (
+                    <ToggleRow key={f.key} checked={features.has(f.key)} onChange={() => toggleFeature(f.key)} label={f.label} />
+                  ))}
+                </div>
                 <div style={{ height: 1, background: 'var(--sc-border)', margin: '0.5em 0' }} />
                 <div style={{ fontSize: '0.72em', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--sc-muted)', marginBottom: '0.3em' }}>Категорії</div>
-                {CATEGORIES.map((c) => (
-                  <ToggleRow key={c} checked={enabled.has(c)} onChange={() => toggleCat(c)} label={categoryLabel[c]} />
-                ))}
+                <div style={grid2}>
+                  {CATEGORIES.map((c) => (
+                    <ToggleRow key={c} checked={enabled.has(c)} onChange={() => toggleCat(c)} label={categoryLabel[c]} />
+                  ))}
+                </div>
                 <button type="button" className="sc-foc" onClick={() => { setShowInaccessible(false); setFeatures(new Set()); setShowProblems(false); setEnabled(new Set(CATEGORIES)); }} style={{ marginTop: '0.6em', background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.85em' }}>
                   Скинути фільтри
                 </button>
@@ -401,7 +405,8 @@ const resultTitle = { display: 'block', fontWeight: 700, fontSize: '0.92em', whi
 const resultSub = { display: 'block', fontSize: '0.78em', color: 'var(--sc-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } as const;
 const filterTrigger = { position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '0.4em', minHeight: '2.6em', padding: '0 0.9em', borderRadius: '1.4em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.9em', cursor: 'pointer', boxShadow: 'var(--sc-shadow-2)' } as const;
 const filterBadge = { minWidth: '1.5em', height: '1.5em', borderRadius: '50%', background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontSize: '0.7em', fontWeight: 800, padding: '0 0.3em' } as const;
-const filterPanel = { position: 'absolute', right: 0, top: 'calc(100% + 0.5em)', zIndex: 6, width: 'min(80vw, 240px)', maxHeight: '60vh', overflowY: 'auto', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '0.9em', boxShadow: 'var(--sc-shadow-2)', padding: '0.7em' } as const;
+const filterPanel = { position: 'absolute', right: 0, top: 'calc(100% + 0.5em)', zIndex: 6, width: 'min(92vw, 380px)', maxHeight: '70vh', overflowY: 'auto', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '0.9em', boxShadow: 'var(--sc-shadow-2)', padding: '0.7em' } as const;
+const grid2 = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0 0.6em' } as const;
 const markerPanel ={ position: 'absolute', top: 0, left: 0, height: '100%', width: 'min(420px, 100vw)', zIndex: 55, background: 'var(--sc-bg)', boxShadow: '4px 0 24px rgba(0,0,0,0.18)', overflowY: 'auto', borderRight: 'var(--sc-bw) solid var(--sc-border)', padding: '1.2em 1.4em 2.5em' } as const;
 const panelClose = { flexShrink: 0, width: '2.2em', height: '2.2em', borderRadius: '50%', cursor: 'pointer', border: 'var(--sc-bw) solid var(--sc-border)', background: 'var(--sc-surface)', color: 'var(--sc-text)', display: 'grid', placeItems: 'center' } as const;
 const panelPrimary = { display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em', borderRadius: '0.7em', fontWeight: 800, background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95em' } as const;
