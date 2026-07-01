@@ -1,12 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Map as MapIcon, List as ListIcon, Megaphone, Plus, CircleUserRound, type LucideIcon } from 'lucide-react';
 import { AccessibilityMenu } from '@/components/AccessibilityMenu';
 import { supabase } from '@/lib/supabase';
 
-export function AppHeader({ active }: { active?: 'map' | 'places' | 'civic' | 'problem' }) {
+export function AppHeader({ active, search }: { active?: 'map' | 'places' | 'civic' | 'problem'; search?: ReactNode }) {
   const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
@@ -43,6 +43,11 @@ export function AppHeader({ active }: { active?: 'map' | 'places' | 'civic' | 'p
           <NavLink href="/problem/new" icon={Megaphone} label="Повідомити" current={active === 'problem'} />
           <NavLink href="/contribute" icon={Plus} label="Додати" />
         </nav>
+
+        {/* Optional search slot (desktop map view puts its search here). */}
+        {search ? (
+          <div style={{ flex: 1, minWidth: 180, maxWidth: 560, margin: '0 auto', position: 'relative' }}>{search}</div>
+        ) : null}
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.6em', flexWrap: 'wrap' }}>
           <AccessibilityMenu />

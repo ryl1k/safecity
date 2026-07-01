@@ -56,6 +56,15 @@ export default function MapPage() {
   const [placeHits, setPlaceHits] = useState<GeoPlace[]>([]);
   const [searching, setSearching] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  // Desktop puts search in the navbar; mobile floats it on the map.
+  const [isDesktop, setIsDesktop] = useState(true);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const sync = () => setIsDesktop(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
 
   async function loadPoints(bb: Bbox) {
     try {
@@ -194,9 +203,69 @@ export default function MapPage() {
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, [filtersOpen]);
 
+  // The search UI, reused in the navbar (desktop) or floating on the map (mobile).
+  const searchBox = (
+    <>
+      <div style={searchWrap}>
+        <Search size={18} aria-hidden style={{ color: 'var(--sc-muted)', flexShrink: 0 }} />
+        <input
+          className="sc-foc" role="combobox" aria-expanded={open && hasResults} aria-controls="map-results" aria-autocomplete="list"
+          aria-activedescendant={activeIndex >= 0 ? `map-opt-${activeIndex}` : undefined}
+          aria-label="Пошук місць або адрес" placeholder="Пошук місць, адрес…" value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={onSearchKeyDown} style={searchInput}
+        />
+        {query ? <button type="button" className="sc-foc" aria-label="Очистити" onClick={() => { setQuery(''); setOpen(false); }} style={clearBtn}><X size={16} aria-hidden /></button> : null}
+      </div>
+      {open && query.trim().length >= 2 && (
+        <ul id="map-results" role="listbox" aria-label="Результати пошуку" style={results}>
+          {filterSugs.categories.length + filterSugs.features.length > 0 && (
+            <>
+              <li style={resultHead} aria-hidden>Додати фільтр</li>
+              {filterSugs.categories.map((c) => (
+                <li key={`fc-${c}`} role="option" aria-selected={false} onMouseDown={(e) => e.preventDefault()} onClick={() => { setEnabled(new Set([c])); setOpen(false); setQuery(''); }} style={resultRow}>
+                  <SlidersHorizontal size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={resultTitle}>{categoryLabel[c]}</span>
+                    <span style={resultSub}>Лише ця категорія</span>
+                  </span>
+                </li>
+              ))}
+              {filterSugs.features.map((f) => (
+                <li key={`ff-${f.key}`} role="option" aria-selected={false} onMouseDown={(e) => e.preventDefault()} onClick={() => { toggleFeature(f.key); setOpen(false); setQuery(''); }} style={resultRow}>
+                  <SlidersHorizontal size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={resultTitle}>{f.label}</span>
+                    <span style={resultSub}>Зручність доступності</span>
+                  </span>
+                </li>
+              ))}
+            </>
+          )}
+          {searching && !hasResults && <li style={resultMuted}>Пошук…</li>}
+          {!searching && !hasResults && <li style={resultMuted}>Нічого не знайдено</li>}
+          {pointHits.length > 0 && <li style={resultHead} aria-hidden>Місця SafeCity</li>}
+          {pointHits.map((p, i) => (
+            <li key={p.id} id={`map-opt-${i}`} role="option" aria-selected={activeIndex === i} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setActiveIndex(i)} onClick={() => void pickPoint(p.id)} style={{ ...resultRow, background: activeIndex === i ? 'var(--sc-primary-tint)' : 'transparent' }}>
+              <MapPinIcon size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
+              <span style={{ minWidth: 0, flex: 1 }}><span style={resultTitle}>{p.name}</span><span style={resultSub}>{categoryLabel[p.category]}{p.address ? ` · ${p.address}` : ''}</span></span>
+              {((s) => (s ? <span style={{ flexShrink: 0, fontSize: '0.8em', fontWeight: 800, color: 'var(--sc-warn)' }}>★ {s.avg.toFixed(1)}</span> : null))(stats[p.id])}
+            </li>
+          ))}
+          {placeHits.length > 0 && <li style={resultHead} aria-hidden>Адреси та місця</li>}
+          {placeHits.map((pl, j) => { const idx = placeBase + j; return (
+            <li key={pl.id} id={`map-opt-${idx}`} role="option" aria-selected={activeIndex === idx} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setActiveIndex(idx)} onClick={() => pickPlace(pl)} style={{ ...resultRow, background: activeIndex === idx ? 'var(--sc-primary-tint)' : 'transparent' }}>
+              <Search size={16} aria-hidden style={{ color: 'var(--sc-muted)', flexShrink: 0 }} />
+              <span style={{ minWidth: 0 }}><span style={resultTitle}>{pl.label.split(',')[0]}</span><span style={resultSub}>{pl.label.split(',').slice(1).join(',').trim()}</span></span>
+            </li>
+          ); })}
+        </ul>
+      )}
+    </>
+  );
+
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column' }}>
-      <AppHeader active="map" />
+      <AppHeader active="map" search={isDesktop ? searchBox : undefined} />
       <main id="main-content" tabIndex={-1} style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <h1 className="sc-sr">Мапа доступних місць</h1>
 
@@ -215,79 +284,12 @@ export default function MapPage() {
           />
         )}
 
-        {/* Floating search (top) */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '0.8em', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-          <div style={{ position: 'relative', width: '100%', maxWidth: 560, pointerEvents: 'auto' }}>
-            <div style={searchWrap}>
-              <Search size={18} aria-hidden style={{ color: 'var(--sc-muted)', flexShrink: 0 }} />
-              <input
-                className="sc-foc" role="combobox" aria-expanded={open && hasResults} aria-controls="map-results" aria-autocomplete="list"
-                aria-activedescendant={activeIndex >= 0 ? `map-opt-${activeIndex}` : undefined}
-                aria-label="Пошук місць або адрес" placeholder="Пошук місць, адрес…" value={query}
-                onChange={(e) => { setQuery(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={onSearchKeyDown} style={searchInput}
-              />
-              {query ? <button type="button" className="sc-foc" aria-label="Очистити" onClick={() => { setQuery(''); setOpen(false); }} style={clearBtn}><X size={16} aria-hidden /></button> : null}
-            </div>
-            {open && query.trim().length >= 2 && (
-              <ul id="map-results" role="listbox" aria-label="Результати пошуку" style={results}>
-                {filterSugs.categories.length + filterSugs.features.length > 0 && (
-                  <>
-                    <li style={resultHead} aria-hidden>Додати фільтр</li>
-                    {filterSugs.categories.map((c) => (
-                      <li
-                        key={`fc-${c}`}
-                        role="option"
-                        aria-selected={false}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => { setEnabled(new Set([c])); setOpen(false); setQuery(''); }}
-                        style={resultRow}
-                      >
-                        <SlidersHorizontal size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
-                        <span style={{ minWidth: 0 }}>
-                          <span style={resultTitle}>{categoryLabel[c]}</span>
-                          <span style={resultSub}>Лише ця категорія</span>
-                        </span>
-                      </li>
-                    ))}
-                    {filterSugs.features.map((f) => (
-                      <li
-                        key={`ff-${f.key}`}
-                        role="option"
-                        aria-selected={false}
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => { toggleFeature(f.key); setOpen(false); setQuery(''); }}
-                        style={resultRow}
-                      >
-                        <SlidersHorizontal size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
-                        <span style={{ minWidth: 0 }}>
-                          <span style={resultTitle}>{f.label}</span>
-                          <span style={resultSub}>Зручність доступності</span>
-                        </span>
-                      </li>
-                    ))}
-                  </>
-                )}
-                {searching && !hasResults && <li style={resultMuted}>Пошук…</li>}
-                {!searching && !hasResults && <li style={resultMuted}>Нічого не знайдено</li>}
-                {pointHits.length > 0 && <li style={resultHead} aria-hidden>Місця SafeCity</li>}
-                {pointHits.map((p, i) => (
-                  <li key={p.id} id={`map-opt-${i}`} role="option" aria-selected={activeIndex === i} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setActiveIndex(i)} onClick={() => void pickPoint(p.id)} style={{ ...resultRow, background: activeIndex === i ? 'var(--sc-primary-tint)' : 'transparent' }}>
-                    <MapPinIcon size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
-                    <span style={{ minWidth: 0, flex: 1 }}><span style={resultTitle}>{p.name}</span><span style={resultSub}>{categoryLabel[p.category]}{p.address ? ` · ${p.address}` : ''}</span></span>
-                    {((s) => (s ? <span style={{ flexShrink: 0, fontSize: '0.8em', fontWeight: 800, color: 'var(--sc-warn)' }}>★ {s.avg.toFixed(1)}</span> : null))(stats[p.id])}
-                  </li>
-                ))}
-                {placeHits.length > 0 && <li style={resultHead} aria-hidden>Адреси та місця</li>}
-                {placeHits.map((pl, j) => { const idx = placeBase + j; return (
-                  <li key={pl.id} id={`map-opt-${idx}`} role="option" aria-selected={activeIndex === idx} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setActiveIndex(idx)} onClick={() => pickPlace(pl)} style={{ ...resultRow, background: activeIndex === idx ? 'var(--sc-primary-tint)' : 'transparent' }}>
-                    <Search size={16} aria-hidden style={{ color: 'var(--sc-muted)', flexShrink: 0 }} />
-                    <span style={{ minWidth: 0 }}><span style={resultTitle}>{pl.label.split(',')[0]}</span><span style={resultSub}>{pl.label.split(',').slice(1).join(',').trim()}</span></span>
-                  </li>
-                ); })}
-              </ul>
-            )}
+        {/* Floating search — mobile only; desktop puts it in the navbar. */}
+        {!isDesktop && (
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '0.8em', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+            <div style={{ position: 'relative', width: '100%', maxWidth: 560, pointerEvents: 'auto' }}>{searchBox}</div>
           </div>
-        </div>
+        )}
 
         {/* Filters popover (top-right) */}
         <div ref={filterRef} style={{ position: 'absolute', right: '0.8em', top: '0.8em' }}>
