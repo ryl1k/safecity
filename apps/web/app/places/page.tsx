@@ -2,8 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Volume2, Square } from 'lucide-react';
-import type { AccessibilityFeature, Category, PointSummary, Rating } from '@safecity/shared';
+import type { AccessibilityFeature, Category, PointSummary } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { SearchBar, Chip, ListRow, LoadingState, ErrorState, EmptyState } from '@/components/ui';
@@ -22,15 +21,8 @@ import {
 import { pointsNear } from '@/lib/points';
 import { reviewStats, type ReviewStat } from '@/lib/reviews';
 import { categoryLabel, distanceLabel, featureSummary } from '@/lib/format';
-import { speak, stopSpeech } from '@/lib/tts';
 
 const LVIV: [number, number] = [24.0316, 49.8419];
-const RATING_WORD: Record<Rating, string> = {
-  full: 'доступно',
-  partial: 'частково доступно',
-  none: 'недоступно',
-  unknown: 'немає даних',
-};
 
 export default function PlacesPage() {
   const router = useRouter();
@@ -42,7 +34,6 @@ export default function PlacesPage() {
   const [categories, setCategories] = useState<Set<Category>>(new Set());
   const [features, setFeatures] = useState<Set<string>>(new Set());
   const [showInaccessible, setShowInaccessible] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
 
   async function load() {
     setStatus('loading');
@@ -63,7 +54,6 @@ export default function PlacesPage() {
   useEffect(() => {
     void load();
   }, []);
-  useEffect(() => () => stopSpeech(), []);
 
   const st: FilterState = { query, categories, features, showInaccessible };
   const filtered = useMemo(
@@ -86,23 +76,6 @@ export default function PlacesPage() {
     if (next.has(val)) next.delete(val);
     else next.add(val);
     return next;
-  }
-
-  function toggleSpeak() {
-    if (speaking) {
-      stopSpeech();
-      setSpeaking(false);
-      return;
-    }
-    const items = filtered.slice(0, 8).map((p, i) => {
-      const summary = featureSummary(p, catalog, 'wheelchair');
-      return `${i + 1}. ${p.name}, ${categoryLabel[p.category]}, ${distanceLabel(p.distanceM)}, ${RATING_WORD[ratingOf(p, catalog)]}${summary ? `, ${summary}` : ''}.`;
-    });
-    setSpeaking(true);
-    speak(`Знайдено ${filtered.length} місць. ${items.join(' ')}`, {
-      onend: () => setSpeaking(false),
-      onerror: () => setSpeaking(false),
-    });
   }
 
   const hasSuggestions = suggestions.categories.length > 0 || suggestions.features.length > 0;
@@ -162,23 +135,9 @@ export default function PlacesPage() {
           </Chip>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>
-          <span aria-live="polite" style={{ color: 'var(--sc-muted)', fontSize: '0.85em' }}>
-            {status === 'ready' ? `${filtered.length} місць` : ''}
-          </span>
-          {status === 'ready' && filtered.length > 0 && (
-            <button
-              type="button"
-              className="sc-foc"
-              onClick={toggleSpeak}
-              aria-label={speaking ? 'Зупинити озвучення' : 'Озвучити знайдені місця'}
-              style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: '0.45em', minHeight: '2.5em', padding: '0 0.9em', borderRadius: '0.7em', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.9em', border: 'var(--sc-bw) solid var(--sc-primary)', background: speaking ? 'var(--sc-primary)' : 'var(--sc-surface)', color: speaking ? 'var(--sc-on-primary)' : 'var(--sc-primary)' }}
-            >
-              {speaking ? <Square size={15} aria-hidden /> : <Volume2 size={15} aria-hidden />}
-              {speaking ? 'Зупинити' : 'Озвучити'}
-            </button>
-          )}
-        </div>
+        <span aria-live="polite" style={{ color: 'var(--sc-muted)', fontSize: '0.85em' }}>
+          {status === 'ready' ? `${filtered.length} місць` : ''}
+        </span>
 
         {status === 'loading' && <LoadingState />}
         {status === 'error' && <ErrorState onRetry={() => void load()} />}

@@ -8,7 +8,6 @@ import { computeRating } from '@safecity/shared';
 import { RatingBadge, ChecklistRow, ReviewItem, Button, LoadingState, ErrorState } from '@/components/ui';
 import { PhotoInput } from '@/components/PhotoInput';
 import { PhotoGallery } from '@/components/PhotoGallery';
-import { useProfile } from '@/profile/ProfileProvider';
 import { getCatalog } from '@/lib/catalog';
 import { pointById } from '@/lib/points';
 import { reviewsFor, addReview, type ReviewRow } from '@/lib/reviews';
@@ -20,9 +19,8 @@ const profileLabel: Record<Profile, string> = { wheelchair: 'Крісло кол
 
 /** The point detail body (no page shell) — reused by /point/[id] and the map modal. */
 export function PointDetailContent({ id, onRouteClick }: { id: string; onRouteClick?: () => void }) {
-  const { primary, needs } = useProfile();
-  // Show ratings only for the user's needs; a guest who never onboarded sees both.
-  const shownProfiles: Profile[] = needs.length ? needs : ['wheelchair', 'blind'];
+  // SafeCity is wheelchair/mobility-focused — only the wheelchair rating is shown.
+  const shownProfiles: Profile[] = ['wheelchair'];
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'notfound'>('loading');
   const [point, setPoint] = useState<PointSummary | null>(null);
@@ -64,9 +62,9 @@ export function PointDetailContent({ id, onRouteClick }: { id: string; onRouteCl
   const applicable = useMemo(() => {
     if (!point) return [];
     return catalog
-      .filter((f) => f.profile === primary && f.categories.includes(point.category))
+      .filter((f) => f.profile === 'wheelchair' && f.categories.includes(point.category))
       .sort((a, b) => Number(b.critical) - Number(a.critical));
-  }, [catalog, point, primary]);
+  }, [catalog, point]);
 
   const reported = useMemo(
     () => (point ? applicable.filter((f) => point.features[f.key] === 'yes' || point.features[f.key] === 'no') : []),
@@ -90,7 +88,7 @@ export function PointDetailContent({ id, onRouteClick }: { id: string; onRouteCl
     setBusy(true);
     try {
       const urls = await uploadPhotos(reviewPhotos, 'reviews');
-      await addReview(id, primary, stars, text, urls);
+      await addReview(id, 'wheelchair', stars, text, urls);
       setReviews(await reviewsFor(id));
       setFormOpen(false);
       setText('');

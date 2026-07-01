@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { SlidersHorizontal, Check } from 'lucide-react';
 import type { ThemeName } from '@safecity/design-tokens';
 import { useTheme } from '@/theme/ThemeProvider';
-import { FontSizeSlider } from '@/components/FontSizeSlider';
 
 const THEMES: { key: ThemeName; label: string }[] = [
   { key: 'standard', label: 'Стандартна' },
@@ -71,10 +70,7 @@ export function AccessibilityMenu() {
               })}
             </div>
 
-            <div style={sectionLabel}>Розмір тексту</div>
-            <FontSizeSlider />
-
-            <Link href="/settings" className="sc-foc" onClick={() => setOpen(false)} style={{ display: 'block', marginTop: '0.9em', color: 'var(--sc-primary)', fontWeight: 700, fontSize: '0.85em', textDecoration: 'none' }}>
+            <Link href="/settings" className="sc-foc" onClick={() => setOpen(false)} style={{ display: 'block', marginTop: '0.2em', color: 'var(--sc-primary)', fontWeight: 700, fontSize: '0.85em', textDecoration: 'none' }}>
               Більше налаштувань →
             </Link>
           </div>

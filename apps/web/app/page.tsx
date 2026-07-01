@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { Accessibility, Eye, SlidersHorizontal, MapPinned, Navigation, Megaphone, type LucideIcon } from 'lucide-react';
+import { SlidersHorizontal, MapPinned, Navigation, Megaphone, type LucideIcon } from 'lucide-react';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { Testimonials } from '@/components/Testimonials';
@@ -8,20 +8,20 @@ import { Reveal } from '@/components/Reveal';
 const STEPS: { n: string; title: string; body: string; Icon: LucideIcon }[] = [
   {
     n: '1',
-    title: 'Налаштуйте під себе',
-    body: 'Оберіть свої потреби — крісло колісне, незрячість або обидві. Інтерфейс умить адаптується: розмір тексту, контраст, озвучення й вібрація, а мапа показує саме те, що важливо вам.',
+    title: 'Створено для мобільності',
+    body: 'Застосунок налаштований для людей на кріслі колісному та з обмеженою мобільністю. Оберіть комфортну тему — мапа показує саме те, що важливо вам.',
     Icon: SlidersHorizontal,
   },
   {
     n: '2',
     title: 'Знаходьте доступні місця',
-    body: 'Кожне місце оцінюється окремо для вашого профілю — колір, форма й підпис показують, чи підходить вам вхід, двері, туалет. Шукайте за назвою чи адресою, фільтруйте за категоріями або слухайте аудіо-список місць поруч.',
+    body: 'Кожне місце оцінюється за доступністю для крісла колісного — вхід, двері, туалет, паркування. Шукайте за назвою чи адресою та фільтруйте за категоріями й зручностями.',
     Icon: MapPinned,
   },
   {
     n: '3',
     title: 'Прокладайте безпечний маршрут',
-    body: 'Маршрути без сходів і з пологими ділянками, що оминають підтверджені бар’єри. Покрокові підказки можна слухати голосом, а поруч на шляху застосунок підкаже доступні місця.',
+    body: 'Маршрути без сходів і з пологими ділянками, що оминають підтверджені бар’єри. Додавайте проміжні зупинки, а поруч на шляху застосунок підкаже доступні місця.',
     Icon: Navigation,
   },
   {
@@ -30,11 +30,6 @@ const STEPS: { n: string; title: string; body: string; Icon: LucideIcon }[] = [
     body: 'Повідомляйте про бар’єри з фото, підтверджуйте чужі повідомлення — і коли набереться достатньо голосів, створюйте петицію до міста та стежте, як проблему усувають.',
     Icon: Megaphone,
   },
-];
-
-const PROFILES: { title: string; body: string; Icon: LucideIcon }[] = [
-  { title: 'Крісло колісне та мобільність', body: 'Візуальна мапа з пін-ами за кольором і формою, маршрути без сходів і з пологими ділянками, доступні туалети й паркування.', Icon: Accessibility },
-  { title: 'Незрячі та слабкозорі', body: 'Аудіо-перший список місць поруч із напрямком за годинником, висока контрастність, великий шрифт, озвучення та вібрація.', Icon: Eye },
 ];
 
 export default function HomePage() {
@@ -94,24 +89,6 @@ export default function HomePage() {
                       <h3 style={{ margin: 0, flex: '1 1 9em', minWidth: 0, fontSize: '1.2em', fontWeight: 800 }}>{s.title}</h3>
                     </div>
                     <p style={{ margin: 0, fontSize: '1em', lineHeight: 1.55, color: 'var(--sc-muted)' }}>{s.body}</p>
-                  </div>
-                </Reveal>
-              ))}
-            </div>
-          </section>
-
-          {/* Two profiles */}
-          <section style={{ marginBottom: '3em' }}>
-            <h2 style={{ fontSize: '1.5em', fontWeight: 800, margin: '0 0 1.2em' }}>Два досвіди, один застосунок</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '1em' }}>
-              {PROFILES.map(({ title, body, Icon }) => (
-                <Reveal key={title}>
-                  <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: '0.7em', height: '100%' }}>
-                    <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '0.6em 0.8em' }}>
-                      <span aria-hidden style={iconSquare}><Icon size={24} /></span>
-                      <h3 style={{ margin: 0, flex: '1 1 9em', minWidth: 0, fontSize: '1.1em', fontWeight: 800 }}>{title}</h3>
-                    </div>
-                    <p style={{ margin: 0, fontSize: '0.92em', lineHeight: 1.5, color: 'var(--sc-muted)' }}>{body}</p>
                   </div>
                 </Reveal>
               ))}
