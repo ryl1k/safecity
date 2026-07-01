@@ -6,7 +6,7 @@ import { Map as MapIcon, List as ListIcon, Megaphone, Plus, CircleUserRound, typ
 import { AccessibilityMenu } from '@/components/AccessibilityMenu';
 import { supabase } from '@/lib/supabase';
 
-export function AppHeader({ active }: { active?: 'map' | 'places' | 'civic' }) {
+export function AppHeader({ active }: { active?: 'map' | 'places' | 'civic' | 'problem' }) {
   const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
@@ -40,7 +40,7 @@ export function AppHeader({ active }: { active?: 'map' | 'places' | 'civic' }) {
         <nav aria-label="Головна навігація" className="sc-header-nav" style={{ display: 'flex', gap: '0.2em', alignItems: 'center', flexWrap: 'wrap' }}>
           <NavLink href="/map" icon={MapIcon} label="Мапа" current={active === 'map'} />
           <NavLink href="/places" icon={ListIcon} label="Місця" current={active === 'places'} />
-          <NavLink href="/civic" icon={Megaphone} label="Громада" current={active === 'civic'} />
+          <NavLink href="/problem/new" icon={Megaphone} label="Повідомити" current={active === 'problem'} />
           <NavLink href="/contribute" icon={Plus} label="Додати" />
         </nav>
 
