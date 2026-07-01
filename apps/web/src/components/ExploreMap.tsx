@@ -199,15 +199,15 @@ export function ExploreMap({
             id: 'clusters', type: 'circle', source: 'pts', filter: ['has', 'point_count'],
             paint: {
               'circle-color': ['step', ['get', 'point_count'], '#0d5b66', 20, '#2563eb', 75, '#7c3aed'],
-              'circle-radius': ['step', ['get', 'point_count'], 15, 20, 21, 75, 28],
-              'circle-stroke-width': 2, 'circle-stroke-color': '#fff', 'circle-opacity': 0.92,
+              'circle-radius': ['step', ['get', 'point_count'], 18, 20, 24, 75, 32],
+              'circle-stroke-width': 2.5, 'circle-stroke-color': '#fff', 'circle-opacity': 0.95,
             },
           });
         }
         if (!map.getLayer('cluster-count')) {
           map.addLayer({
             id: 'cluster-count', type: 'symbol', source: 'pts', filter: ['has', 'point_count'],
-            layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 13 },
+            layout: { 'text-field': ['get', 'point_count_abbreviated'], 'text-font': ['Noto Sans Bold'], 'text-size': 14 },
             paint: { 'text-color': '#fff' },
           });
         }
@@ -216,7 +216,7 @@ export function ExploreMap({
             id: 'pt', type: 'symbol', source: 'pts', filter: ['!', ['has', 'point_count']],
             layout: {
               'icon-image': ['get', 'icon'],
-              'icon-size': 1,
+              'icon-size': 1.3,
               'icon-anchor': 'bottom',
               'icon-allow-overlap': true,
               'text-field': ['step', ['zoom'], '', 15, ['get', 'name']],
@@ -372,9 +372,13 @@ export function ExploreMap({
       if (!dropMarkerRef.current) {
         const el = document.createElement('div');
         el.setAttribute('aria-label', 'Ваша мітка');
-        el.style.cssText =
-          'width:24px;height:24px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);cursor:grab;' +
-          'background:var(--sc-primary);border:2px solid var(--sc-surface);box-shadow:var(--sc-shadow-2);';
+        el.style.cssText = 'cursor:grab;line-height:0;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35));';
+        // A proper downward teardrop pin (distinct rose colour, white centre dot).
+        el.innerHTML =
+          '<svg xmlns="http://www.w3.org/2000/svg" width="32" height="42" viewBox="0 0 40 52">' +
+          '<path d="M20 50C12 38 3 30 3 18A17 17 0 1 1 37 18C37 30 28 38 20 50Z" fill="#e11d48" stroke="#fff" stroke-width="3"/>' +
+          '<circle cx="20" cy="18" r="6.5" fill="#fff"/>' +
+          '</svg>';
         const m = new maplibregl.Marker({ element: el, draggable: true, anchor: 'bottom' })
           .setLngLat([marker.lng, marker.lat])
           .addTo(map);
