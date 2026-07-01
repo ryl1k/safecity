@@ -152,8 +152,13 @@ export default function MapPage() {
       setDropped((d) => (d && d.lng === lng && d.lat === lat ? { ...d, address: addr } : d)),
     );
   }
-  // Enter "place a marker" mode: the next map click drops the pin.
-  function startDrop() { setModalId(null); setPickFromCb(() => (lng: number, lat: number) => dropAt(lng, lat)); }
+  // Drop a marker at the current viewport centre (the map is also click-to-drop).
+  function dropAtCenter() {
+    const b = view ?? lastBbox.current;
+    const lng = b ? (b.minLng + b.maxLng) / 2 : LVIV[0];
+    const lat = b ? (b.minLat + b.maxLat) / 2 : LVIV[1];
+    dropAt(lng, lat);
+  }
   function clearDropped() { setDropped(null); setRouteDir(null); setRouteLine([]); setPickFromCb(null); }
 
   // Picking a search result drops a marker there with its known address (no reverse lookup needed).
@@ -208,7 +213,10 @@ export default function MapPage() {
         ) : (
           <ExploreMap points={markers} problems={problems} center={LVIV} onSelect={setModalId} onSelectProblem={(id) => router.push(`/problem/${id}`)} onMoveEnd={onMoveEnd} focus={focus}
             pickMode={pickFromCb !== null}
-            onMapClick={(lng, lat) => { pickFromCb?.(lng, lat); setPickFromCb(null); }}
+            onMapClick={(lng, lat) => {
+              if (pickFromCb) { pickFromCb(lng, lat); setPickFromCb(null); }
+              else if (!routeDir) dropAt(lng, lat); // plain click drops/moves a pin
+            }}
             line={routeLine}
             marker={dropped ? { lng: dropped.lng, lat: dropped.lat } : null}
             onMarkerMove={dropAt}
@@ -326,10 +334,10 @@ export default function MapPage() {
           {status === 'ready' ? `${matching.length} місць` : '…'}
         </span>
 
-        {/* Place-a-marker button (bottom-left) */}
-        {!dropped && (
-          <button type="button" className="sc-foc" onClick={startDrop} style={dropFab} aria-pressed={pickFromCb !== null}>
-            <MapPinIcon size={16} aria-hidden /> {pickFromCb !== null ? 'Клікніть на мапі…' : 'Поставити мітку'}
+        {/* Place-a-marker button (bottom-centre). The map is also click-to-drop. */}
+        {!modalId && (
+          <button type="button" className="sc-foc" onClick={dropAtCenter} style={dropFab}>
+            <MapPinIcon size={16} aria-hidden /> Поставити мітку
           </button>
         )}
 
@@ -345,9 +353,14 @@ export default function MapPage() {
               {dropped.address ?? 'Визначення адреси…'}
             </p>
             {routeDir === null ? (
-              <div style={{ display: 'flex', gap: '0.6em', flexWrap: 'wrap' }}>
-                <button type="button" className="sc-foc" onClick={() => setRouteDir('to')} style={panelPrimary}>Маршрут сюди</button>
-                <button type="button" className="sc-foc" onClick={() => setRouteDir('from')} style={panelSecondary}>Маршрут звідси</button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6em' }}>
+                <div style={{ display: 'flex', gap: '0.6em', flexWrap: 'wrap' }}>
+                  <button type="button" className="sc-foc" onClick={() => setRouteDir('to')} style={panelPrimary}>Маршрут сюди</button>
+                  <button type="button" className="sc-foc" onClick={() => setRouteDir('from')} style={panelSecondary}>Маршрут звідси</button>
+                </div>
+                <button type="button" className="sc-foc" onClick={() => router.push(`/problem/new?lng=${dropped.lng}&lat=${dropped.lat}&label=${encodeURIComponent(dropped.address ?? '')}`)} style={panelReport}>
+                  Повідомити про проблему
+                </button>
               </div>
             ) : (
               <>
@@ -404,9 +417,10 @@ const resultSub = { display: 'block', fontSize: '0.78em', color: 'var(--sc-muted
 const filterTrigger = { position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '0.4em', minHeight: '2.6em', padding: '0 0.9em', borderRadius: '1.4em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.9em', cursor: 'pointer', boxShadow: 'var(--sc-shadow-2)' } as const;
 const filterBadge = { minWidth: '1.5em', height: '1.5em', borderRadius: '50%', background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontSize: '0.7em', fontWeight: 800, padding: '0 0.3em' } as const;
 const filterPanel = { position: 'absolute', right: 0, top: 'calc(100% + 0.5em)', zIndex: 6, width: 'min(80vw, 240px)', maxHeight: '60vh', overflowY: 'auto', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '0.9em', boxShadow: 'var(--sc-shadow-2)', padding: '0.7em' } as const;
-const dropFab = { position: 'absolute', left: '0.8em', bottom: '0.8em', display: 'inline-flex', alignItems: 'center', gap: '0.4em', minHeight: '2.6em', padding: '0 0.9em', borderRadius: '1.4em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.9em', cursor: 'pointer', boxShadow: 'var(--sc-shadow-2)' } as const;
+const dropFab = { position: 'absolute', left: '50%', transform: 'translateX(-50%)', bottom: '0.8em', display: 'inline-flex', alignItems: 'center', gap: '0.4em', minHeight: '2.6em', padding: '0 0.9em', borderRadius: '1.4em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.9em', cursor: 'pointer', boxShadow: 'var(--sc-shadow-2)' } as const;
 const markerPanel = { position: 'absolute', top: 0, left: 0, height: '100%', width: 'min(420px, 100vw)', zIndex: 55, background: 'var(--sc-bg)', boxShadow: '4px 0 24px rgba(0,0,0,0.18)', overflowY: 'auto', borderRight: 'var(--sc-bw) solid var(--sc-border)', padding: '1.2em 1.4em 2.5em' } as const;
 const panelClose = { flexShrink: 0, width: '2.2em', height: '2.2em', borderRadius: '50%', cursor: 'pointer', border: 'var(--sc-bw) solid var(--sc-border)', background: 'var(--sc-surface)', color: 'var(--sc-text)', display: 'grid', placeItems: 'center' } as const;
 const panelPrimary = { display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em', borderRadius: '0.7em', fontWeight: 800, background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95em' } as const;
 const panelSecondary = { display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em', borderRadius: '0.7em', fontWeight: 800, background: 'var(--sc-surface)', color: 'var(--sc-primary)', border: 'var(--sc-bw) solid var(--sc-primary)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95em' } as const;
+const panelReport = { display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em', borderRadius: '0.7em', fontWeight: 800, background: 'var(--sc-surface)', color: 'var(--sc-bad)', border: 'var(--sc-bw) solid var(--sc-bad)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95em', width: '100%' } as const;
 const panelBack = { background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.9em', padding: 0, marginBottom: '0.8em' } as const;

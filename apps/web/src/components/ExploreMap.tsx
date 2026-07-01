@@ -161,10 +161,20 @@ export function ExploreMap({
         positionOptions: { enableHighAccuracy: true },
         trackUserLocation: true,
         showAccuracyCircle: false, // desktop geolocation is IP-based (~100 km); the blob misleads — keep just the dot
-        fitBoundsOptions: { maxZoom: 16 },
+        fitBoundsOptions: { maxZoom: 15 },
       });
       map.addControl(geolocate, 'bottom-right');
-      // Start where the user stands: auto-locate once, centering on them (falls back to `center` if denied).
+      // The control fits the map to GPS *accuracy*. On a wired PC that accuracy is
+      // ~100 km (IP-based), which yanks the camera way out. Override: on the first
+      // fix, just centre on the user at a normal city zoom — no accuracy fit.
+      let centredOnUser = false;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      geolocate.on('geolocate', (e: any) => {
+        if (centredOnUser) return;
+        centredOnUser = true;
+        map.jumpTo({ center: [e.coords.longitude, e.coords.latitude], zoom: Math.max(map.getZoom(), 15) });
+      });
+      // Start where the user stands: auto-locate once (falls back to `center` if denied).
       map.on('load', () => {
         try {
           geolocate.trigger();
@@ -185,8 +195,9 @@ export function ExploreMap({
       };
       map.on('load', emit);
       map.on('moveend', emit);
+      // Always surface map clicks; the page decides (route-pick vs. drop a marker).
       map.on('click', (e: any) => {
-        if (pickModeRef.current) onMapClickRef.current?.(e.lngLat.lng, e.lngLat.lat);
+        onMapClickRef.current?.(e.lngLat.lng, e.lngLat.lat);
       });
 
       // Re-add route layer after style reload (dark/light mode wipes all sources).
