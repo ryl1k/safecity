@@ -64,6 +64,7 @@ func DefaultRestrictions() Restrictions {
 type RouteInput struct {
 	From         [2]float64 // [lng,lat]
 	To           [2]float64
+	Via          [][2]float64 // optional intermediate waypoints, in order
 	Profile      string
 	Restrictions Restrictions    // applied only for wheelchair
 	Avoid        [][][][]float64 // GeoJSON MultiPolygon coordinates
@@ -151,7 +152,11 @@ func (c *Client) Route(ctx context.Context, in RouteInput) (RouteResult, error) 
 }
 
 func (c *Client) orsCall(ctx context.Context, profile string, in RouteInput) ([]byte, int, error) {
-	payload := map[string]any{"coordinates": [][2]float64{in.From, in.To}}
+	coords := make([][2]float64, 0, len(in.Via)+2)
+	coords = append(coords, in.From)
+	coords = append(coords, in.Via...)
+	coords = append(coords, in.To)
+	payload := map[string]any{"coordinates": coords}
 	options := map[string]any{}
 	if len(in.Avoid) > 0 {
 		options["avoid_polygons"] = map[string]any{"type": "MultiPolygon", "coordinates": in.Avoid}

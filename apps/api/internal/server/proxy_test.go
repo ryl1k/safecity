@@ -38,6 +38,37 @@ func TestRouteOK(t *testing.T) {
 	}
 }
 
+func TestRouteEmptyViaAccepted(t *testing.T) {
+	// The web always sends `via` (an empty array for a 2-point route); the strict
+	// decoder must not reject it as an unknown field.
+	fg := &fakeGeo{route: geo.RouteResult{Profile: "wheelchair"}}
+	rec := postJSON(proxyServer(fg, &fakeStore{}), "/route", `{"from":[24.0,49.8],"to":[24.1,49.9],"via":[],"profile":"wheelchair"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestRouteWithVia(t *testing.T) {
+	// Intermediate stops must be forwarded to the routing engine in order.
+	fg := &fakeGeo{route: geo.RouteResult{Profile: "wheelchair"}}
+	rec := postJSON(proxyServer(fg, &fakeStore{}), "/route",
+		`{"from":[24.0,49.8],"to":[24.1,49.9],"via":[[24.05,49.85]],"profile":"wheelchair"}`)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	if len(fg.gotRoute.Via) != 1 || fg.gotRoute.Via[0] != [2]float64{24.05, 49.85} {
+		t.Fatalf("via = %v, want [[24.05 49.85]]", fg.gotRoute.Via)
+	}
+}
+
+func TestRouteViaOutOfRange(t *testing.T) {
+	rec := postJSON(proxyServer(&fakeGeo{}, &fakeStore{}), "/route",
+		`{"from":[24.0,49.8],"to":[24.1,49.9],"via":[[500,49.85]]}`)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
 func TestRouteBlindUsesFoot(t *testing.T) {
 	fg := &fakeGeo{}
 	postJSON(proxyServer(fg, &fakeStore{}), "/route", `{"from":[24.0,49.8],"to":[24.1,49.9],"profile":"blind"}`)
