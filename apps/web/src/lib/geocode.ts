@@ -19,6 +19,26 @@ interface NominatimRow {
   lat: string;
 }
 
+/** Reverse-geocode coordinates to a human address. Returns null if none found.
+ *  Prefers the Go API (/geocode/reverse); falls back to Nominatim-direct. */
+export async function reverseGeocode(lng: number, lat: number, signal?: AbortSignal): Promise<string | null> {
+  try {
+    if (apiEnabled) {
+      const p = await api.get<GeoPlace>(`/geocode/reverse${qs({ lng, lat })}`, { signal });
+      return p?.label ?? null;
+    }
+    const url =
+      'https://nominatim.openstreetmap.org/reverse' +
+      `?format=jsonv2&lon=${lng}&lat=${lat}&accept-language=uk&zoom=18`;
+    const res = await fetch(url, { signal, headers: { Accept: 'application/json' } });
+    if (!res.ok) return null;
+    const row = (await res.json()) as { display_name?: string };
+    return row.display_name ?? null;
+  } catch {
+    return null; // best-effort — callers fall back to coords
+  }
+}
+
 /** Geocode a free-text place/address query. Returns up to `limit` matches. */
 export async function geocodePlaces(query: string, limit = 5, signal?: AbortSignal): Promise<GeoPlace[]> {
   const q = query.trim();

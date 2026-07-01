@@ -101,6 +101,8 @@ export function ExploreMap({
   pickMode = false,
   onMapClick,
   line,
+  marker,
+  onMarkerMove,
 }: {
   points: ExploreMarker[];
   problems?: ExploreProblem[];
@@ -112,6 +114,8 @@ export function ExploreMap({
   pickMode?: boolean;
   onMapClick?: (lng: number, lat: number) => void;
   line?: [number, number][];
+  marker?: { lng: number; lat: number } | null; // user-dropped pin
+  onMarkerMove?: (lng: number, lat: number) => void; // drag to reposition
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -127,12 +131,16 @@ export function ExploreMap({
   const pickModeRef = useRef(pickMode);
   const onMapClickRef = useRef(onMapClick);
   const lineRef = useRef(line ?? []);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const dropMarkerRef = useRef<any>(null);
+  const onMarkerMoveRef = useRef(onMarkerMove);
   onSelectRef.current = onSelect;
   onSelectProblemRef.current = onSelectProblem;
   onMoveEndRef.current = onMoveEnd;
   pickModeRef.current = pickMode;
   onMapClickRef.current = onMapClick;
   lineRef.current = line ?? [];
+  onMarkerMoveRef.current = onMarkerMove;
 
   // Init map once.
   useEffect(() => {
@@ -149,10 +157,21 @@ export function ExploreMap({
       });
       mapRef.current = map;
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
-      map.addControl(
-        new maplibregl.GeolocateControl({ positionOptions: { enableHighAccuracy: true }, trackUserLocation: true }),
-        'bottom-right',
-      );
+      const geolocate = new maplibregl.GeolocateControl({
+        positionOptions: { enableHighAccuracy: true },
+        trackUserLocation: true,
+        showAccuracyCircle: false, // desktop geolocation is IP-based (~100 km); the blob misleads — keep just the dot
+        fitBoundsOptions: { maxZoom: 16 },
+      });
+      map.addControl(geolocate, 'bottom-right');
+      // Start where the user stands: auto-locate once, centering on them (falls back to `center` if denied).
+      map.on('load', () => {
+        try {
+          geolocate.trigger();
+        } catch {
+          /* geolocation unavailable/denied — stay at the default center */
+        }
+      });
 
       const emit = () => {
         const b = map.getBounds();
@@ -270,6 +289,41 @@ export function ExploreMap({
     };
     if (map.isStyleLoaded()) trySync(); else map.once('load', trySync);
   }, [line]);
+
+  // User-dropped marker: create/move/remove a distinct draggable pin.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const maplibregl = (await import('maplibre-gl')).default;
+      const map = mapRef.current;
+      if (cancelled || !map) return;
+      if (!marker) {
+        dropMarkerRef.current?.remove();
+        dropMarkerRef.current = null;
+        return;
+      }
+      if (!dropMarkerRef.current) {
+        const el = document.createElement('div');
+        el.setAttribute('aria-label', 'Ваша мітка');
+        el.style.cssText =
+          'width:24px;height:24px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);cursor:grab;' +
+          'background:var(--sc-primary);border:2px solid var(--sc-surface);box-shadow:var(--sc-shadow-2);';
+        const m = new maplibregl.Marker({ element: el, draggable: true, anchor: 'bottom' })
+          .setLngLat([marker.lng, marker.lat])
+          .addTo(map);
+        m.on('dragend', () => {
+          const p = m.getLngLat();
+          onMarkerMoveRef.current?.(p.lng, p.lat);
+        });
+        dropMarkerRef.current = m;
+      } else {
+        dropMarkerRef.current.setLngLat([marker.lng, marker.lat]);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [marker]);
 
   // Switch cursor to crosshair when in pick mode.
   useEffect(() => {

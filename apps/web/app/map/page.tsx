@@ -6,13 +6,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { SlidersHorizontal, Check, MapPin as MapPinIcon, Search, X } from 'lucide-react';
 import type { AccessibilityFeature, Category, PointSummary } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
-import { PointDetailModal } from '@/components/PointDetailModal';
+import { PointDetailModal, RouteTabContent } from '@/components/PointDetailModal';
 import { LoadingState } from '@/components/ui';
 import { getCatalog } from '@/lib/catalog';
 import { pointsInBbox, pointById, searchPointsByName, type PointHit } from '@/lib/points';
 import { problemsInBbox, type ProblemMarker } from '@/lib/civic';
 import { reviewStats, type ReviewStat } from '@/lib/reviews';
-import { geocodePlaces, type GeoPlace } from '@/lib/geocode';
+import { geocodePlaces, reverseGeocode, type GeoPlace } from '@/lib/geocode';
 import { declutter, featuresForCategories, isAccessible, suggestFilters } from '@/lib/filters';
 import { categoryLabel } from '@/lib/format';
 
@@ -41,6 +41,8 @@ export default function MapPage() {
   const [view, setView] = useState<Bbox | null>(null);
   const filterRef = useRef<HTMLDivElement>(null);
   const [modalId, setModalId] = useState<string | null>(null);
+  const [dropped, setDropped] = useState<{ lng: number; lat: number; address: string | null } | null>(null);
+  const [routeDir, setRouteDir] = useState<'to' | 'from' | null>(null);
   const [pickFromCb, setPickFromCb] = useState<((lng: number, lat: number) => void) | null>(null);
   const [routeLine, setRouteLine] = useState<[number, number][]>([]);
   const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number } | null>(null);
@@ -140,7 +142,27 @@ export default function MapPage() {
 
   function flyTo(lng: number, lat: number) { nonceRef.current += 1; setFocus({ lng, lat, nonce: nonceRef.current }); }
   async function pickPoint(id: string) { setOpen(false); setQuery(''); const p = await pointById(id).catch(() => null); if (p) flyTo(p.lng, p.lat); setModalId(id); }
-  function pickPlace(place: GeoPlace) { setOpen(false); setQuery(place.label.split(',')[0] ?? ''); flyTo(place.lng, place.lat); }
+
+  // Drop a marker at coords, then resolve its address in the background.
+  function dropAt(lng: number, lat: number) {
+    setRouteDir(null);
+    setModalId(null);
+    setDropped({ lng, lat, address: null });
+    void reverseGeocode(lng, lat).then((addr) =>
+      setDropped((d) => (d && d.lng === lng && d.lat === lat ? { ...d, address: addr } : d)),
+    );
+  }
+  // Enter "place a marker" mode: the next map click drops the pin.
+  function startDrop() { setModalId(null); setPickFromCb(() => (lng: number, lat: number) => dropAt(lng, lat)); }
+  function clearDropped() { setDropped(null); setRouteDir(null); setRouteLine([]); setPickFromCb(null); }
+
+  // Picking a search result drops a marker there with its known address (no reverse lookup needed).
+  function pickPlace(place: GeoPlace) {
+    setOpen(false); setQuery(place.label.split(',')[0] ?? '');
+    setRouteDir(null); setModalId(null);
+    setDropped({ lng: place.lng, lat: place.lat, address: place.label });
+    flyTo(place.lng, place.lat);
+  }
 
   const flat = useMemo(
     () => [...pointHits.map((p) => ({ kind: 'point' as const, p })), ...placeHits.map((pl) => ({ kind: 'place' as const, pl }))],
@@ -188,6 +210,8 @@ export default function MapPage() {
             pickMode={pickFromCb !== null}
             onMapClick={(lng, lat) => { pickFromCb?.(lng, lat); setPickFromCb(null); }}
             line={routeLine}
+            marker={dropped ? { lng: dropped.lng, lat: dropped.lat } : null}
+            onMarkerMove={dropAt}
           />
         )}
 
@@ -302,6 +326,44 @@ export default function MapPage() {
           {status === 'ready' ? `${matching.length} місць` : '…'}
         </span>
 
+        {/* Place-a-marker button (bottom-left) */}
+        {!dropped && (
+          <button type="button" className="sc-foc" onClick={startDrop} style={dropFab} aria-pressed={pickFromCb !== null}>
+            <MapPinIcon size={16} aria-hidden /> {pickFromCb !== null ? 'Клікніть на мапі…' : 'Поставити мітку'}
+          </button>
+        )}
+
+        {/* Dropped-marker panel: address + route actions */}
+        {dropped && !modalId && (
+          <div role="dialog" aria-label="Мітка на мапі" style={markerPanel}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5em', marginBottom: '0.7em' }}>
+              <MapPinIcon size={18} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
+              <strong style={{ flex: 1, minWidth: 0, fontSize: '1.05em' }}>Мітка на мапі</strong>
+              <button type="button" className="sc-foc" aria-label="Закрити" onClick={clearDropped} style={panelClose}><X size={16} aria-hidden /></button>
+            </div>
+            <p style={{ margin: '0 0 1em', fontSize: '0.92em', lineHeight: 1.45, color: 'var(--sc-text)' }}>
+              {dropped.address ?? 'Визначення адреси…'}
+            </p>
+            {routeDir === null ? (
+              <div style={{ display: 'flex', gap: '0.6em', flexWrap: 'wrap' }}>
+                <button type="button" className="sc-foc" onClick={() => setRouteDir('to')} style={panelPrimary}>Маршрут сюди</button>
+                <button type="button" className="sc-foc" onClick={() => setRouteDir('from')} style={panelSecondary}>Маршрут звідси</button>
+              </div>
+            ) : (
+              <>
+                <button type="button" className="sc-foc" onClick={() => { setRouteDir(null); setRouteLine([]); setPickFromCb(null); }} style={panelBack}>← Змінити напрямок</button>
+                <RouteTabContent
+                  seedFrom={routeDir === 'from' ? { coords: [dropped.lng, dropped.lat], label: dropped.address ?? `${dropped.lat.toFixed(5)}, ${dropped.lng.toFixed(5)}` } : undefined}
+                  seedTo={routeDir === 'to' ? { coords: [dropped.lng, dropped.lat], label: dropped.address ?? `${dropped.lat.toFixed(5)}, ${dropped.lng.toFixed(5)}` } : undefined}
+                  onRequestMapPick={(cb) => setPickFromCb(() => cb)}
+                  onCancelMapPick={() => setPickFromCb(null)}
+                  onRouteLine={setRouteLine}
+                />
+              </>
+            )}
+          </div>
+        )}
+
         {modalId && (
           <PointDetailModal
             id={modalId}
@@ -342,3 +404,9 @@ const resultSub = { display: 'block', fontSize: '0.78em', color: 'var(--sc-muted
 const filterTrigger = { position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '0.4em', minHeight: '2.6em', padding: '0 0.9em', borderRadius: '1.4em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.9em', cursor: 'pointer', boxShadow: 'var(--sc-shadow-2)' } as const;
 const filterBadge = { minWidth: '1.5em', height: '1.5em', borderRadius: '50%', background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontSize: '0.7em', fontWeight: 800, padding: '0 0.3em' } as const;
 const filterPanel = { position: 'absolute', right: 0, top: 'calc(100% + 0.5em)', zIndex: 6, width: 'min(80vw, 240px)', maxHeight: '60vh', overflowY: 'auto', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '0.9em', boxShadow: 'var(--sc-shadow-2)', padding: '0.7em' } as const;
+const dropFab = { position: 'absolute', left: '0.8em', bottom: '0.8em', display: 'inline-flex', alignItems: 'center', gap: '0.4em', minHeight: '2.6em', padding: '0 0.9em', borderRadius: '1.4em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.9em', cursor: 'pointer', boxShadow: 'var(--sc-shadow-2)' } as const;
+const markerPanel = { position: 'absolute', top: 0, left: 0, height: '100%', width: 'min(420px, 100vw)', zIndex: 55, background: 'var(--sc-bg)', boxShadow: '4px 0 24px rgba(0,0,0,0.18)', overflowY: 'auto', borderRight: 'var(--sc-bw) solid var(--sc-border)', padding: '1.2em 1.4em 2.5em' } as const;
+const panelClose = { flexShrink: 0, width: '2.2em', height: '2.2em', borderRadius: '50%', cursor: 'pointer', border: 'var(--sc-bw) solid var(--sc-border)', background: 'var(--sc-surface)', color: 'var(--sc-text)', display: 'grid', placeItems: 'center' } as const;
+const panelPrimary = { display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em', borderRadius: '0.7em', fontWeight: 800, background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95em' } as const;
+const panelSecondary = { display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em', borderRadius: '0.7em', fontWeight: 800, background: 'var(--sc-surface)', color: 'var(--sc-primary)', border: 'var(--sc-bw) solid var(--sc-primary)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95em' } as const;
+const panelBack = { background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.9em', padding: 0, marginBottom: '0.8em' } as const;

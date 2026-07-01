@@ -9,7 +9,7 @@ import { problemsInBbox } from '@/lib/civic';
 import { api, apiEnabled } from '@/lib/api';
 import { distanceLabel } from '@/lib/format';
 import { speak, stopSpeech } from '@/lib/tts';
-import { geocodePlaces } from '@/lib/geocode';
+import { geocodePlaces, reverseGeocode } from '@/lib/geocode';
 import type { GeoPlace } from '@/lib/geocode';
 import { PointDetailContent } from './PointDetailContent';
 
@@ -90,13 +90,17 @@ function AddressField({
 }
 
 // ── Route tab content ──────────────────────────────────────────────────────
-function RouteTabContent({
+export function RouteTabContent({
   pointId,
+  seedFrom,
+  seedTo,
   onRequestMapPick,
   onCancelMapPick,
   onRouteLine,
 }: {
-  pointId: string;
+  pointId?: string;
+  seedFrom?: { coords: [number, number]; label: string }; // pre-fill start (e.g. from a dropped marker)
+  seedTo?: { coords: [number, number]; label: string }; // pre-fill destination
   onRequestMapPick?: (cb: (lng: number, lat: number) => void) => void;
   onCancelMapPick?: () => void;
   onRouteLine?: (coords: [number, number][]) => void;
@@ -134,17 +138,22 @@ function RouteTabContent({
   const stepsRef = useRef<Step[]>([]);
   stepsRef.current = steps;
 
-  // Pre-fill TO from destination point
+  // Pre-fill TO: an explicit seed wins; otherwise resolve the destination point.
   useEffect(() => {
+    if (seedTo) { setToCoords(seedTo.coords); setToLabel(seedTo.label); return; }
+    if (!pointId) return;
     pointById(pointId).then((p) => {
       if (!p) return;
       setToCoords([p.lng, p.lat]);
       setToLabel(p.name);
     }).catch(() => {});
-  }, [pointId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pointId, seedTo]);
 
-  // Activate map pick for FROM as soon as tab opens
+  // Seed the start when provided (routing FROM a marker); otherwise prompt the
+  // user to pick the start on the map as soon as the tab opens.
   useEffect(() => {
+    if (seedFrom) { setFromCoords(seedFrom.coords); setFromLabel(seedFrom.label); return; }
     activateMapPick('from');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -164,13 +173,26 @@ function RouteTabContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromCoords, toCoords, stops, primary]);
 
+  // Set a waypoint's coords immediately (with a coord label), then upgrade the
+  // label to a real address once reverse geocoding resolves.
+  function setPoint(field: 'from' | 'to' | number, lng: number, lat: number) {
+    const coordLabel = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    if (field === 'from') { setFromCoords([lng, lat]); setFromLabel(coordLabel); }
+    else if (field === 'to') { setToCoords([lng, lat]); setToLabel(coordLabel); }
+    else setStops((prev) => prev.map((s, i) => (i === field ? { coords: [lng, lat], label: coordLabel } : s)));
+    void reverseGeocode(lng, lat).then((addr) => {
+      if (!addr) return;
+      // Only replace the provisional coord label — never clobber a later edit/pick.
+      if (field === 'from') setFromLabel((cur) => (cur === coordLabel ? addr : cur));
+      else if (field === 'to') setToLabel((cur) => (cur === coordLabel ? addr : cur));
+      else setStops((prev) => prev.map((s) => (s.coords && s.coords[0] === lng && s.coords[1] === lat ? { ...s, label: addr } : s)));
+    });
+  }
+
   function activateMapPick(field: 'from' | 'to' | number) {
     setActiveField(field);
     onRequestMapPick?.((lng, lat) => {
-      const label = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-      if (field === 'from') { setFromCoords([lng, lat]); setFromLabel(label); }
-      else if (field === 'to') { setToCoords([lng, lat]); setToLabel(label); }
-      else { setStops((prev) => prev.map((s, i) => i === field ? { coords: [lng, lat], label } : s)); }
+      setPoint(field, lng, lat);
       setActiveField(null);
     });
   }
@@ -200,8 +222,7 @@ function RouteTabContent({
     const idx = stops.length;
     setActiveField(idx);
     onRequestMapPick?.((lng, lat) => {
-      const label = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
-      setStops((prev) => prev.map((s, i) => i === idx ? { coords: [lng, lat], label } : s));
+      setPoint(idx, lng, lat);
       setActiveField(null);
     });
   }
