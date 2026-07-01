@@ -16,6 +16,8 @@ import { api, apiEnabled } from '@/lib/api';
 import { getCatalog } from '@/lib/catalog';
 import { categoryLabel, distanceLabel } from '@/lib/format';
 import { speak, stopSpeech } from '@/lib/tts';
+import { geocodePlaces } from '@/lib/geocode';
+import type { GeoPlace } from '@/lib/geocode';
 
 const LVIV: [number, number] = [24.0316, 49.8419];
 const MapView = dynamic(() => import('@/components/MapView').then((m) => m.MapView), { ssr: false });
@@ -45,12 +47,105 @@ function avoidSquare(lng: number, lat: number): number[][][] {
   ]];
 }
 
+function FromPicker({ onPick }: { onPick: (coords: [number, number], label: string) => void }) {
+  const [query, setQuery] = useState('');
+  const [results, setResults] = useState<GeoPlace[]>([]);
+  const [searching, setSearching] = useState(false);
+  const [locating, setLocating] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    if (query.length < 3) { setResults([]); return; }
+    abortRef.current?.abort();
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    setSearching(true);
+    geocodePlaces(query, 5, ctrl.signal)
+      .then(setResults)
+      .catch(() => {})
+      .finally(() => setSearching(false));
+    return () => ctrl.abort();
+  }, [query]);
+
+  function useGPS() {
+    setLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        onPick([pos.coords.longitude, pos.coords.latitude], 'Моє місцезнаходження');
+        setLocating(false);
+      },
+      () => { onPick(LVIV, 'Центр Львова'); setLocating(false); },
+      { timeout: 6000 },
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 520, margin: '2em auto 0' }}>
+      <h2 style={{ margin: '0 0 0.6em', fontSize: '1.1em', fontWeight: 800 }}>Звідки прокласти маршрут?</h2>
+      <div style={{ position: 'relative' }}>
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Введіть адресу або місце…"
+          autoFocus
+          style={{
+            width: '100%', boxSizing: 'border-box',
+            padding: '0.75em 1em', borderRadius: '0.7em',
+            border: '2px solid var(--sc-border-strong)',
+            background: 'var(--sc-surface)', color: 'var(--sc-text)',
+            fontFamily: 'inherit', fontSize: '1em',
+          }}
+        />
+        {searching && (
+          <span style={{ position: 'absolute', right: '0.8em', top: '50%', transform: 'translateY(-50%)', color: 'var(--sc-muted)', fontSize: '0.8em' }}>…</span>
+        )}
+        {results.length > 0 && (
+          <ul style={{
+            position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 10,
+            margin: '0.2em 0 0', padding: 0, listStyle: 'none',
+            background: 'var(--sc-surface)', border: '1.5px solid var(--sc-border-strong)',
+            borderRadius: '0.7em', boxShadow: '0 4px 16px rgba(0,0,0,0.12)', overflow: 'hidden',
+          }}>
+            {results.map((r) => (
+              <li key={r.id}>
+                <button
+                  type="button"
+                  onClick={() => onPick([r.lng, r.lat], r.label)}
+                  style={{
+                    width: '100%', textAlign: 'left', padding: '0.65em 1em',
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    fontFamily: 'inherit', fontSize: '0.9em', color: 'var(--sc-text)',
+                    borderBottom: '1px solid var(--sc-border)',
+                  }}
+                >
+                  {r.label}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+      <Button
+        variant="secondary"
+        onClick={useGPS}
+        disabled={locating}
+        style={{ marginTop: '0.8em', width: '100%' }}
+      >
+        {locating ? 'Визначення…' : '📍 Використати моє місцезнаходження'}
+      </Button>
+    </div>
+  );
+}
+
 function RouteInner() {
   const params = useSearchParams();
   const to = params.get('to');
   const { primary } = useProfile();
 
-  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('loading');
+  const [fromCoords, setFromCoords] = useState<[number, number] | null>(null);
+  const [fromLabel, setFromLabel] = useState<string>('');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [dest, setDest] = useState<PointSummary | null>(null);
   const [line, setLine] = useState<[number, number][]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
@@ -64,7 +159,12 @@ function RouteInner() {
   const nearbyRef = useRef<Nearby[]>([]);
   nearbyRef.current = nearby;
 
-  async function plan() {
+  function pickFrom(coords: [number, number], label: string) {
+    setFromCoords(coords);
+    setFromLabel(label);
+  }
+
+  async function plan(start: [number, number]) {
     if (!to) {
       setStatus('error');
       return;
@@ -81,7 +181,6 @@ function RouteInner() {
         return;
       }
       setDest(point);
-      const start = await getStart();
       const dest: [number, number] = [point.lng, point.lat];
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -159,10 +258,11 @@ function RouteInner() {
       .map((p) => ({ id: p.id, name: p.name, category: p.category }));
   }
 
+  // When user picks a start, immediately route
   useEffect(() => {
-    void plan();
+    if (fromCoords) void plan(fromCoords);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [to, primary]);
+  }, [fromCoords, to, primary]);
 
   useEffect(() => () => stopSpeech(), []);
 
@@ -194,86 +294,88 @@ function RouteInner() {
           {primary === 'blind' ? 'Пішохідний маршрут з озвученням' : 'Маршрут без сходів'}
         </p>
 
-        {status === 'loading' && <LoadingState label="Прокладання маршруту" />}
-        {status === 'error' && <ErrorState title="Не вдалося прокласти маршрут" onRetry={() => void plan()} />}
+        {/* Step 1: pick start */}
+        {!fromCoords && <FromPicker onPick={pickFrom} />}
 
-        {status === 'ready' && fallback && (
-          <p role="status" style={{ margin: '0 0 1em', padding: '0.7em 1em', borderRadius: '0.7em', background: 'var(--sc-warn-bg)', color: 'var(--sc-warn)', border: 'var(--sc-bw) solid var(--sc-warn-line)', fontSize: '0.85em', fontWeight: 700 }}>
-            Пішохідний маршрут — детальних даних для крісла колісного на цьому відрізку бракує.
-          </p>
-        )}
+        {/* Step 2: routing in progress / result */}
+        {fromCoords && (
+          <>
+            {/* "from" label + change link */}
+            <p style={{ margin: '0 0 1em', fontSize: '0.88em', color: 'var(--sc-muted)' }}>
+              Від: <strong style={{ color: 'var(--sc-text)' }}>{fromLabel}</strong>{' '}
+              <button
+                type="button"
+                onClick={() => { setFromCoords(null); setStatus('idle'); }}
+                style={{ background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: 'inherit', padding: 0 }}
+              >
+                Змінити
+              </button>
+            </p>
 
-        {status === 'ready' && avoided > 0 && (
-          <p role="status" style={{ margin: '0 0 1em', padding: '0.7em 1em', borderRadius: '0.7em', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', border: 'var(--sc-bw) solid var(--sc-primary)', fontSize: '0.85em', fontWeight: 700 }}>
-            Оминаємо {avoided} підтверджених бар’єр(и) на шляху.
-          </p>
-        )}
+            {status === 'loading' && <LoadingState label="Прокладання маршруту" />}
+            {status === 'error' && <ErrorState title="Не вдалося прокласти маршрут" onRetry={() => void plan(fromCoords)} />}
 
-        {status === 'ready' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '1em' }}>
-            {/* Map on top, full width */}
-            <div style={{ width: '100%', height: 'min(50vh, 420px)', minHeight: 280 }}>
-              <MapView points={[]} center={dest ? [dest.lng, dest.lat] : LVIV} onSelect={() => {}} line={line} />
-            </div>
-
-            {/* Summary + audio, under the map */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>
-              {summary ? (
-                <span style={{ fontWeight: 800 }}>
-                  {distanceLabel(summary.distance)} · {Math.round(summary.duration / 60)} хв
-                </span>
-              ) : null}
-              <Button variant={speaking ? 'secondary' : 'accent'} onClick={toggleSpeak} style={{ marginLeft: 'auto' }}>
-                {speaking ? 'Зупинити' : 'Озвучити'}
-              </Button>
-            </div>
-
-            {/* Accessible points along the way */}
-            {nearby.length > 0 && (
-              <section style={{ background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', padding: '1em 1.2em' }}>
-                <h2 style={{ margin: '0 0 0.5em', fontSize: '1em', fontWeight: 800 }}>Доступні місця поруч на маршруті</h2>
-                <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.4em' }}>
-                  {nearby.map((n) => (
-                    <li key={n.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5em', flexWrap: 'wrap', fontSize: '0.9em' }}>
-                      <span aria-hidden style={{ width: '0.7em', height: '0.7em', borderRadius: '50%', background: 'var(--sc-ok)', flexShrink: 0 }} />
-                      <Link href={`/point/${n.id}`} className="sc-foc" style={{ color: 'var(--sc-primary)', textDecoration: 'underline', fontWeight: 700 }}>{n.name}</Link>
-                      <span style={{ color: 'var(--sc-muted)' }}>· {categoryLabel[n.category]}</span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
+            {status === 'ready' && fallback && (
+              <p role="status" style={{ margin: '0 0 1em', padding: '0.7em 1em', borderRadius: '0.7em', background: 'var(--sc-warn-bg)', color: 'var(--sc-warn)', border: 'var(--sc-bw) solid var(--sc-warn-line)', fontSize: '0.85em', fontWeight: 700 }}>
+                Пішохідний маршрут — детальних даних для крісла колісного на цьому відрізку бракує.
+              </p>
             )}
 
-            {/* Steps */}
-            <ol style={{ listStyle: 'none', margin: 0, padding: 0, background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', overflow: 'hidden' }}>
-              {steps.map((s, i) => (
-                <li key={i} style={{ display: 'flex', gap: '0.7em', padding: '0.7em 0.9em', borderTop: i ? 'var(--sc-bw) solid var(--sc-border)' : 'none' }}>
-                  <span aria-hidden style={{ width: '1.7em', height: '1.7em', flexShrink: 0, borderRadius: '50%', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '0.8em' }}>{i + 1}</span>
-                  <span style={{ flex: 1, minWidth: 0, fontSize: '0.92em' }}>{s.instruction}</span>
-                  <span style={{ color: 'var(--sc-muted)', fontSize: '0.8em', whiteSpace: 'nowrap', flexShrink: 0 }}>{distanceLabel(s.distance)}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
+            {status === 'ready' && avoided > 0 && (
+              <p role="status" style={{ margin: '0 0 1em', padding: '0.7em 1em', borderRadius: '0.7em', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', border: 'var(--sc-bw) solid var(--sc-primary)', fontSize: '0.85em', fontWeight: 700 }}>
+                Оминаємо {avoided} підтверджених бар'єр(и) на шляху.
+              </p>
+            )}
+
+            {status === 'ready' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '1em' }}>
+                <div style={{ width: '100%', height: 'min(50vh, 420px)', minHeight: 280 }}>
+                  <MapView points={[]} center={dest ? [dest.lng, dest.lat] : LVIV} onSelect={() => {}} line={line} />
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>
+                  {summary ? (
+                    <span style={{ fontWeight: 800 }}>
+                      {distanceLabel(summary.distance)} · {Math.round(summary.duration / 60)} хв
+                    </span>
+                  ) : null}
+                  <Button variant={speaking ? 'secondary' : 'accent'} onClick={toggleSpeak} style={{ marginLeft: 'auto' }}>
+                    {speaking ? 'Зупинити' : 'Озвучити'}
+                  </Button>
+                </div>
+
+                {nearby.length > 0 && (
+                  <section style={{ background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', padding: '1em 1.2em' }}>
+                    <h2 style={{ margin: '0 0 0.5em', fontSize: '1em', fontWeight: 800 }}>Доступні місця поруч на маршруті</h2>
+                    <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: '0.4em' }}>
+                      {nearby.map((n) => (
+                        <li key={n.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5em', flexWrap: 'wrap', fontSize: '0.9em' }}>
+                          <span aria-hidden style={{ width: '0.7em', height: '0.7em', borderRadius: '50%', background: 'var(--sc-ok)', flexShrink: 0 }} />
+                          <Link href={`/point/${n.id}`} className="sc-foc" style={{ color: 'var(--sc-primary)', textDecoration: 'underline', fontWeight: 700 }}>{n.name}</Link>
+                          <span style={{ color: 'var(--sc-muted)' }}>· {categoryLabel[n.category]}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
+                )}
+
+                <ol style={{ listStyle: 'none', margin: 0, padding: 0, background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', overflow: 'hidden' }}>
+                  {steps.map((s, i) => (
+                    <li key={i} style={{ display: 'flex', gap: '0.7em', padding: '0.7em 0.9em', borderTop: i ? 'var(--sc-bw) solid var(--sc-border)' : 'none' }}>
+                      <span aria-hidden style={{ width: '1.7em', height: '1.7em', flexShrink: 0, borderRadius: '50%', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '0.8em' }}>{i + 1}</span>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: '0.92em' }}>{s.instruction}</span>
+                      <span style={{ color: 'var(--sc-muted)', fontSize: '0.8em', whiteSpace: 'nowrap', flexShrink: 0 }}>{distanceLabel(s.distance)}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            )}
+          </>
         )}
       </main>
       <Footer />
     </div>
   );
-}
-
-function getStart(): Promise<[number, number]> {
-  return new Promise((resolve) => {
-    if (typeof navigator === 'undefined' || !navigator.geolocation) {
-      resolve(LVIV);
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => resolve([pos.coords.longitude, pos.coords.latitude]),
-      () => resolve(LVIV),
-      { timeout: 4000 },
-    );
-  });
 }
 
 export default function RoutePage() {

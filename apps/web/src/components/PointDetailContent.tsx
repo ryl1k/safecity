@@ -19,7 +19,7 @@ import { categoryLabel } from '@/lib/format';
 const profileLabel: Record<Profile, string> = { wheelchair: 'Крісло колісне', blind: 'Незрячі' };
 
 /** The point detail body (no page shell) — reused by /point/[id] and the map modal. */
-export function PointDetailContent({ id }: { id: string }) {
+export function PointDetailContent({ id, onRouteClick }: { id: string; onRouteClick?: () => void }) {
   const { primary, needs } = useProfile();
   // Show ratings only for the user's needs; a guest who never onboarded sees both.
   const shownProfiles: Profile[] = needs.length ? needs : ['wheelchair', 'blind'];
@@ -123,7 +123,11 @@ export function PointDetailContent({ id }: { id: string }) {
 
       {/* Actions up top */}
       <div style={{ display: 'flex', gap: '0.8em', flexWrap: 'wrap', marginTop: '1.2em' }}>
-        <Link href={`/route?to=${point.id}`} className="sc-foc" style={actionLink('primary')}>Маршрут сюди</Link>
+        {onRouteClick ? (
+          <button type="button" className="sc-foc" onClick={onRouteClick} style={actionLink('primary')}>Маршрут сюди</button>
+        ) : (
+          <Link href={`/route?to=${point.id}`} className="sc-foc" style={actionLink('primary')}>Маршрут сюди</Link>
+        )}
         <Link href={`/problem/new?point=${point.id}`} className="sc-foc" style={actionLink('danger')}>Повідомити про проблему</Link>
       </div>
 

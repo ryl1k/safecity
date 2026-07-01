@@ -21,7 +21,7 @@ const CATEGORIES: Category[] = ['venue', 'transit', 'crossing', 'toilet', 'parki
 
 const ExploreMap = dynamic(() => import('@/components/ExploreMap').then((m) => m.ExploreMap), { ssr: false });
 
-interface Bbox { minLng: number; minLat: number; maxLng: number; maxLat: number }
+interface Bbox { minLng: number; minLat: number; maxLng: number; maxLat: number; zoom?: number }
 
 // Whole-Lviv bounding box — loaded once so panning never changes the point set.
 const LVIV_BBOX: Bbox = { minLng: 23.85, minLat: 49.74, maxLng: 24.22, maxLat: 49.96 };
@@ -39,7 +39,10 @@ export default function MapPage() {
   const [problems, setProblems] = useState<ProblemMarker[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [view, setView] = useState<Bbox | null>(null);
+  const filterRef = useRef<HTMLDivElement>(null);
   const [modalId, setModalId] = useState<string | null>(null);
+  const [pickFromCb, setPickFromCb] = useState<((lng: number, lat: number) => void) | null>(null);
+  const [routeLine, setRouteLine] = useState<[number, number][]>([]);
   const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number } | null>(null);
   const lastBbox = useRef<Bbox | null>(null);
   const loadedBboxRef = useRef<Bbox | null>(null);
@@ -161,6 +164,17 @@ export default function MapPage() {
   function toggleFeature(id: string) { setFeatures((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
   const activeFilters = (showInaccessible ? 1 : 0) + features.size + (showProblems ? 1 : 0) + (CATEGORIES.length - enabled.size);
 
+  useEffect(() => {
+    if (!filtersOpen) return;
+    function onClickOutside(e: MouseEvent) {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setFiltersOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', onClickOutside);
+    return () => document.removeEventListener('mousedown', onClickOutside);
+  }, [filtersOpen]);
+
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="map" />
@@ -170,7 +184,11 @@ export default function MapPage() {
         {status === 'error' ? (
           <div style={{ padding: '2em 1.25em' }}><LoadingState label="Повторне завантаження…" /></div>
         ) : (
-          <ExploreMap points={markers} problems={problems} center={LVIV} onSelect={setModalId} onSelectProblem={(id) => router.push(`/problem/${id}`)} onMoveEnd={onMoveEnd} focus={focus} />
+          <ExploreMap points={markers} problems={problems} center={LVIV} onSelect={setModalId} onSelectProblem={(id) => router.push(`/problem/${id}`)} onMoveEnd={onMoveEnd} focus={focus}
+            pickMode={pickFromCb !== null}
+            onMapClick={(lng, lat) => { pickFromCb?.(lng, lat); setPickFromCb(null); }}
+            line={routeLine}
+          />
         )}
 
         {/* Floating search (top) */}
@@ -247,8 +265,8 @@ export default function MapPage() {
           </div>
         </div>
 
-        {/* Filters popover (bottom-left) — scales to any number of categories */}
-        <div style={{ position: 'absolute', left: '0.8em', bottom: '0.8em' }}>
+        {/* Filters popover (top-right) */}
+        <div ref={filterRef} style={{ position: 'absolute', right: '0.8em', top: '0.8em' }}>
           <button
             type="button" className="sc-foc" aria-haspopup="dialog" aria-expanded={filtersOpen}
             onClick={() => setFiltersOpen((o) => !o)} style={filterTrigger}
@@ -258,7 +276,6 @@ export default function MapPage() {
           </button>
           {filtersOpen && (
             <>
-              <div onClick={() => setFiltersOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 5 }} aria-hidden />
               <div role="dialog" aria-label="Фільтри мапи" style={filterPanel}>
                 <ToggleRow checked={showInaccessible} onChange={() => setShowInaccessible((v) => !v)} label="Показати недоступні" />
                 <ToggleRow checked={showProblems} onChange={() => setShowProblems((v) => !v)} label="Показати проблеми" />
@@ -284,9 +301,17 @@ export default function MapPage() {
         <span aria-live="polite" style={{ position: 'absolute', right: '0.8em', bottom: '0.8em', fontSize: '0.8em', fontWeight: 700, color: 'var(--sc-text)', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', padding: '0.3em 0.7em', boxShadow: 'var(--sc-shadow-1)' }}>
           {status === 'ready' ? `${matching.length} місць` : '…'}
         </span>
-      </main>
 
-      {modalId && <PointDetailModal id={modalId} onClose={() => setModalId(null)} />}
+        {modalId && (
+          <PointDetailModal
+            id={modalId}
+            onClose={() => { setModalId(null); setPickFromCb(null); setRouteLine([]); }}
+            onRequestMapPick={(cb) => setPickFromCb(() => cb)}
+            onCancelMapPick={() => setPickFromCb(null)}
+            onRouteLine={setRouteLine}
+          />
+        )}
+      </main>
     </div>
   );
 }
@@ -316,4 +341,4 @@ const resultTitle = { display: 'block', fontWeight: 700, fontSize: '0.92em', whi
 const resultSub = { display: 'block', fontSize: '0.78em', color: 'var(--sc-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } as const;
 const filterTrigger = { position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '0.4em', minHeight: '2.6em', padding: '0 0.9em', borderRadius: '1.4em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.9em', cursor: 'pointer', boxShadow: 'var(--sc-shadow-2)' } as const;
 const filterBadge = { minWidth: '1.5em', height: '1.5em', borderRadius: '50%', background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontSize: '0.7em', fontWeight: 800, padding: '0 0.3em' } as const;
-const filterPanel = { position: 'absolute', left: 0, bottom: 'calc(100% + 0.5em)', zIndex: 6, width: 'min(80vw, 240px)', maxHeight: '60vh', overflowY: 'auto', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '0.9em', boxShadow: 'var(--sc-shadow-2)', padding: '0.7em' } as const;
+const filterPanel = { position: 'absolute', right: 0, top: 'calc(100% + 0.5em)', zIndex: 6, width: 'min(80vw, 240px)', maxHeight: '60vh', overflowY: 'auto', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '0.9em', boxShadow: 'var(--sc-shadow-2)', padding: '0.7em' } as const;

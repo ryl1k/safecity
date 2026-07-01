@@ -37,6 +37,7 @@ export interface Bbox {
   minLat: number;
   maxLng: number;
   maxLat: number;
+  zoom: number;
 }
 
 function basemapStyle(dark: boolean) {
@@ -97,6 +98,9 @@ export function ExploreMap({
   onSelectProblem,
   onMoveEnd,
   focus,
+  pickMode = false,
+  onMapClick,
+  line,
 }: {
   points: ExploreMarker[];
   problems?: ExploreProblem[];
@@ -105,6 +109,9 @@ export function ExploreMap({
   onSelectProblem?: (id: string) => void;
   onMoveEnd?: (b: Bbox) => void;
   focus?: { lng: number; lat: number; nonce: number } | null;
+  pickMode?: boolean;
+  onMapClick?: (lng: number, lat: number) => void;
+  line?: [number, number][];
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -117,9 +124,15 @@ export function ExploreMap({
   const onSelectRef = useRef(onSelect);
   const onSelectProblemRef = useRef(onSelectProblem);
   const onMoveEndRef = useRef(onMoveEnd);
+  const pickModeRef = useRef(pickMode);
+  const onMapClickRef = useRef(onMapClick);
+  const lineRef = useRef(line ?? []);
   onSelectRef.current = onSelect;
   onSelectProblemRef.current = onSelectProblem;
   onMoveEndRef.current = onMoveEnd;
+  pickModeRef.current = pickMode;
+  onMapClickRef.current = onMapClick;
+  lineRef.current = line ?? [];
 
   // Init map once.
   useEffect(() => {
@@ -143,10 +156,29 @@ export function ExploreMap({
 
       const emit = () => {
         const b = map.getBounds();
-        onMoveEndRef.current?.({ minLng: b.getWest(), minLat: b.getSouth(), maxLng: b.getEast(), maxLat: b.getNorth() });
+        onMoveEndRef.current?.({
+          minLng: b.getWest(),
+          minLat: b.getSouth(),
+          maxLng: b.getEast(),
+          maxLat: b.getNorth(),
+          zoom: map.getZoom(),
+        });
       };
       map.on('load', emit);
       map.on('moveend', emit);
+      map.on('click', (e: any) => {
+        if (pickModeRef.current) onMapClickRef.current?.(e.lngLat.lng, e.lngLat.lat);
+      });
+
+      // Re-add route layer after style reload (dark/light mode wipes all sources).
+      map.on('style.load', () => {
+        const coords = lineRef.current;
+        if (coords.length < 2) return;
+        try {
+          map.addSource('sc-route', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } } });
+          map.addLayer({ id: 'sc-route', type: 'line', source: 'sc-route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#2563eb', 'line-width': 5, 'line-opacity': 0.85 } });
+        } catch {}
+      });
 
       observerRef.current = new MutationObserver(() => {
         const d = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -219,6 +251,31 @@ export function ExploreMap({
       cancelled = true;
     };
   }, [problems]);
+
+  // Draw / update the route line on the real map.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    const coords = line ?? [];
+    const geojson: any = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } };
+    const trySync = () => {
+      try {
+        if (map.getSource('sc-route')) {
+          (map.getSource('sc-route') as any).setData(geojson);
+        } else if (coords.length >= 2) {
+          map.addSource('sc-route', { type: 'geojson', data: geojson });
+          map.addLayer({ id: 'sc-route', type: 'line', source: 'sc-route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#2563eb', 'line-width': 5, 'line-opacity': 0.85 } });
+        }
+      } catch {}
+    };
+    if (map.isStyleLoaded()) trySync(); else map.once('load', trySync);
+  }, [line]);
+
+  // Switch cursor to crosshair when in pick mode.
+  useEffect(() => {
+    const canvas = mapRef.current?.getCanvas() as HTMLCanvasElement | undefined;
+    if (canvas) canvas.style.cursor = pickMode ? 'crosshair' : '';
+  }, [pickMode]);
 
   // Fly to a chosen search result.
   useEffect(() => {
