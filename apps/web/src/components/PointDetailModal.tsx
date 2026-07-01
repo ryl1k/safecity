@@ -137,6 +137,7 @@ export function RouteTabContent({
   const [speaking, setSpeaking] = useState(false);
   const stepsRef = useRef<Step[]>([]);
   stepsRef.current = steps;
+  const lastPlanKey = useRef<string>(''); // dedupes auto-routing against re-renders
 
   // Pre-fill TO: an explicit seed wins; otherwise resolve the destination point.
   useEffect(() => {
@@ -164,12 +165,18 @@ export function RouteTabContent({
   useEffect(() => { onRouteLine?.(line); }, [line, onRouteLine]);
   useEffect(() => () => { onRouteLine?.([]); }, [onRouteLine]);
 
-  // Auto-route when all waypoints are ready (from + all stops filled + to)
+  // Auto-route when all waypoints are ready (from + all stops filled + to).
+  // Dedupe by the actual waypoint set so re-renders can't fire a storm of
+  // identical /route requests (which previously rate-limited ORS).
   useEffect(() => {
     if (!fromCoords || !toCoords) return;
     if (stops.some((s) => !s.coords)) return;
     const via = stops.map((s) => s.coords!);
-    void plan([fromCoords, ...via, toCoords]);
+    const wps = [fromCoords, ...via, toCoords];
+    const key = `${primary}|${JSON.stringify(wps)}`;
+    if (key === lastPlanKey.current) return;
+    lastPlanKey.current = key;
+    void plan(wps);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromCoords, toCoords, stops, primary]);
 
