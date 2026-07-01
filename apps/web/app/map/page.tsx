@@ -13,7 +13,7 @@ import { pointsInBbox, pointById, searchPointsByName, type PointHit } from '@/li
 import { problemsInBbox, type ProblemMarker } from '@/lib/civic';
 import { reviewStats, type ReviewStat } from '@/lib/reviews';
 import { geocodePlaces, reverseGeocode, type GeoPlace } from '@/lib/geocode';
-import { declutter, featuresForCategories, isAccessible, suggestFilters } from '@/lib/filters';
+import { featuresForCategories, isAccessible, suggestFilters } from '@/lib/filters';
 import { categoryLabel } from '@/lib/format';
 
 const LVIV: [number, number] = [24.0316, 49.8419];
@@ -38,7 +38,6 @@ export default function MapPage() {
   const [showProblems, setShowProblems] = useState(false);
   const [problems, setProblems] = useState<ProblemMarker[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [view, setView] = useState<Bbox | null>(null);
   const filterRef = useRef<HTMLDivElement>(null);
   const [modalId, setModalId] = useState<string | null>(null);
   const [dropped, setDropped] = useState<{ lng: number; lat: number; address: string | null } | null>(null);
@@ -76,7 +75,6 @@ export default function MapPage() {
 
   function onMoveEnd(b: Bbox) {
     lastBbox.current = b;
-    setView(b); // re-declutter from the already-loaded points — no fetch while covered
     const loaded = loadedBboxRef.current;
     const covered =
       !!loaded && b.minLng >= loaded.minLng && b.maxLng <= loaded.maxLng && b.minLat >= loaded.minLat && b.maxLat <= loaded.maxLat;
@@ -140,12 +138,6 @@ export default function MapPage() {
     [dropped],
   );
 
-  // Decluttered subset actually drawn — one per grid cell, accessible ones win.
-  const markers = useMemo(
-    // pad 0.6 → render ~0.6 screen of buffer beyond each edge so pins glide in on pan.
-    () => (view ? declutter(matching, view, 9, (m) => (m.accessible ? 1 : 0), 0.6) : matching.slice(0, 80)),
-    [matching, view],
-  );
 
   function flyTo(lng: number, lat: number) { nonceRef.current += 1; setFocus({ lng, lat, nonce: nonceRef.current }); }
   async function pickPoint(id: string) { setOpen(false); setQuery(''); const p = await pointById(id).catch(() => null); if (p) flyTo(p.lng, p.lat); setModalId(id); }
@@ -211,7 +203,7 @@ export default function MapPage() {
         {status === 'error' ? (
           <div style={{ padding: '2em 1.25em' }}><LoadingState label="Повторне завантаження…" /></div>
         ) : (
-          <ExploreMap points={markers} problems={problems} center={LVIV} onSelect={setModalId} onSelectProblem={(id) => router.push(`/problem/${id}`)} onMoveEnd={onMoveEnd} focus={focus}
+          <ExploreMap points={matching} problems={problems} center={LVIV} onSelect={setModalId} onSelectProblem={(id) => router.push(`/problem/${id}`)} onMoveEnd={onMoveEnd} focus={focus}
             pickMode={pickFromCb !== null}
             onMapClick={(lng, lat) => {
               if (pickFromCb) { pickFromCb(lng, lat); setPickFromCb(null); }
