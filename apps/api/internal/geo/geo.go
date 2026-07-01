@@ -306,6 +306,55 @@ func (c *Client) Geocode(ctx context.Context, query string, limit int) ([]Place,
 	return places, nil
 }
 
+// Reverse resolves coordinates to a single nearby address (cached). Returns nil
+// when Nominatim has no result for the spot (e.g. open water).
+func (c *Client) Reverse(ctx context.Context, lng, lat float64) (*Place, error) {
+	cacheKey := fmt.Sprintf("rev:%.5f,%.5f", lng, lat)
+	if v, ok := c.geoCache.get(cacheKey); ok {
+		if len(v) == 0 {
+			return nil, nil
+		}
+		return &v[0], nil
+	}
+
+	u := fmt.Sprintf("%s/reverse?format=jsonv2&lon=%s&lat=%s&accept-language=uk&zoom=18",
+		c.nominatimURL,
+		strconv.FormatFloat(lng, 'f', -1, 64), strconv.FormatFloat(lat, 'f', -1, 64))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", userAgent) // required by Nominatim policy
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("nominatim reverse request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("nominatim reverse status %d", resp.StatusCode)
+	}
+	var row struct {
+		PlaceID int    `json:"place_id"`
+		Display string `json:"display_name"`
+		Lon     string `json:"lon"`
+		Lat     string `json:"lat"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&row); err != nil {
+		return nil, fmt.Errorf("decode nominatim reverse: %w", err)
+	}
+	if strings.TrimSpace(row.Display) == "" {
+		c.geoCache.set(cacheKey, []Place{}) // cache the "no result" too
+		return nil, nil
+	}
+	rlng, _ := strconv.ParseFloat(row.Lon, 64)
+	rlat, _ := strconv.ParseFloat(row.Lat, 64)
+	p := Place{ID: fmt.Sprintf("osm-%d", row.PlaceID), Label: row.Display, Lng: rlng, Lat: rlat}
+	c.geoCache.set(cacheKey, []Place{p})
+	return &p, nil
+}
+
 func truncate(s string, n int) string {
 	if len(s) > n {
 		return s[:n] + "…"

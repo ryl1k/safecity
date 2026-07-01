@@ -125,3 +125,24 @@ func (s *Server) handleGeocode(w http.ResponseWriter, r *http.Request) {
 	}
 	httpx.JSON(w, http.StatusOK, places)
 }
+
+// handleReverseGeocode: GET /geocode/reverse?lng=&lat= — coords → nearest address.
+func (s *Server) handleReverseGeocode(w http.ResponseWriter, r *http.Request) {
+	lng, okLng := floatQuery(r.URL.Query().Get("lng"))
+	lat, okLat := floatQuery(r.URL.Query().Get("lat"))
+	if !okLng || !okLat || !validLngLat(lng, lat) {
+		httpx.Error(w, http.StatusBadRequest, "invalid_query", "lng and lat are required numbers in range")
+		return
+	}
+	place, err := s.geo.Reverse(r.Context(), lng, lat)
+	if err != nil {
+		s.log.Error("reverse geocode", "err", err)
+		httpx.Error(w, http.StatusBadGateway, "upstream_error", "reverse geocoding failed")
+		return
+	}
+	if place == nil {
+		httpx.Error(w, http.StatusNotFound, "not_found", "no address for this location")
+		return
+	}
+	httpx.JSON(w, http.StatusOK, place)
+}

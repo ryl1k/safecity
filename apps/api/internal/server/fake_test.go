@@ -126,6 +126,11 @@ type fakeGeo struct {
 	gotGeoLimit int
 	places      []geo.Place
 	geoErr      error
+
+	gotRevLng float64
+	gotRevLat float64
+	reverse   *geo.Place
+	revErr    error
 }
 
 func (f *fakeGeo) Route(_ context.Context, in geo.RouteInput) (geo.RouteResult, error) {
@@ -137,4 +142,9 @@ func (f *fakeGeo) Geocode(_ context.Context, query string, limit int) ([]geo.Pla
 	f.gotGeoQuery = query
 	f.gotGeoLimit = limit
 	return f.places, f.geoErr
+}
+
+func (f *fakeGeo) Reverse(_ context.Context, lng, lat float64) (*geo.Place, error) {
+	f.gotRevLng, f.gotRevLat = lng, lat
+	return f.reverse, f.revErr
 }

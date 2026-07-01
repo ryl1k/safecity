@@ -139,6 +139,38 @@ func TestGeocodeOK(t *testing.T) {
 	}
 }
 
+func TestReverseGeocodeOK(t *testing.T) {
+	fg := &fakeGeo{reverse: &geo.Place{ID: "osm-9", Label: "вул. Ринок, Львів", Lng: 24.03, Lat: 49.84}}
+	rec := httptest.NewRecorder()
+	proxyServer(fg, &fakeStore{}).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/geocode/reverse?lng=24.03&lat=49.84", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
+	}
+	if fg.gotRevLng != 24.03 || fg.gotRevLat != 49.84 {
+		t.Fatalf("geo got lng=%v lat=%v", fg.gotRevLng, fg.gotRevLat)
+	}
+	if !strings.Contains(rec.Body.String(), "Ринок") {
+		t.Fatalf("body = %s", rec.Body.String())
+	}
+}
+
+func TestReverseGeocodeNoResult(t *testing.T) {
+	fg := &fakeGeo{reverse: nil} // Nominatim had nothing (e.g. open water)
+	rec := httptest.NewRecorder()
+	proxyServer(fg, &fakeStore{}).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/geocode/reverse?lng=24.03&lat=49.84", nil))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", rec.Code)
+	}
+}
+
+func TestReverseGeocodeBadQuery(t *testing.T) {
+	rec := httptest.NewRecorder()
+	proxyServer(&fakeGeo{}, &fakeStore{}).Handler().ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/geocode/reverse?lng=999&lat=49.84", nil))
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want 400", rec.Code)
+	}
+}
+
 func TestGeocodeUpstreamError(t *testing.T) {
 	fg := &fakeGeo{geoErr: io.ErrUnexpectedEOF}
 	rec := httptest.NewRecorder()

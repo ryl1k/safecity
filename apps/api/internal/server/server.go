@@ -47,6 +47,7 @@ type DataStore interface {
 type GeoService interface {
 	Route(ctx context.Context, in geo.RouteInput) (geo.RouteResult, error)
 	Geocode(ctx context.Context, query string, limit int) ([]geo.Place, error)
+	Reverse(ctx context.Context, lng, lat float64) (*geo.Place, error)
 }
 
 // Deps are the dependencies wired into the server. Log is required; the rest are
@@ -139,6 +140,7 @@ func (s *Server) routes() {
 			s.limited(r)
 			r.Post("/route", s.handleRoute)
 			r.Get("/geocode", s.handleGeocode)
+			r.Get("/geocode/reverse", s.handleReverseGeocode)
 		})
 	}
 
