@@ -39,12 +39,17 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     (async () => {
       try {
+        // SafeCity is wheelchair/mobility-only now — coerce any legacy 'blind'
+        // value picked before the refactor so old installs don't dead-end.
         const p = await AsyncStorage.getItem(PRIMARY_KEY);
-        if (isProfile(p)) setPrimaryState(p);
+        if (isProfile(p)) setPrimaryState(p === 'blind' ? 'wheelchair' : p);
         const raw = await AsyncStorage.getItem(NEEDS_KEY);
         if (raw) {
           const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) setNeedsState(parsed.filter(isProfile));
+          if (Array.isArray(parsed)) {
+            const coerced = parsed.filter(isProfile).map((x) => (x === 'blind' ? 'wheelchair' : x));
+            setNeedsState(Array.from(new Set(coerced)));
+          }
         }
       } catch {
         // first run — defaults are fine

@@ -7,12 +7,5 @@ export const radii = { sm: 6, md: 10, lg: 14, pill: 999 } as const;
 export const fontSize = { display: 32, heading: 22, title: 18, body: 16, caption: 13 } as const;
 
 export { rating as ratingMeta, categoryShape, fontFamily };
-export {
-  ThemeProvider,
-  useTheme,
-  clampScale,
-  MIN_SCALE,
-  MAX_SCALE,
-  DEFAULT_SCALE,
-} from './ThemeProvider';
+export { ThemeProvider, useTheme } from './ThemeProvider';
 export type { ThemeName, Palette } from '@safecity/design-tokens';

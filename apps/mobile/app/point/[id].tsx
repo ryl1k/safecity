@@ -16,14 +16,16 @@ import { pointById } from '@/lib/points';
 import { addReview, reviewsFor, type ReviewRow } from '@/lib/reviews';
 import { uploadPhotos } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
-import { useProfile } from '@/state/ProfileProvider';
 import { radii, space, useTheme } from '@/theme/theme';
+
+// SafeCity is wheelchair/mobility-only — ratings, criteria and reviews are all
+// scoped to the wheelchair profile (no per-profile toggle).
+const PROFILE = 'wheelchair' as const;
 
 export default function PointDetail() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { palette, baseScale } = useTheme();
-  const { primary } = useProfile();
 
   const [point, setPoint] = useState<PointSummary | null>(null);
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
@@ -78,7 +80,7 @@ export default function PointDetail() {
     setSaving(true);
     try {
       const photoUrls = await uploadPhotos(photos, 'reviews');
-      await addReview(id, primary, stars, text.trim(), photoUrls);
+      await addReview(id, PROFILE, stars, text.trim(), photoUrls);
       successFeedback();
       setReviews(await reviewsFor(id));
       setFormOpen(false);
@@ -122,9 +124,9 @@ export default function PointDetail() {
     );
   }
 
-  const rating = computeRating(point.features, catalog, point.category, primary);
+  const rating = computeRating(point.features, catalog, point.category, PROFILE);
   const applicable = catalog
-    .filter((f) => f.profile === primary && f.categories.includes(point.category))
+    .filter((f) => f.profile === PROFILE && f.categories.includes(point.category))
     .sort((a, b) => Number(b.critical) - Number(a.critical));
   const critical = applicable.filter((f) => f.critical);
   const shown = showAll ? applicable : critical;
