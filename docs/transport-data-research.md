@@ -41,7 +41,30 @@
   GTFS-RT `VehicleDescriptor.wheelchair_accessible` field is the only per-vehicle hope,
   worth checking in the realtime feed during service hours.
 
-## Proposed implementation (next step)
+## SOLVED: journey planning via Transitous (verified 2026-07-03)
+
+**[Transitous](https://transitous.org)** — a free, community-run MOTIS routing API
+(`api.transitous.org`, no key) — already imports **Lviv's GTFS (static + both
+realtime feeds), Ukrzaliznytsia rail, Odesa and Stryi**. Verified live:
+
+- `GET /api/v3/plan?fromPlace=lat,lng&toPlace=lat,lng` returns real Lviv
+  itineraries (walk → tram/bus → walk, with transfers).
+- `pedestrianProfile=WHEELCHAIR` routes the walking legs for wheelchairs.
+- Every transit leg carries **`wheelchairAccessible: ACCESSIBLE | NOT_ACCESSIBLE`**
+  — sourced from the same GTFS trip flags we validated (Т08/А53 → ACCESSIBLE,
+  Т04 → NOT_ACCESSIBLE). The app can prefer/filter fully accessible itineraries
+  and badge each leg.
+- Legs include polyline geometry for map drawing; realtime delays included.
+- Caveats: community fair-use service (no SLA); origin coords occasionally fail
+  to snap in pedestrian zones (nudge to the nearest stop as fallback); coverage
+  of other Ukrainian cities depends on Transitous adding their feeds.
+
+**Integration plan:** add a «Транспортом» mode to the route panel → call
+Transitous plan with `pedestrianProfile=WHEELCHAIR` → sort itineraries by
+"all transit legs accessible" first → render legs with route badges +
+accessibility markers + line geometry on the map.
+
+## Earlier proposed implementation (stops/lines import — still useful later)
 
 1. **Importer** `tooling/importers/gtfs-transport.mjs`:
    read static.zip → per stop: name, lng/lat, list of serving routes with
