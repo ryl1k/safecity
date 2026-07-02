@@ -15,19 +15,19 @@ import { reviewStats, type ReviewStat } from '@/lib/reviews';
 import { geocodePlaces, reverseGeocode, type GeoPlace } from '@/lib/geocode';
 import { featuresForCategories, isAccessible, suggestFilters } from '@/lib/filters';
 import { categoryLabel } from '@/lib/format';
+import { CITIES, DEFAULT_CITY_ID, cityBbox, cityById, loadCity, saveCity, type City } from '@/lib/cities';
 
-const LVIV: [number, number] = [24.0316, 49.8419];
 const CATEGORIES: Category[] = ['venue', 'transit', 'crossing', 'toilet', 'parking'];
 
 const ExploreMap = dynamic(() => import('@/components/ExploreMap').then((m) => m.ExploreMap), { ssr: false });
 
 interface Bbox { minLng: number; minLat: number; maxLng: number; maxLat: number; zoom?: number }
 
-// Whole-Lviv bounding box — loaded once so panning never changes the point set.
-const LVIV_BBOX: Bbox = { minLng: 23.85, minLat: 49.74, maxLng: 24.22, maxLat: 49.96 };
-
 export default function MapPage() {
   const router = useRouter();
+  // Selected city (persisted). SSR renders the default; the stored city is
+  // synced on mount to avoid a hydration mismatch.
+  const [city, setCityState] = useState<City>(() => cityById(DEFAULT_CITY_ID));
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
   const [points, setPoints] = useState<PointSummary[]>([]);
@@ -44,7 +44,7 @@ export default function MapPage() {
   const [routeDir, setRouteDir] = useState<'to' | 'from' | null>(null);
   const [pickFromCb, setPickFromCb] = useState<((lng: number, lat: number) => void) | null>(null);
   const [routeLine, setRouteLine] = useState<[number, number][]>([]);
-  const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number } | null>(null);
+  const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number; zoom?: number } | null>(null);
   const lastBbox = useRef<Bbox | null>(null);
   const loadedBboxRef = useRef<Bbox | null>(null);
   const nonceRef = useRef(0);
@@ -79,8 +79,25 @@ export default function MapPage() {
   useEffect(() => {
     void getCatalog().then(setCatalog).catch(() => setCatalog([]));
     void reviewStats().then(setStats).catch(() => {});
-    void loadPoints(LVIV_BBOX);
+    const c = loadCity();
+    setCityState(c);
+    if (c.id !== DEFAULT_CITY_ID) {
+      nonceRef.current += 1;
+      setFocus({ lng: c.lng, lat: c.lat, nonce: nonceRef.current, zoom: 12.5 });
+    }
+    void loadPoints(cityBbox(c));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  function switchCity(id: string) {
+    const c = cityById(id);
+    setCityState(c);
+    saveCity(c.id);
+    setModalId(null);
+    nonceRef.current += 1;
+    setFocus({ lng: c.lng, lat: c.lat, nonce: nonceRef.current, zoom: 12.5 });
+    void loadPoints(cityBbox(c));
+  }
 
   function onMoveEnd(b: Bbox) {
     lastBbox.current = b;
@@ -272,7 +289,7 @@ export default function MapPage() {
         {status === 'error' ? (
           <div style={{ padding: '2em 1.25em' }}><LoadingState label="Повторне завантаження…" /></div>
         ) : (
-          <ExploreMap points={matching} problems={problems} center={LVIV} onSelect={setModalId} onSelectProblem={(id) => router.push(`/problem/${id}`)} onMoveEnd={onMoveEnd} focus={focus}
+          <ExploreMap points={matching} problems={problems} center={[city.lng, city.lat]} onSelect={setModalId} onSelectProblem={(id) => router.push(`/problem/${id}`)} onMoveEnd={onMoveEnd} focus={focus}
             pickMode={pickFromCb !== null}
             onMapClick={(lng, lat) => {
               if (pickFromCb) { pickFromCb(lng, lat); setPickFromCb(null); }
@@ -290,6 +307,19 @@ export default function MapPage() {
             <div style={{ position: 'relative', width: '100%', maxWidth: 560, pointerEvents: 'auto' }}>{searchBox}</div>
           </div>
         )}
+
+        {/* City picker (top-left; below the floating search on mobile) */}
+        <select
+          className="sc-foc"
+          aria-label="Місто"
+          value={city.id}
+          onChange={(e) => switchCity(e.target.value)}
+          style={{ ...cityPicker, top: isDesktop ? '0.8em' : '4.5em' }}
+        >
+          {CITIES.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
 
         {/* Filters popover (top-right) */}
         <div ref={filterRef} style={{ position: 'absolute', right: '0.8em', top: '0.8em' }}>
@@ -409,6 +439,7 @@ const filterTrigger = { position: 'relative', display: 'inline-flex', alignItems
 const filterBadge = { minWidth: '1.5em', height: '1.5em', borderRadius: '50%', background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontSize: '0.7em', fontWeight: 800, padding: '0 0.3em' } as const;
 const filterPanel = { position: 'absolute', right: 0, top: 'calc(100% + 0.5em)', zIndex: 6, width: 'min(92vw, 380px)', maxHeight: '70vh', overflowY: 'auto', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '0.9em', boxShadow: 'var(--sc-shadow-2)', padding: '0.7em' } as const;
 const grid2 = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0 0.6em' } as const;
+const cityPicker = { position: 'absolute', left: '0.8em', minHeight: '2.6em', padding: '0 0.8em', borderRadius: '1.4em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.9em', cursor: 'pointer', boxShadow: 'var(--sc-shadow-2)' } as const;
 const markerPanel ={ position: 'absolute', top: 0, left: 0, height: '100%', width: 'min(420px, 100vw)', zIndex: 55, background: 'var(--sc-bg)', boxShadow: '4px 0 24px rgba(0,0,0,0.18)', overflowY: 'auto', borderRight: 'var(--sc-bw) solid var(--sc-border)', padding: '1.2em 1.4em 2.5em' } as const;
 const panelClose = { flexShrink: 0, width: '2.2em', height: '2.2em', borderRadius: '50%', cursor: 'pointer', border: 'var(--sc-bw) solid var(--sc-border)', background: 'var(--sc-surface)', color: 'var(--sc-text)', display: 'grid', placeItems: 'center' } as const;
 const panelPrimary = { display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em', borderRadius: '0.7em', fontWeight: 800, background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95em' } as const;

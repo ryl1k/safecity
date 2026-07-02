@@ -13,8 +13,8 @@ import { api, apiEnabled } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { uploadPhotos } from '@/lib/storage';
 import { categoryLabel } from '@/lib/format';
+import { loadCity } from '@/lib/cities';
 
-const LVIV: [number, number] = [24.0316, 49.8419];
 const CATEGORIES: Category[] = ['venue', 'transit', 'crossing', 'toilet', 'parking'];
 const VAL_OPTS: { value: FeatureValue; label: string }[] = [
   { value: 'yes', label: 'Так' },
@@ -56,7 +56,7 @@ export default function ContributePage() {
     setError(null);
     setBusy(true);
     try {
-      const p = loc ?? LVIV;
+      const p = loc ?? ([loadCity().lng, loadCity().lat] as [number, number]);
       const cleaned: Record<string, FeatureValue> = {};
       for (const [k, v] of Object.entries(values)) if (v === 'yes' || v === 'no') cleaned[k] = v;
       const photoUrls = await uploadPhotos(photos, 'points');

@@ -19,7 +19,7 @@ import { speak, stopSpeech } from '@/lib/tts';
 import { geocodePlaces } from '@/lib/geocode';
 import type { GeoPlace } from '@/lib/geocode';
 
-const LVIV: [number, number] = [24.0316, 49.8419];
+import { loadCity } from '@/lib/cities';
 const MapView = dynamic(() => import('@/components/MapView').then((m) => m.MapView), { ssr: false });
 
 interface Step { instruction: string; distance: number }
@@ -74,7 +74,7 @@ function FromPicker({ onPick }: { onPick: (coords: [number, number], label: stri
         onPick([pos.coords.longitude, pos.coords.latitude], 'Моє місцезнаходження');
         setLocating(false);
       },
-      () => { onPick(LVIV, 'Центр Львова'); setLocating(false); },
+      () => { const c = loadCity(); onPick([c.lng, c.lat], `Центр міста ${c.name}`); setLocating(false); },
       { timeout: 6000 },
     );
   }
@@ -330,7 +330,7 @@ function RouteInner() {
             {status === 'ready' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1em' }}>
                 <div style={{ width: '100%', height: 'min(50vh, 420px)', minHeight: 280 }}>
-                  <MapView points={[]} center={dest ? [dest.lng, dest.lat] : LVIV} onSelect={() => {}} line={line} />
+                  <MapView points={[]} center={dest ? [dest.lng, dest.lat] : [loadCity().lng, loadCity().lat]} onSelect={() => {}} line={line} />
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>

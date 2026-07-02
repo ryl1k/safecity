@@ -108,7 +108,7 @@ export function ExploreMap({
   onSelect: (id: string) => void;
   onSelectProblem?: (id: string) => void;
   onMoveEnd?: (b: Bbox) => void;
-  focus?: { lng: number; lat: number; nonce: number } | null;
+  focus?: { lng: number; lat: number; nonce: number; zoom?: number } | null;
   pickMode?: boolean;
   onMapClick?: (lng: number, lat: number) => void;
   line?: [number, number][];
@@ -397,11 +397,11 @@ export function ExploreMap({
     if (canvas) canvas.style.cursor = pickMode ? 'crosshair' : '';
   }, [pickMode]);
 
-  // Fly to a chosen search result / focus.
+  // Fly to a chosen search result / focus (explicit zoom for city switches).
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !focus) return;
-    map.flyTo({ center: [focus.lng, focus.lat], zoom: Math.max(map.getZoom(), 16), duration: 800 });
+    map.flyTo({ center: [focus.lng, focus.lat], zoom: focus.zoom ?? Math.max(map.getZoom(), 16), duration: 800 });
   }, [focus]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;

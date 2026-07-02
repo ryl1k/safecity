@@ -21,11 +21,11 @@ import {
 import { pointsNear } from '@/lib/points';
 import { reviewStats, type ReviewStat } from '@/lib/reviews';
 import { categoryLabel, distanceLabel, featureSummary } from '@/lib/format';
-
-const LVIV: [number, number] = [24.0316, 49.8419];
+import { CITIES, DEFAULT_CITY_ID, cityById, loadCity, saveCity, type City } from '@/lib/cities';
 
 export default function PlacesPage() {
   const router = useRouter();
+  const [city, setCityState] = useState<City>(() => cityById(DEFAULT_CITY_ID));
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [points, setPoints] = useState<PointSummary[]>([]);
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
@@ -35,12 +35,13 @@ export default function PlacesPage() {
   const [features, setFeatures] = useState<Set<string>>(new Set());
   const [showInaccessible, setShowInaccessible] = useState(false);
 
-  async function load() {
+  async function load(c: City) {
     setStatus('loading');
     try {
       const [cat, pts, rs] = await Promise.all([
         getCatalog(),
-        pointsNear(LVIV[0], LVIV[1], 4000),
+        // Wide radius so showcase points spread across a big city are included.
+        pointsNear(c.lng, c.lat, 15000),
         reviewStats().catch(() => ({})),
       ]);
       setCatalog(cat);
@@ -52,8 +53,17 @@ export default function PlacesPage() {
     }
   }
   useEffect(() => {
-    void load();
+    const c = loadCity();
+    setCityState(c);
+    void load(c);
   }, []);
+
+  function switchCity(id: string) {
+    const c = cityById(id);
+    setCityState(c);
+    saveCity(c.id);
+    void load(c);
+  }
 
   const st: FilterState = { query, categories, features, showInaccessible };
   const filtered = useMemo(
@@ -88,7 +98,20 @@ export default function PlacesPage() {
         tabIndex={-1}
         style={{ flex: 1, width: '100%', maxWidth: 'min(100%, 860px)', margin: '0 auto', padding: '1.4em 1.25em 4em', display: 'flex', flexDirection: 'column', gap: '1em' }}
       >
-        <h1 style={{ margin: 0, fontSize: '1.7em', fontWeight: 800 }}>Доступні місця</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>
+          <h1 style={{ margin: 0, fontSize: '1.7em', fontWeight: 800, flex: '1 1 auto', minWidth: 0 }}>Доступні місця</h1>
+          <select
+            className="sc-foc"
+            aria-label="Місто"
+            value={city.id}
+            onChange={(e) => switchCity(e.target.value)}
+            style={{ minHeight: '2.6em', padding: '0 0.8em', borderRadius: '0.7em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.9em', cursor: 'pointer' }}
+          >
+            {CITIES.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+        </div>
         <p style={{ margin: 0, color: 'var(--sc-muted)', lineHeight: 1.5 }}>
           Шукайте заклади, транспорт і переходи — за назвою, категорією чи зручністю доступності.
         </p>
@@ -140,7 +163,7 @@ export default function PlacesPage() {
         </span>
 
         {status === 'loading' && <LoadingState />}
-        {status === 'error' && <ErrorState onRetry={() => void load()} />}
+        {status === 'error' && <ErrorState onRetry={() => void load(city)} />}
         {status === 'ready' && filtered.length === 0 && (
           <EmptyState
             title="Нічого не знайдено"
