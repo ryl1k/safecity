@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -96,6 +97,152 @@ func (s *Store) BarriersInBBox(ctx context.Context, minLng, minLat, maxLng, maxL
 		out = append(out, p)
 	}
 	return out, rows.Err()
+}
+
+// ProblemListItem is a problem row for public list views (with the linked
+// point's name resolved server-side).
+type ProblemListItem struct {
+	ID            string    `json:"id"`
+	Title         string    `json:"title"`
+	Description   *string   `json:"description"`
+	Status        string    `json:"status"`
+	Severity      int       `json:"severity"`
+	Confirmations int       `json:"confirmations"`
+	Photos        []string  `json:"photos"`
+	PointName     *string   `json:"point_name"`
+	CreatedAt     time.Time `json:"created_at"`
+}
+
+const listProblemsSQL = `
+select p.id::text, p.title, p.description, p.status::text, p.severity,
+       p.confirmations, coalesce(p.photos, '{}'), pt.name, p.created_at
+from problems p
+left join points pt on pt.id = p.point_id
+order by p.confirmations desc, p.created_at desc`
+
+// ListProblems returns all problems, most-confirmed first. Public read.
+func (s *Store) ListProblems(ctx context.Context) ([]ProblemListItem, error) {
+	rows, err := s.db.Pool.Query(ctx, listProblemsSQL)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	return scanProblemList(rows)
+}
+
+func scanProblemList(rows pgx.Rows) ([]ProblemListItem, error) {
+	out := []ProblemListItem{}
+	for rows.Next() {
+		var p ProblemListItem
+		if err := rows.Scan(&p.ID, &p.Title, &p.Description, &p.Status, &p.Severity,
+			&p.Confirmations, &p.Photos, &p.PointName, &p.CreatedAt); err != nil {
+			return nil, err
+		}
+		if p.Photos == nil {
+			p.Photos = []string{}
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
+// ProblemMarker is a located problem for the map layer.
+type ProblemMarker struct {
+	ID            string  `json:"id"`
+	Title         string  `json:"title"`
+	Status        string  `json:"status"`
+	Severity      int     `json:"severity"`
+	Confirmations int     `json:"confirmations"`
+	Lng           float64 `json:"lng"`
+	Lat           float64 `json:"lat"`
+}
+
+const problemsInBBoxSQL = `
+select id::text, title, status::text, severity, confirmations, lng, lat
+from problems_in_bbox($1, $2, $3, $4)`
+
+// ProblemsInBBox returns located problems inside a bounding box. Public read.
+func (s *Store) ProblemsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]ProblemMarker, error) {
+	rows, err := s.db.Pool.Query(ctx, problemsInBBoxSQL, minLng, minLat, maxLng, maxLat)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []ProblemMarker{}
+	for rows.Next() {
+		var m ProblemMarker
+		if err := rows.Scan(&m.ID, &m.Title, &m.Status, &m.Severity, &m.Confirmations, &m.Lng, &m.Lat); err != nil {
+			return nil, err
+		}
+		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+// PetitionDetail is a petition as shown on a problem page.
+type PetitionDetail struct {
+	ID                     string  `json:"id"`
+	Scope                  string  `json:"scope"`
+	Title                  string  `json:"title"`
+	Body                   *string `json:"body"`
+	OfficialURL            *string `json:"official_url"`
+	InternalSignatures     int     `json:"internal_signatures"`
+	OfficialSignatureCount *int    `json:"official_signature_count"`
+	Status                 string  `json:"status"`
+}
+
+// ProblemDetail is a problem page payload: the problem + its petition (if any).
+type ProblemDetail struct {
+	Problem  ProblemListItem `json:"problem"`
+	Petition *PetitionDetail `json:"petition"`
+}
+
+const problemByIDSQL = `
+select p.id::text, p.title, p.description, p.status::text, p.severity,
+       p.confirmations, coalesce(p.photos, '{}'), pt.name, p.created_at
+from problems p
+left join points pt on pt.id = p.point_id
+where p.id = $1::uuid`
+
+const petitionForProblemSQL = `
+select id::text, scope::text, title, body, official_url,
+       internal_signatures, official_signature_count, status
+from petitions
+where problem_id = $1::uuid
+order by created_at desc
+limit 1`
+
+// ProblemByID returns one problem with its petition, or (nil, nil) if absent.
+func (s *Store) ProblemByID(ctx context.Context, id string) (*ProblemDetail, error) {
+	var d ProblemDetail
+	p := &d.Problem
+	err := s.db.Pool.QueryRow(ctx, problemByIDSQL, id).Scan(
+		&p.ID, &p.Title, &p.Description, &p.Status, &p.Severity,
+		&p.Confirmations, &p.Photos, &p.PointName, &p.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	if p.Photos == nil {
+		p.Photos = []string{}
+	}
+
+	var pet PetitionDetail
+	err = s.db.Pool.QueryRow(ctx, petitionForProblemSQL, id).Scan(
+		&pet.ID, &pet.Scope, &pet.Title, &pet.Body, &pet.OfficialURL,
+		&pet.InternalSignatures, &pet.OfficialSignatureCount, &pet.Status)
+	switch {
+	case errors.Is(err, pgx.ErrNoRows):
+		// no petition yet — fine
+	case err != nil:
+		return nil, err
+	default:
+		d.Petition = &pet
+	}
+	return &d, nil
 }
 
 // SignResult is the petition signature tally after signing.

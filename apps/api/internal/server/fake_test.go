@@ -59,6 +59,32 @@ type fakeStore struct {
 	// BarriersInBBox
 	barriers    []store.LngLat
 	barriersErr error
+
+	// SearchPoints
+	gotSearchQ     string
+	gotSearchLimit int
+	hits           []store.PointHit
+	hitsErr        error
+
+	// ReviewsFor / ReviewStats
+	gotReviewsPoint string
+	reviews         []store.Review
+	reviewsErr      error
+	stats           []store.ReviewStat
+	statsErr        error
+
+	// ListProblems / ProblemsInBBox / ProblemByID
+	problems       []store.ProblemListItem
+	problemsErr    error
+	markers        []store.ProblemMarker
+	markersErr     error
+	gotProblemID   string
+	problemDetail  *store.ProblemDetail
+	problemDetErr  error
+
+	// FeatureCatalog
+	catalog    []store.Feature
+	catalogErr error
 }
 
 func (f *fakeStore) CreateProblem(_ context.Context, userID string, in store.NewProblem) (store.Problem, error) {
@@ -114,6 +140,37 @@ func (f *fakeStore) SignPetition(_ context.Context, userID, petitionID string) (
 
 func (f *fakeStore) BarriersInBBox(_ context.Context, _, _, _, _ float64) ([]store.LngLat, error) {
 	return f.barriers, f.barriersErr
+}
+
+func (f *fakeStore) SearchPoints(_ context.Context, query string, limit int) ([]store.PointHit, error) {
+	f.gotSearchQ, f.gotSearchLimit = query, limit
+	return f.hits, f.hitsErr
+}
+
+func (f *fakeStore) ReviewsFor(_ context.Context, pointID string) ([]store.Review, error) {
+	f.gotReviewsPoint = pointID
+	return f.reviews, f.reviewsErr
+}
+
+func (f *fakeStore) ReviewStats(_ context.Context) ([]store.ReviewStat, error) {
+	return f.stats, f.statsErr
+}
+
+func (f *fakeStore) ListProblems(_ context.Context) ([]store.ProblemListItem, error) {
+	return f.problems, f.problemsErr
+}
+
+func (f *fakeStore) ProblemsInBBox(_ context.Context, _, _, _, _ float64) ([]store.ProblemMarker, error) {
+	return f.markers, f.markersErr
+}
+
+func (f *fakeStore) ProblemByID(_ context.Context, id string) (*store.ProblemDetail, error) {
+	f.gotProblemID = id
+	return f.problemDetail, f.problemDetErr
+}
+
+func (f *fakeStore) FeatureCatalog(_ context.Context) ([]store.Feature, error) {
+	return f.catalog, f.catalogErr
 }
 
 // fakeGeo is a configurable GeoService for handler unit tests.

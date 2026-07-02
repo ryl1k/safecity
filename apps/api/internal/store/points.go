@@ -111,6 +111,41 @@ func (s *Store) PointDetail(ctx context.Context, id string) (*PointDetail, error
 	return &p, nil
 }
 
+// PointHit is a lightweight name/address search match.
+type PointHit struct {
+	ID       string  `json:"id"`
+	Name     string  `json:"name"`
+	Category string  `json:"category"`
+	Address  *string `json:"address"`
+}
+
+const searchPointsSQL = `
+select id::text, name, category::text, address
+from points
+where name ilike $1 or address ilike $1
+order by name
+limit $2`
+
+// SearchPoints matches points by name or address substring (case-insensitive).
+func (s *Store) SearchPoints(ctx context.Context, query string, limit int) ([]PointHit, error) {
+	pattern := "%" + query + "%"
+	rows, err := s.db.Pool.Query(ctx, searchPointsSQL, pattern, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []PointHit{}
+	for rows.Next() {
+		var h PointHit
+		if err := rows.Scan(&h.ID, &h.Name, &h.Category, &h.Address); err != nil {
+			return nil, err
+		}
+		out = append(out, h)
+	}
+	return out, rows.Err()
+}
+
 func ensureFeatures(m *map[string]string) {
 	if *m == nil {
 		*m = map[string]string{}

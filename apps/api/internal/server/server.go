@@ -32,6 +32,13 @@ type DataStore interface {
 	PointsNear(ctx context.Context, lng, lat, radiusM float64) ([]store.PointSummary, error)
 	PointsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.PointSummary, error)
 	PointDetail(ctx context.Context, id string) (*store.PointDetail, error)
+	SearchPoints(ctx context.Context, query string, limit int) ([]store.PointHit, error)
+	ReviewsFor(ctx context.Context, pointID string) ([]store.Review, error)
+	ReviewStats(ctx context.Context) ([]store.ReviewStat, error)
+	ListProblems(ctx context.Context) ([]store.ProblemListItem, error)
+	ProblemsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.ProblemMarker, error)
+	ProblemByID(ctx context.Context, id string) (*store.ProblemDetail, error)
+	FeatureCatalog(ctx context.Context) ([]store.Feature, error)
 	// contribution writes
 	AddPoint(ctx context.Context, userID string, in store.NewPoint) (string, error)
 	UpsertReview(ctx context.Context, userID, pointID string, in store.NewReview) (store.Review, error)
@@ -133,13 +140,22 @@ func (s *Server) routes() {
 		s.router.Route("/points", func(r chi.Router) {
 			r.Get("/near", s.handlePointsNear)
 			r.Get("/bbox", s.handlePointsBBox)
+			r.Get("/search", s.handlePointsSearch)
 			r.Get("/{id}", s.handlePointDetail)
+			r.Get("/{id}/reviews", s.handlePointReviews)
 			r.Group(func(r chi.Router) {
 				s.authed(r)
 				r.Post("/", s.handleAddPoint)
 				r.Post("/{id}/reviews", s.handleAddReview)
 			})
 		})
+
+		// Public civic + catalog reads.
+		s.router.Get("/problems", s.handleListProblems)
+		s.router.Get("/problems/bbox", s.handleProblemsBBox)
+		s.router.Get("/problems/{id}", s.handleProblemDetail)
+		s.router.Get("/reviews/stats", s.handleReviewStats)
+		s.router.Get("/catalog/features", s.handleFeatureCatalog)
 	}
 
 	// Public, rate-limited proxy surface (guests route + geocode).
