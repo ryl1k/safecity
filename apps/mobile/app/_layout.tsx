@@ -4,6 +4,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { ThemeProvider } from '@/theme/theme';
 import { ProfileProvider } from '@/state/ProfileProvider';
+import { CityProvider } from '@/state/CityProvider';
 
 export default function RootLayout() {
   return (
@@ -11,8 +12,10 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <ThemeProvider>
           <ProfileProvider>
-            <StatusBar style="auto" />
-            <Stack screenOptions={{ headerShown: false }} />
+            <CityProvider>
+              <StatusBar style="auto" />
+              <Stack screenOptions={{ headerShown: false }} />
+            </CityProvider>
           </ProfileProvider>
         </ThemeProvider>
       </SafeAreaProvider>

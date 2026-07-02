@@ -1,9 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
-import type { AccessibilityFeature, Category, PointSummary, Rating } from '@safecity/shared';
-import { computeRating } from '@safecity/shared';
+import type { AccessibilityFeature, Category, PointSummary } from '@safecity/shared';
 import { PointRow } from '@/components/PointRow';
-import { Button, Chip, EmptyState, ErrorState, LoadingState, SearchBar } from '@/components/ui';
+import { Chip, EmptyState, ErrorState, LoadingState, SearchBar } from '@/components/ui';
 import { getCatalog } from '@/lib/catalog';
 import {
   CATEGORIES,
@@ -13,23 +12,16 @@ import {
   suggestFilters,
   type FilterState,
 } from '@/lib/filters';
-import { categoryLabel, distanceLabel, featureSummary } from '@/lib/format';
+import { categoryLabel } from '@/lib/format';
 import { pointsNear } from '@/lib/points';
-import { speak, stopSpeech } from '@/lib/tts';
+import { useCity } from '@/state/CityProvider';
 import { useProfile } from '@/state/ProfileProvider';
 import { space, useTheme } from '@/theme/theme';
-
-const RATING_WORD: Record<Rating, string> = {
-  full: 'доступно',
-  partial: 'частково доступно',
-  none: 'недоступно',
-  unknown: 'немає даних',
-};
-const LVIV = { lng: 24.0316, lat: 49.8419 };
 
 export default function PlacesScreen() {
   const { palette, baseScale } = useTheme();
   const { primary } = useProfile();
+  const { city } = useCity();
   const [points, setPoints] = useState<PointSummary[]>([]);
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
@@ -38,12 +30,16 @@ export default function PlacesScreen() {
   const [categories, setCategories] = useState<Set<Category>>(new Set());
   const [features, setFeatures] = useState<Set<string>>(new Set());
   const [showInaccessible, setShowInaccessible] = useState(false);
-  const [speaking, setSpeaking] = useState(false);
 
   async function load() {
     setStatus('loading');
     try {
-      const [cat, pts] = await Promise.all([getCatalog(), pointsNear(LVIV.lng, LVIV.lat, 4000)]);
+      const [cat, pts] = await Promise.all([
+        getCatalog(),
+        // Nearest-first with per-row distances (points_near orders by distance_m).
+        // Wide radius (~15 km) covers the city bbox used by the map tab.
+        pointsNear(city.lng, city.lat, 15000),
+      ]);
       setCatalog(cat);
       setPoints(pts);
       setStatus('ready');
@@ -54,8 +50,9 @@ export default function PlacesScreen() {
 
   useEffect(() => {
     void load();
-  }, []);
-  useEffect(() => () => stopSpeech(), []);
+    // Refetch when the selected city changes; catalog is harmless to reload too.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city]);
 
   const state: FilterState = { query, categories, features, showInaccessible };
   const filtered = useMemo(
@@ -79,24 +76,6 @@ export default function PlacesScreen() {
     return next;
   }
 
-  function toggleSpeak() {
-    if (speaking) {
-      stopSpeech();
-      setSpeaking(false);
-      return;
-    }
-    const items = filtered.slice(0, 8).map((p, i) => {
-      const rating = computeRating(p.features, catalog, p.category, primary);
-      const summary = featureSummary(p, catalog, primary);
-      return `${i + 1}. ${p.name}, ${categoryLabel[p.category]}, ${distanceLabel(p.distanceM)}, ${RATING_WORD[rating]}${summary ? `, ${summary}` : ''}.`;
-    });
-    setSpeaking(true);
-    speak(`Знайдено ${filtered.length} місць. ${items.join(' ')}`, {
-      onend: () => setSpeaking(false),
-      onerror: () => setSpeaking(false),
-    });
-  }
-
   if (status === 'loading') return <LoadingState />;
   if (status === 'error') return <ErrorState label="Не вдалося завантажити місця" onRetry={load} />;
 
@@ -111,6 +90,7 @@ export default function PlacesScreen() {
       keyboardShouldPersistTaps="handled"
       ListHeaderComponent={
         <View style={{ gap: space.md, marginBottom: space.xs }}>
+          <Text style={{ color: palette.muted, fontSize: 13 * baseScale, fontWeight: '700' }}>{city.name}</Text>
           <SearchBar value={query} onChangeText={setQuery} placeholder="Пошук місця, категорії чи зручності…" />
 
           {/* Smart-search: tap a suggestion to turn it into a filter */}
@@ -175,17 +155,7 @@ export default function PlacesScreen() {
             />
           </View>
 
-          <View style={styles.headRow}>
-            <Text style={{ color: palette.muted, fontSize: 13 * baseScale }}>{filtered.length} місць</Text>
-            {filtered.length > 0 ? (
-              <Button
-                title={speaking ? '⏹ Зупинити' : '🔊 Озвучити'}
-                variant={speaking ? 'primary' : 'secondary'}
-                onPress={toggleSpeak}
-                accessibilityLabel={speaking ? 'Зупинити озвучення' : 'Озвучити знайдені місця'}
-              />
-            ) : null}
-          </View>
+          <Text style={{ color: palette.muted, fontSize: 13 * baseScale }}>{filtered.length} місць</Text>
         </View>
       }
       renderItem={({ item }) => <PointRow point={item} catalog={catalog} profile={primary} />}
@@ -196,5 +166,4 @@ export default function PlacesScreen() {
 
 const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: space.sm },
-  headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md, flexWrap: 'wrap' },
 });

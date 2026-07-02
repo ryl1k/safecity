@@ -8,10 +8,10 @@ import { Button, Card, Chip, Field, LoadingState, Segmented } from '@/components
 import { getCatalog } from '@/lib/catalog';
 import { categoryLabel } from '@/lib/format';
 import { successFeedback } from '@/lib/haptics';
-import { LVIV } from '@/lib/location';
 import { addPoint } from '@/lib/points';
 import { uploadPhotos } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
+import { useCity } from '@/state/CityProvider';
 import { space, useTheme } from '@/theme/theme';
 
 const CATEGORIES: Category[] = ['venue', 'transit', 'crossing', 'toilet', 'parking'];
@@ -23,6 +23,7 @@ const VAL_OPTS: { value: FeatureValue; label: string }[] = [
 
 export default function ContributeScreen() {
   const { palette, baseScale } = useTheme();
+  const { city } = useCity();
   const router = useRouter();
 
   const [gate, setGate] = useState<'checking' | 'guest' | 'ready'>('checking');
@@ -69,7 +70,7 @@ export default function ContributeScreen() {
     }
     setBusy(true);
     try {
-      const p = loc ?? LVIV;
+      const p: [number, number] = loc ?? [city.lng, city.lat];
       const cleaned: Record<string, FeatureValue> = {};
       for (const [k, v] of Object.entries(values)) if (v === 'yes' || v === 'no') cleaned[k] = v;
       const photoUrls = await uploadPhotos(photos, 'points');

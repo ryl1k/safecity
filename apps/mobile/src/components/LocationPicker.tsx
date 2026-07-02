@@ -2,11 +2,12 @@ import { useMemo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Camera, Map, Marker } from '@maplibre/maplibre-react-native';
 import { basemapStyle } from '@/lib/mapStyle';
+import { useCity } from '@/state/CityProvider';
 import { radii, space, useTheme } from '@/theme/theme';
 
-const LVIV: [number, number] = [24.0316, 49.8419];
-
-/** Tap the map to drop / move the marker. Mirrors web LocationPicker. */
+/** Tap the map to drop / move the marker. Mirrors web LocationPicker.
+ *  Defaults to the selected city's centre (not a hardcoded location) until
+ *  the user drops a pin. */
 export function LocationPicker({
   value,
   onChange,
@@ -15,7 +16,8 @@ export function LocationPicker({
   onChange: (lng: number, lat: number) => void;
 }) {
   const { palette, baseScale, themeName } = useTheme();
-  const center = value ?? LVIV;
+  const { city } = useCity();
+  const center: [number, number] = value ?? [city.lng, city.lat];
   const mapStyle = useMemo(() => basemapStyle(themeName === 'dark'), [themeName]);
 
   return (

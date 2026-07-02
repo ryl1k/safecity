@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Camera, Map, Marker } from '@maplibre/maplibre-react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -7,7 +7,6 @@ import { categoryIcon } from '@/lib/filters';
 import { basemapStyle } from '@/lib/mapStyle';
 import { useTheme } from '@/theme/theme';
 
-const LVIV: [number, number] = [24.0316, 49.8419];
 const LABEL_ZOOM = 15.5; // show name labels once zoomed in this far
 type MciName = keyof typeof MaterialCommunityIcons.glyphMap;
 
@@ -21,8 +20,10 @@ export interface MapMarkerData {
 }
 
 /** MapLibre map (CARTO basemap) with category-icon pins, an accessibility ring,
- *  and name labels that appear once zoomed in. */
-export function PointsMap({
+ *  and name labels that appear once zoomed in. `center` is required — callers
+ *  drive it from the selected city (or the user's location). Memoized: callers
+ *  must pass stable `center`/`onSelect` references or the memo is defeated. */
+function PointsMapInner({
   markers,
   onSelect,
   center,
@@ -31,7 +32,7 @@ export function PointsMap({
 }: {
   markers: MapMarkerData[];
   onSelect?: (id: string) => void;
-  center?: [number, number];
+  center: [number, number];
   zoom?: number;
   me?: [number, number] | null;
 }) {
@@ -50,7 +51,9 @@ export function PointsMap({
         if (typeof z === 'number' && Math.abs(z - mapZoom) > 0.25) setMapZoom(z);
       }}
     >
-      <Camera initialViewState={{ center: center ?? LVIV, zoom }} />
+      {/* MapLibre RN v11 Camera doesn't re-fly on prop changes alone — remount
+          it (keyed on the target) so switching cities recenters the map. */}
+      <Camera key={`${center[0]},${center[1]}`} initialViewState={{ center, zoom }} />
       {me ? (
         <Marker id="me" lngLat={me}>
           <View style={[styles.me, { borderColor: palette.surface, backgroundColor: palette.focus }]} />
@@ -70,7 +73,7 @@ export function PointsMap({
             >
               <MaterialCommunityIcons
                 name={categoryIcon[m.category] as MciName}
-                size={16}
+                size={18}
                 color={m.accessible ? palette.ok : palette.muted}
               />
             </View>
@@ -88,13 +91,15 @@ export function PointsMap({
   );
 }
 
+export const PointsMap = memo(PointsMapInner);
+
 const styles = StyleSheet.create({
   map: { flex: 1 },
   pinWrap: { alignItems: 'center', width: 120 },
   pin: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
