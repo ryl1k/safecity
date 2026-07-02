@@ -47,6 +47,8 @@ type DataStore interface {
 	ConfirmProblem(ctx context.Context, userID, problemID string) (store.ConfirmResult, error)
 	CreatePetition(ctx context.Context, userID string, in store.NewPetition) (store.Petition, error)
 	SignPetition(ctx context.Context, userID, petitionID string) (store.SignResult, error)
+	// account profile
+	UpdateProfileNeeds(ctx context.Context, userID string, needs []string, primary string) error
 	// routing support
 	BarriersInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.LngLat, error)
 }
@@ -63,6 +65,11 @@ type TransitService interface {
 	Plan(ctx context.Context, from, to [2]float64) (transit.Result, error)
 }
 
+// AccountService performs server-side account operations (Supabase admin API).
+type AccountService interface {
+	CreateUser(ctx context.Context, email, password string) error
+}
+
 // Deps are the dependencies wired into the server. Log is required; the rest are
 // optional so tests can construct a minimal server.
 type Deps struct {
@@ -74,6 +81,7 @@ type Deps struct {
 	Store       DataStore                   // data access; nil disables data routes
 	Geo         GeoService                  // routing/geocoding proxy; nil disables proxy routes
 	Transit     TransitService              // public-transport planning; nil disables /transit
+	Accounts    AccountService              // server-side signup; nil disables /auth/signup
 	Metrics     *metrics.Metrics            // Prometheus hook; nil disables /metrics
 	CORSOrigins []string                    // allowed browser origins; empty disables CORS
 }
@@ -89,6 +97,7 @@ type Server struct {
 	store    DataStore
 	geo      GeoService
 	transit  TransitService
+	accounts AccountService
 	metrics  *metrics.Metrics
 }
 
@@ -118,7 +127,7 @@ func New(d Deps) *Server {
 		r.Use(auth.Authenticate(d.Verifier))
 	}
 
-	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles, limiter: d.Limiter, store: d.Store, geo: d.Geo, transit: d.Transit, metrics: d.Metrics}
+	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles, limiter: d.Limiter, store: d.Store, geo: d.Geo, transit: d.Transit, accounts: d.Accounts, metrics: d.Metrics}
 	s.routes()
 	return s
 }
@@ -176,11 +185,20 @@ func (s *Server) routes() {
 		})
 	}
 
+	// Server-side signup (public, rate-limited — keyed per IP).
+	if s.accounts != nil {
+		s.router.Group(func(r chi.Router) {
+			s.limited(r)
+			r.Post("/auth/signup", s.handleSignup)
+		})
+	}
+
 	// Authenticated, rate-limited surface.
 	s.router.Group(func(r chi.Router) {
 		s.authed(r)
 		r.Get("/me", s.handleMe)
 		if s.store != nil {
+			r.Post("/me/profile", s.handleProfileSync)
 			r.Post("/problems", s.handleCreateProblem)
 			r.Post("/problems/{id}/confirm", s.handleConfirmProblem)
 			r.Post("/petitions", s.handleCreatePetition)

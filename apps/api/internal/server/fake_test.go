@@ -85,6 +85,11 @@ type fakeStore struct {
 	// FeatureCatalog
 	catalog    []store.Feature
 	catalogErr error
+
+	// UpdateProfileNeeds
+	gotNeeds   []string
+	gotPrimary string
+	needsErr   error
 }
 
 func (f *fakeStore) CreateProblem(_ context.Context, userID string, in store.NewProblem) (store.Problem, error) {
@@ -171,6 +176,13 @@ func (f *fakeStore) ProblemByID(_ context.Context, id string) (*store.ProblemDet
 
 func (f *fakeStore) FeatureCatalog(_ context.Context) ([]store.Feature, error) {
 	return f.catalog, f.catalogErr
+}
+
+func (f *fakeStore) UpdateProfileNeeds(_ context.Context, userID string, needs []string, primary string) error {
+	f.gotUser = userID
+	f.gotNeeds = needs
+	f.gotPrimary = primary
+	return f.needsErr
 }
 
 // fakeGeo is a configurable GeoService for handler unit tests.

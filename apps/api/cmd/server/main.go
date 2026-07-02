@@ -13,6 +13,7 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/safecity/api/internal/accounts"
 	"github.com/safecity/api/internal/auth"
 	"github.com/safecity/api/internal/config"
 	"github.com/safecity/api/internal/db"
@@ -60,6 +61,14 @@ func main() {
 	geoClient := geo.New(cfg.ORSAPIKey, cfg.ORSBaseURL, cfg.NominatimURL, 15*time.Second)
 	transitClient := transit.New(cfg.TransitousURL, 20*time.Second)
 
+	// Server-side signup needs the service key; without it the route is disabled.
+	var accountsClient server.AccountService
+	if ac := accounts.New(cfg.SupabaseURL, cfg.SupabaseSecretKey, 10*time.Second); ac.Configured() {
+		accountsClient = ac
+	} else {
+		logger.Warn("SUPABASE_SECRET_KEY not set — /auth/signup disabled")
+	}
+
 	// ML gRPC client (optional; connection is lazy so this never blocks startup).
 	if cfg.MLGRPCAddr != "" {
 		mlClient, err := ml.Dial(cfg.MLGRPCAddr)
@@ -82,6 +91,7 @@ func main() {
 		Store:       store.New(database),
 		Geo:         geoClient,
 		Transit:     transitClient,
+		Accounts:    accountsClient,
 		Metrics:     metrics.New(),
 		CORSOrigins: cfg.CORSOrigins,
 	})
