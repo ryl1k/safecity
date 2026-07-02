@@ -160,13 +160,25 @@ export function itineraryCoords(it: TransitItinerary): [number, number][] {
   return it.legs.flatMap((l) => l.coords);
 }
 
-const MODE_UA: Record<string, string> = {
-  BUS: 'Автобус', TRAM: 'Трамвай', SUBWAY: 'Метро', METRO: 'Метро', WALK: 'Пішки',
-};
+/** Vehicle category, eway-style: Трамвай / Тролейбус / Автобус / Маршрутка /
+ *  Приміський автобус / Метро / Поїзд. Buses vs marshrutkas are told apart by
+ *  the Lviv route table; 100+ numbers are suburban. */
+export function routeCategory(l: TransitLeg): string {
+  if (l.mode === 'WALK') return 'Пішки';
+  const r = l.route ? routeKey(l.route) : '';
+  if (/^Тр/.test(r)) return 'Тролейбус';
+  if (/^Т\d/.test(r) || l.mode === 'TRAM') return 'Трамвай';
+  if (/RAIL|TRAIN/i.test(l.mode)) return 'Поїзд';
+  if (l.mode === 'SUBWAY' || l.mode === 'METRO') return 'Метро';
+  const num = r.match(/^(\d+)/);
+  if (num && Number(num[1]) >= 100) return 'Приміський автобус';
+  if (/^А/.test(r) && LVIV_ROUTE_ACCESS[r] === 'no') return 'Маршрутка';
+  return 'Автобус';
+}
 
 export function legLabel(l: TransitLeg): string {
-  const mode = MODE_UA[l.mode] ?? l.mode;
-  return l.route ? `${mode} ${l.route}` : mode;
+  const cat = routeCategory(l);
+  return l.route ? `${cat} ${l.route}` : cat;
 }
 
 export function fmtTime(iso: string): string {

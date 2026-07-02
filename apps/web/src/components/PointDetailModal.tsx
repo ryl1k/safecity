@@ -212,11 +212,25 @@ export function RouteTabContent({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pointId, seedTo]);
 
-  // Seed the start when provided (routing FROM a marker); otherwise prompt the
-  // user to pick the start on the map as soon as the tab opens.
+  // Seed the start: explicit seed wins (routing FROM a marker); otherwise use
+  // the user's current location, falling back to a map pick if unavailable.
   useEffect(() => {
     if (seedFrom) { setFromCoords(seedFrom.coords); setFromLabel(seedFrom.label); return; }
-    activateMapPick('from');
+    let cancelled = false;
+    if (typeof navigator !== 'undefined' && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          if (cancelled) return;
+          setFromCoords([pos.coords.longitude, pos.coords.latitude]);
+          setFromLabel('Моє місцезнаходження');
+        },
+        () => { if (!cancelled) activateMapPick('from'); },
+        { timeout: 6000, maximumAge: 60000 },
+      );
+    } else {
+      activateMapPick('from');
+    }
+    return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -488,45 +502,49 @@ export function RouteTabContent({
                 onClick={() => { setSelectedIt(i); onRouteDisplay?.(transitDisplay(transitIts, i)); }}
                 aria-pressed={active}
                 style={{
-                  textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', padding: '0.7em 0.9em', borderRadius: '0.8em',
-                  border: `var(--sc-bw) solid ${active ? 'var(--sc-primary)' : 'var(--sc-border)'}`,
-                  background: active ? 'var(--sc-primary-tint)' : 'var(--sc-surface)', color: 'var(--sc-text)',
+                  textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', padding: '0.65em 0.75em', borderRadius: '0.7em',
+                  border: `var(--sc-bw) solid ${active ? 'var(--sc-primary)' : 'transparent'}`,
+                  background: active ? 'var(--sc-primary-tint)' : 'transparent',
+                  borderBottom: active ? undefined : 'var(--sc-bw) solid var(--sc-border)',
+                  color: 'var(--sc-text)',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6em', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.55em', flexWrap: 'wrap' }}>
                   <strong style={{ fontSize: '0.95em' }}>{it.durationMin} хв</strong>
-                  <span style={{ color: 'var(--sc-muted)', fontSize: '0.82em' }}>
+                  <span style={{ color: 'var(--sc-muted)', fontSize: '0.8em' }}>
                     {fmtTime(it.startTime)}–{fmtTime(it.endTime)} · {it.transfers === 0 ? 'без пересадок' : `${it.transfers} перес.`}
                   </span>
-                  {it.access === 'yes' ? (
-                    <span style={{ marginLeft: 'auto', fontSize: '0.75em', fontWeight: 800, color: 'var(--sc-ok)' }}>♿ доступний</span>
-                  ) : it.access === 'no' ? (
-                    <span style={{ marginLeft: 'auto', fontSize: '0.75em', fontWeight: 800, color: 'var(--sc-warn)' }}>частково недоступний</span>
-                  ) : (
-                    <span style={{ marginLeft: 'auto', fontSize: '0.75em', fontWeight: 700, color: 'var(--sc-muted)' }}>доступність невідома</span>
-                  )}
+                  <span style={{
+                    marginLeft: 'auto', fontSize: '0.75em', fontWeight: 700,
+                    color: it.access === 'yes' ? 'var(--sc-ok)' : it.access === 'no' ? 'var(--sc-bad)' : 'var(--sc-muted)',
+                  }}>
+                    {it.access === 'yes' ? 'доступний' : it.access === 'no' ? 'недоступний транспорт' : 'невідомо'}
+                  </span>
                 </div>
-                <div style={{ display: 'flex', gap: '0.35em', flexWrap: 'wrap', marginTop: '0.45em' }}>
+                <div style={{ display: 'flex', gap: '0.3em', flexWrap: 'wrap', marginTop: '0.4em' }}>
                   {transitLegs.map((l, j) => (
                     <span key={j} style={{
-                      fontSize: '0.8em', fontWeight: 800, padding: '0.15em 0.5em', borderRadius: '0.5em',
-                      background: l.accessible === 'yes' ? 'var(--sc-ok)' : l.accessible === 'no' ? 'var(--sc-bad)' : 'var(--sc-surface-2, #e5e7eb)',
-                      color: l.accessible === 'unknown' ? 'var(--sc-text)' : '#fff',
-                      border: l.accessible === 'unknown' ? 'var(--sc-bw) solid var(--sc-border-strong)' : 'none',
+                      fontSize: '0.78em', fontWeight: 700, padding: '0.1em 0.5em', borderRadius: '0.45em',
+                      background: l.accessible === 'yes'
+                        ? 'color-mix(in srgb, var(--sc-ok) 13%, transparent)'
+                        : l.accessible === 'no'
+                          ? 'color-mix(in srgb, var(--sc-bad) 11%, transparent)'
+                          : 'color-mix(in srgb, var(--sc-muted) 13%, transparent)',
+                      color: l.accessible === 'yes' ? 'var(--sc-ok)' : l.accessible === 'no' ? 'var(--sc-bad)' : 'var(--sc-text)',
                     }}>
-                      {legLabel(l)}{l.accessible === 'no' ? ' ✕' : l.accessible === 'yes' ? ' ✓' : ''}
+                      {legLabel(l)}
                     </span>
                   ))}
                 </div>
                 {active && (
-                  <ol style={{ listStyle: 'none', margin: '0.55em 0 0', padding: 0 }}>
+                  <ol style={{ listStyle: 'none', margin: '0.5em 0 0', padding: 0 }}>
                     {it.legs.map((l, j) => (
-                      <li key={j} style={{ display: 'flex', gap: '0.5em', padding: '0.25em 0', fontSize: '0.85em' }}>
+                      <li key={j} style={{ display: 'flex', gap: '0.5em', padding: '0.22em 0', fontSize: '0.83em' }}>
                         <span style={{ color: 'var(--sc-muted)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{fmtTime(l.startTime)}</span>
                         <span style={{ minWidth: 0 }}>
                           {l.mode === 'WALK'
                             ? 'Пішки'
-                            : `Сядьте на ${legLabel(l).toLowerCase()} на «${l.fromName}» → вийдіть на «${l.toName}»`}
+                            : `${legLabel(l)}: «${l.fromName}» → «${l.toName}»`}
                         </span>
                       </li>
                     ))}
@@ -537,7 +555,7 @@ export function RouteTabContent({
           })}
           {transitIts.length > 0 && (
             <p style={{ margin: 0, fontSize: '0.72em', color: 'var(--sc-muted)' }}>
-              ✓ — низькопідлогові автобуси й тролейбуси; ✕ — маршрутки та старі трамваї. Дані: міський GTFS + Transitous + eway.
+              Зелений — низькопідлогові автобуси й тролейбуси; червоний — маршрутки та старі трамваї.
             </p>
           )}
         </div>
