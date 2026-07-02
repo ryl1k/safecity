@@ -24,6 +24,18 @@ directly. See board epic **M10 · Go API backend**.
   max 50000), nearest first. Each carries `features` for the client rating engine.
 - `GET /points/bbox?min_lng=&min_lat=&max_lng=&max_lat=` — public; points in a bounding box.
 - `GET /points/{id}` — public; full point detail (adds `description`, `photos`). 404 if absent.
+- `GET /points/search?q=&limit=` — public; name/address substring search (min 2 chars).
+- `GET /points/{id}/reviews` — public; a point's reviews, newest first.
+- `GET /reviews/stats` — public; per-point `{point_id, avg, count}` aggregated in SQL.
+- `GET /problems` — public; all problems (with resolved point names), most-confirmed first.
+- `GET /problems/bbox?min_lng=…` — public; located problems for the map layer.
+- `GET /problems/{id}` — public; `{problem, petition}` (petition may be null). 404 if absent.
+- `GET /problems/{id}/me` — authenticated; the caller's `{confirmed, signed}` state.
+- `GET /catalog/features` — public; the accessibility feature catalog (cached 1 h).
+- `GET /transit/plan?from_lng=&from_lat=&to_lng=&to_lat=` — public; transit itineraries via
+  Transitous with per-leg accessibility, eway vehicle categories, and accessible-first ranking
+  (promoted unless over 2× slower). Returns `{covered, notice?, itineraries}`; coverage is
+  Lviv-only for now. All business logic lives in `internal/transit`.
 
 ### Writes (authenticated, rate-limited; `created_by`/`user_id` forced to the caller)
 - `POST /points` — add a point. Body: `name`, `category`, `lat`, `lng` (required), `address?`,
@@ -37,6 +49,18 @@ directly. See board epic **M10 · Go API backend**.
   (`internal` default | `official`), `body?`, `official_url?`. → 201 petition.
 - `POST /petitions/{id}/sign` — sign a petition. 409 if already signed, 404 if missing.
   Returns `{signatures}` (live count).
+- `POST /me/profile` — sync the caller's accessibility profile. Body: `needs` (`wheelchair|blind`[]),
+  `primary?`.
+- `POST /auth/signup` — public, rate-limited; server-side account creation via the Supabase
+  admin API (`email_confirm=true`). Body: `email`, `password` (min 8). 409 if taken; disabled
+  without `SUPABASE_SECRET_KEY`.
+
+### Moderation (`/admin/*` — moderator role required; RLS enforces again in-DB)
+- `GET /admin/points/unverified`, `POST /admin/points/{id}/verify` (`{status}`),
+  `DELETE /admin/points/{id}`
+- `GET /admin/problems`, `POST /admin/problems/{id}/resolve`, `DELETE /admin/problems/{id}`
+- `GET /admin/reviews?limit=`, `DELETE /admin/reviews/{id}`
+- `GET /admin/users?limit=`, `POST /admin/users/{id}/role` (`{role: user|trusted|moderator}`)
 
 Photo uploads stay client→Supabase Storage direct; the API only records the resulting URLs.
 Note: petition signatures have no DB count trigger, so the API returns the live `count(*)`.
@@ -50,11 +74,10 @@ Note: petition signatures have no DB count trigger, so the API returns the live 
 - `GET /geocode?q=&limit=` — Nominatim proxy (cached 10 min, sends a required User-Agent).
   Returns `[{id, label, lng, lat}]`; empty for queries under 3 chars.
 
-Base URLs are configurable (`ORS_BASE_URL`, `NOMINATIM_URL`) so ORS/Nominatim can be self-hosted.
-- `POST /problems` — authenticated; report a problem. Body: `title` (required),
-  `description?`, `category?`, `severity?` (1–3), and either `point_id` or `lat`+`lng`
-  (dropped pin). Returns the created row (201). `created_by` is forced to the caller
-  via RLS — the client cannot set it.
+- `GET /geocode/reverse?lng=&lat=` — reverse geocoding with compact labels (street + number).
+
+Base URLs are configurable (`ORS_BASE_URL`, `NOMINATIM_URL`, `TRANSITOUS_URL`) so every
+upstream can be self-hosted later.
 
 ## Importers (ETL CLIs, idempotent on `osm_id`)
 Run from `apps/api` (they load the repo-root `.env`). Admin jobs — they use the
