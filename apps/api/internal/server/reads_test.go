@@ -100,6 +100,21 @@ func TestProblemDetailOK(t *testing.T) {
 	}
 }
 
+func TestProblemViewerState(t *testing.T) {
+	// anonymous → 401
+	if rec := get(pointServer(&fakeStore{}), "/problems/"+testUUID+"/me"); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("anon status = %d, want 401", rec.Code)
+	}
+	fs := &fakeStore{viewerState: store.ProblemViewerState{Confirmed: true, Signed: false}}
+	rec := do(pointServer(fs), authedReq(http.MethodGet, "/problems/"+testUUID+"/me", ""))
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), `"confirmed":true`) {
+		t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
+	}
+	if fs.gotProblemID != testUUID || fs.gotUser != "u1" {
+		t.Fatalf("store got %q/%q", fs.gotProblemID, fs.gotUser)
+	}
+}
+
 func TestFeatureCatalogOK(t *testing.T) {
 	fs := &fakeStore{catalog: []store.Feature{{Key: "ramp", Label: "Пандус"}}}
 	rec := get(pointServer(fs), "/catalog/features")

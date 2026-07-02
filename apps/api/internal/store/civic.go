@@ -245,6 +245,31 @@ func (s *Store) ProblemByID(ctx context.Context, id string) (*ProblemDetail, err
 	return &d, nil
 }
 
+// ProblemViewerState reflects the caller's own interactions with a problem —
+// whether they already confirmed it / signed its petition (drives button state).
+type ProblemViewerState struct {
+	Confirmed bool `json:"confirmed"`
+	Signed    bool `json:"signed"`
+}
+
+const problemViewerStateSQL = `
+select
+  exists(select 1 from problem_confirmations
+         where problem_id = $1::uuid and user_id = auth.uid()),
+  exists(select 1 from petition_signatures ps
+         join petitions p on p.id = ps.petition_id
+         where p.problem_id = $1::uuid and ps.user_id = auth.uid())`
+
+// ProblemViewerState returns the caller's confirmation/signature state for one
+// problem.
+func (s *Store) ProblemViewerState(ctx context.Context, userID, problemID string) (ProblemViewerState, error) {
+	var st ProblemViewerState
+	err := s.db.WithUser(ctx, userID, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx, problemViewerStateSQL, problemID).Scan(&st.Confirmed, &st.Signed)
+	})
+	return st, classify(err)
+}
+
 // SignResult is the petition signature tally after signing.
 type SignResult struct {
 	Signatures int `json:"signatures"`

@@ -81,6 +81,8 @@ type fakeStore struct {
 	gotProblemID   string
 	problemDetail  *store.ProblemDetail
 	problemDetErr  error
+	viewerState    store.ProblemViewerState
+	viewerStateErr error
 
 	// FeatureCatalog
 	catalog    []store.Feature
@@ -194,6 +196,12 @@ func (f *fakeStore) ProblemByID(_ context.Context, id string) (*store.ProblemDet
 
 func (f *fakeStore) FeatureCatalog(_ context.Context) ([]store.Feature, error) {
 	return f.catalog, f.catalogErr
+}
+
+func (f *fakeStore) ProblemViewerState(_ context.Context, userID, problemID string) (store.ProblemViewerState, error) {
+	f.gotUser = userID
+	f.gotProblemID = problemID
+	return f.viewerState, f.viewerStateErr
 }
 
 func (f *fakeStore) UpdateProfileNeeds(_ context.Context, userID string, needs []string, primary string) error {

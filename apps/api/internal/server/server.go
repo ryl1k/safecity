@@ -38,6 +38,7 @@ type DataStore interface {
 	ListProblems(ctx context.Context) ([]store.ProblemListItem, error)
 	ProblemsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.ProblemMarker, error)
 	ProblemByID(ctx context.Context, id string) (*store.ProblemDetail, error)
+	ProblemViewerState(ctx context.Context, userID, problemID string) (store.ProblemViewerState, error)
 	FeatureCatalog(ctx context.Context) ([]store.Feature, error)
 	// contribution writes
 	AddPoint(ctx context.Context, userID string, in store.NewPoint) (string, error)
@@ -229,6 +230,7 @@ func (s *Server) routes() {
 		r.Get("/me", s.handleMe)
 		if s.store != nil {
 			r.Post("/me/profile", s.handleProfileSync)
+			r.Get("/problems/{id}/me", s.handleProblemViewerState)
 			r.Post("/problems", s.handleCreateProblem)
 			r.Post("/problems/{id}/confirm", s.handleConfirmProblem)
 			r.Post("/petitions", s.handleCreatePetition)

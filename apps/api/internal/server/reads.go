@@ -118,6 +118,27 @@ func (s *Server) handleProblemDetail(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, res)
 }
 
+// handleProblemViewerState: GET /problems/{id}/me — the caller's own
+// confirmed/signed state for a problem (authenticated).
+func (s *Server) handleProblemViewerState(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.principal(w, r)
+	if !ok {
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if !isUUID(id) {
+		httpx.Error(w, http.StatusBadRequest, "invalid_query", "problem id must be a uuid")
+		return
+	}
+	st, err := s.store.ProblemViewerState(r.Context(), p.UserID, id)
+	if err != nil {
+		s.log.Error("problem viewer state", "err", err, "id", id)
+		httpx.Error(w, http.StatusInternalServerError, "internal", "could not load state")
+		return
+	}
+	httpx.JSON(w, http.StatusOK, st)
+}
+
 // handleFeatureCatalog: GET /catalog/features — the accessibility feature
 // catalog (small, effectively static).
 func (s *Server) handleFeatureCatalog(w http.ResponseWriter, r *http.Request) {

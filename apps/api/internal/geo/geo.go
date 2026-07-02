@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -352,7 +353,7 @@ func (c *Client) Geocode(ctx context.Context, query string, limit int) ([]Place,
 		lat, _ := strconv.ParseFloat(r.Lat, 64)
 		places = append(places, Place{
 			ID:    fmt.Sprintf("osm-%d", r.PlaceID),
-			Label: r.Display,
+			Label: trimLabel(r.Display),
 			Lng:   lng,
 			Lat:   lat,
 		})
@@ -448,6 +449,30 @@ func shortAddress(name string, a map[string]string, fallback string) string {
 		return fallback
 	}
 	return strings.Join(parts, ", ")
+}
+
+// dropLabelPart matches the admin tail of a Nominatim display name
+// (oblast/raion/hromada/postcode/country) that only adds noise for users.
+var dropLabelPart = regexp.MustCompile(`(?i)область|район|громад|Україна|^\d{4,6}$`)
+
+// trimLabel keeps the first few meaningful parts of a full display name for
+// search results (street, locality) and drops the admin tail.
+func trimLabel(s string) string {
+	kept := make([]string, 0, 3)
+	for _, p := range strings.Split(s, ",") {
+		p = strings.TrimSpace(p)
+		if p == "" || dropLabelPart.MatchString(p) {
+			continue
+		}
+		kept = append(kept, p)
+		if len(kept) == 3 {
+			break
+		}
+	}
+	if len(kept) == 0 {
+		return s
+	}
+	return strings.Join(kept, ", ")
 }
 
 func truncate(s string, n int) string {
