@@ -1,4 +1,5 @@
 import type { Profile } from '@safecity/shared';
+import { api } from './api';
 import { supabase } from './supabase';
 
 const PRIMARY_KEY = 'sc-primary-need';
@@ -24,15 +25,16 @@ function readLocalProfile(): { needs: Profile[]; primary: Profile | null } {
 
 /**
  * Merge the guest's device accessibility profile into their account on sign-in.
- * Safe to call after every login — it just upserts the stored needs/primary.
+ * Safe to call after every login — the API upserts the stored needs/primary.
  */
 export async function syncProfileToAccount(): Promise<void> {
-  const { data } = await supabase.auth.getUser();
-  if (!data.user) return;
+  const { data } = await supabase.auth.getSession();
+  if (!data.session) return;
   const { needs, primary } = readLocalProfile();
   if (!needs.length && !primary) return;
-  await supabase
-    .from('profiles')
-    .update({ needs, primary_need: primary ?? needs[0] ?? null })
-    .eq('id', data.user.id);
+  try {
+    await api.post('/me/profile', { needs, primary: primary ?? needs[0] ?? '' });
+  } catch {
+    /* best-effort sync — never block the login flow */
+  }
 }

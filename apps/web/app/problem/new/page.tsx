@@ -8,7 +8,7 @@ import { Footer } from '@/components/Footer';
 import { Button, Field, Segmented, LoadingState } from '@/components/ui';
 import { PhotoInput } from '@/components/PhotoInput';
 import { supabase } from '@/lib/supabase';
-import { api, apiEnabled } from '@/lib/api';
+import { api } from '@/lib/api';
 import { uploadPhotos } from '@/lib/storage';
 import { pointById } from '@/lib/points';
 import { geocodePlaces, type GeoPlace } from '@/lib/geocode';
@@ -92,25 +92,10 @@ function NewProblemInner() {
         return;
       }
       const photoUrls = await uploadPhotos(photos, 'problems');
-      if (apiEnabled) {
-        const body = pointId
-          ? { point_id: pointId, title, description, severity: Number(severity), photos: photoUrls }
-          : { lat: loc!.lat, lng: loc!.lng, title, description, severity: Number(severity), photos: photoUrls };
-        await api.post<{ id: string }>('/problems', body);
-      } else if (pointId) {
-        // Supabase-direct handles point-attached reports; pin location needs the API (PostGIS geom).
-        const { error } = await supabase.from('problems').insert({
-          point_id: pointId,
-          title,
-          description: description || null,
-          severity: Number(severity),
-          photos: photoUrls,
-          created_by: auth.user.id,
-        });
-        if (error) throw error;
-      } else {
-        throw new Error('Звіт за локацією доступний лише через сервер API.');
-      }
+      const body = pointId
+        ? { point_id: pointId, title, description, severity: Number(severity), photos: photoUrls }
+        : { lat: loc!.lat, lng: loc!.lng, title, description, severity: Number(severity), photos: photoUrls };
+      await api.post<{ id: string }>('/problems', body);
       router.push('/map?reported=1');
     } catch (err: any) {
       setError(err?.message ?? 'Не вдалося надіслати');

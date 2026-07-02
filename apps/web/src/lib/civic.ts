@@ -1,6 +1,5 @@
 import type { ProblemStatus } from '@safecity/shared';
-import { api, apiEnabled } from './api';
-import { supabase } from './supabase';
+import { api, qs } from './api';
 
 export interface ProblemRow {
   id: string;
@@ -25,7 +24,19 @@ export interface PetitionRow {
   status: string;
 }
 
-function mapProblem(r: any): ProblemRow {
+interface ApiProblem {
+  id: string;
+  title: string;
+  description: string | null;
+  status: ProblemStatus;
+  severity: number;
+  confirmations: number;
+  photos: string[] | null;
+  point_name: string | null;
+  created_at: string;
+}
+
+function mapProblem(r: ApiProblem): ProblemRow {
   return {
     id: r.id,
     title: r.title,
@@ -34,7 +45,7 @@ function mapProblem(r: any): ProblemRow {
     severity: r.severity,
     confirmations: r.confirmations,
     photos: r.photos ?? [],
-    pointName: r.points?.name ?? null,
+    pointName: r.point_name,
     createdAt: r.created_at,
   };
 }
@@ -56,43 +67,37 @@ export async function problemsInBbox(
   maxLng: number,
   maxLat: number,
 ): Promise<ProblemMarker[]> {
-  const { data, error } = await supabase.rpc('problems_in_bbox', {
-    min_lng: minLng,
-    min_lat: minLat,
-    max_lng: maxLng,
-    max_lat: maxLat,
-  });
-  if (error) throw error;
-  return ((data ?? []) as any[]).map((r) => ({
-    id: r.id,
-    title: r.title,
-    status: r.status,
-    severity: r.severity,
-    confirmations: r.confirmations,
-    lng: r.lng,
-    lat: r.lat,
-  }));
+  return api.get<ProblemMarker[]>(
+    `/problems/bbox${qs({ min_lng: minLng, min_lat: minLat, max_lng: maxLng, max_lat: maxLat })}`,
+  );
 }
 
 export async function listProblems(): Promise<ProblemRow[]> {
-  const { data, error } = await supabase
-    .from('problems')
-    .select('id, title, description, status, severity, confirmations, photos, created_at, points(name)')
-    .order('confirmations', { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map(mapProblem);
+  const rows = await api.get<ApiProblem[]>('/problems');
+  return rows.map(mapProblem);
 }
 
-function mapPetition(pet: any): PetitionRow {
+interface ApiPetition {
+  id: string;
+  scope: 'internal' | 'official';
+  title: string;
+  body: string | null;
+  official_url: string | null;
+  internal_signatures: number;
+  official_signature_count: number | null;
+  status: string;
+}
+
+function mapPetition(p: ApiPetition): PetitionRow {
   return {
-    id: pet.id,
-    scope: pet.scope,
-    title: pet.title,
-    body: pet.body,
-    officialUrl: pet.official_url,
-    internalSignatures: pet.internal_signatures,
-    officialSignatureCount: pet.official_signature_count,
-    status: pet.status,
+    id: p.id,
+    scope: p.scope,
+    title: p.title,
+    body: p.body,
+    officialUrl: p.official_url,
+    internalSignatures: p.internal_signatures,
+    officialSignatureCount: p.official_signature_count,
+    status: p.status,
   };
 }
 
@@ -102,48 +107,35 @@ export async function createPetition(
   title: string,
   body: string,
 ): Promise<PetitionRow> {
-  if (apiEnabled) {
-    const p = await api.post<{
-      id: string;
-      scope: 'internal' | 'official';
-      title: string;
-      status: string;
-      internal_signatures: number;
-    }>('/petitions', { problem_id: problemId, title, body });
-    return {
-      id: p.id,
-      scope: p.scope,
-      title: p.title,
-      body: body || null,
-      officialUrl: null,
-      internalSignatures: p.internal_signatures,
-      officialSignatureCount: null,
-      status: p.status,
-    };
-  }
-  const { data: auth } = await supabase.auth.getUser();
-  if (!auth.user) throw new Error('not-authenticated');
-  const { data, error } = await supabase
-    .from('petitions')
-    .insert({ problem_id: problemId, scope: 'internal', title, body: body || null, created_by: auth.user.id })
-    .select('*')
-    .single();
-  if (error) throw error;
-  return mapPetition(data);
+  const p = await api.post<{
+    id: string;
+    scope: 'internal' | 'official';
+    title: string;
+    status: string;
+    internal_signatures: number;
+  }>('/petitions', { problem_id: problemId, title, body });
+  return {
+    id: p.id,
+    scope: p.scope,
+    title: p.title,
+    body: body || null,
+    officialUrl: null,
+    internalSignatures: p.internal_signatures,
+    officialSignatureCount: null,
+    status: p.status,
+  };
 }
 
 export async function problemById(
   id: string,
 ): Promise<{ problem: ProblemRow; petition: PetitionRow | null } | null> {
-  const { data, error } = await supabase
-    .from('problems')
-    .select('id, title, description, status, severity, confirmations, photos, created_at, points(name), petitions(*)')
-    .eq('id', id)
-    .maybeSingle();
-  if (error || !data) return null;
-  const pet = (data as any).petitions?.[0];
-  return {
-    problem: mapProblem(data),
-    petition: pet ? mapPetition(pet) : null,
-  };
+  try {
+    const res = await api.get<{ problem: ApiProblem; petition: ApiPetition | null }>(`/problems/${id}`);
+    return {
+      problem: mapProblem(res.problem),
+      petition: res.petition ? mapPetition(res.petition) : null,
+    };
+  } catch {
+    return null; // page shows "not found"
+  }
 }

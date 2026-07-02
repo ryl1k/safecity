@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { Button, Field, LoadingState } from '@/components/ui';
+import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { syncProfileToAccount } from '@/lib/account';
 
@@ -26,13 +27,8 @@ function AuthInner() {
     setBusy(true);
     try {
       if (mode === 'up') {
-        const res = await fetch('/api/signup', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password }),
-        });
-        const j = await res.json();
-        if (!res.ok) throw new Error(j.error || 'Не вдалося створити акаунт');
+        // Server-side signup via the Go API (returns user-facing Ukrainian errors).
+        await api.post('/auth/signup', { email, password }, { auth: false });
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
         await syncProfileToAccount();

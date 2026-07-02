@@ -9,7 +9,7 @@ import { LocationPicker } from '@/components/LocationPicker';
 import { PhotoInput } from '@/components/PhotoInput';
 import { Button, Field, Segmented } from '@/components/ui';
 import { getCatalog } from '@/lib/catalog';
-import { api, apiEnabled } from '@/lib/api';
+import { api } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 import { uploadPhotos } from '@/lib/storage';
 import { categoryLabel } from '@/lib/format';
@@ -60,34 +60,17 @@ export default function ContributePage() {
       const cleaned: Record<string, FeatureValue> = {};
       for (const [k, v] of Object.entries(values)) if (v === 'yes' || v === 'no') cleaned[k] = v;
       const photoUrls = await uploadPhotos(photos, 'points');
-      let newId: string;
-      if (apiEnabled) {
-        const res = await api.post<{ id: string }>('/points', {
-          name,
-          category,
-          lat: p[1],
-          lng: p[0],
-          address,
-          description,
-          features: cleaned,
-          photos: photoUrls,
-        });
-        newId = res.id;
-      } else {
-        const { data, error } = await supabase.rpc('add_point', {
-          p_name: name,
-          p_category: category,
-          p_lng: p[0],
-          p_lat: p[1],
-          p_address: address || null,
-          p_description: description || null,
-          p_features: cleaned,
-          p_photos: photoUrls,
-        });
-        if (error) throw error;
-        newId = data as string;
-      }
-      router.push(`/point/${newId}`);
+      const res = await api.post<{ id: string }>('/points', {
+        name,
+        category,
+        lat: p[1],
+        lng: p[0],
+        address,
+        description,
+        features: cleaned,
+        photos: photoUrls,
+      });
+      router.push(`/point/${res.id}`);
     } catch (err: any) {
       setError(err?.message ?? 'Не вдалося додати місце');
     } finally {

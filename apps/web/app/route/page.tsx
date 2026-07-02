@@ -11,8 +11,7 @@ import { Footer } from '@/components/Footer';
 import { Button, LoadingState, ErrorState } from '@/components/ui';
 import { useProfile } from '@/profile/ProfileProvider';
 import { pointById, pointsInBbox } from '@/lib/points';
-import { problemsInBbox } from '@/lib/civic';
-import { api, apiEnabled } from '@/lib/api';
+import { api } from '@/lib/api';
 import { getCatalog } from '@/lib/catalog';
 import { categoryLabel, distanceLabel } from '@/lib/format';
 import { speak, stopSpeech } from '@/lib/tts';
@@ -35,17 +34,6 @@ function metersBetween(a: [number, number], b: [number, number]): number {
   return Math.sqrt(x * x + dLat * dLat) * R;
 }
 
-// Small square avoidance polygon (~30 m) around a barrier, as a GeoJSON ring.
-function avoidSquare(lng: number, lat: number): number[][][] {
-  const d = 0.0002;
-  return [[
-    [lng - d, lat - d],
-    [lng + d, lat - d],
-    [lng + d, lat + d],
-    [lng - d, lat + d],
-    [lng - d, lat - d],
-  ]];
-}
 
 function FromPicker({ onPick }: { onPick: (coords: [number, number], label: string) => void }) {
   const [query, setQuery] = useState('');
@@ -183,48 +171,18 @@ function RouteInner() {
       setDest(point);
       const dest: [number, number] = [point.lng, point.lat];
 
+      // The Go API builds avoid_polygons from confirmed problems server-side.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let data: any;
-      if (apiEnabled) {
-        // The Go API builds avoid_polygons from confirmed problems server-side.
-        try {
-          data = await api.post(
-            '/route',
-            { from: start, to: dest, profile: primary },
-            { auth: false },
-          );
-        } catch {
-          setStatus('error');
-          return;
-        }
-      } else {
-        // Live-barrier avoidance: confirmed/escalated problems in the start↔dest area.
-        const box = {
-          minLng: Math.min(start[0], dest[0]) - 0.003,
-          minLat: Math.min(start[1], dest[1]) - 0.003,
-          maxLng: Math.max(start[0], dest[0]) + 0.003,
-          maxLat: Math.max(start[1], dest[1]) + 0.003,
-        };
-        let avoid: number[][][][] = [];
-        try {
-          const probs = await problemsInBbox(box.minLng, box.minLat, box.maxLng, box.maxLat);
-          avoid = probs
-            .filter((p) => p.status === 'confirmed' || p.status === 'escalated')
-            .map((p) => avoidSquare(p.lng, p.lat));
-        } catch {
-          /* avoidance is best-effort */
-        }
-
-        const res = await fetch('/api/route', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ from: start, to: dest, profile: primary, avoid }),
-        });
-        if (!res.ok) {
-          setStatus('error');
-          return;
-        }
-        data = await res.json();
+      try {
+        data = await api.post(
+          '/route',
+          { from: start, to: dest, profile: primary },
+          { auth: false },
+        );
+      } catch {
+        setStatus('error');
+        return;
       }
       const coords: [number, number][] = data.coordinates ?? [];
       setLine(coords);

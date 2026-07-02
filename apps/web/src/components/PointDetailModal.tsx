@@ -5,24 +5,18 @@ import { X } from 'lucide-react';
 import { Button, LoadingState, ErrorState } from '@/components/ui';
 import { useProfile } from '@/profile/ProfileProvider';
 import { pointById } from '@/lib/points';
-import { problemsInBbox } from '@/lib/civic';
-import { api, apiEnabled } from '@/lib/api';
+import { api } from '@/lib/api';
 import { distanceLabel } from '@/lib/format';
 import { speak, stopSpeech } from '@/lib/tts';
 import { geocodePlaces, reverseGeocode } from '@/lib/geocode';
 import type { GeoPlace } from '@/lib/geocode';
-import { planTransit, isTransitCovered, legLabel, fmtTime, type TransitItinerary } from '@/lib/transit';
+import { planTransit, fmtTime, type TransitItinerary } from '@/lib/transit';
 import type { RouteDisplay } from './ExploreMap';
 import { PointDetailContent } from './PointDetailContent';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
 
 interface Step { instruction: string; distance: number }
-
-function avoidSquare(lng: number, lat: number): number[][][] {
-  const d = 0.0002;
-  return [[[lng-d,lat-d],[lng+d,lat-d],[lng+d,lat+d],[lng-d,lat+d],[lng-d,lat-d]]];
-}
 
 const trunc = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
@@ -72,7 +66,7 @@ function transitDisplay(its: TransitItinerary[], selected: number): RouteDisplay
     for (const l of it.legs) {
       if (l.mode === 'WALK' || l.coords.length < 2) continue;
       const b = l.coords[0]!, a = l.coords[l.coords.length - 1]!;
-      markers.push({ lng: b[0], lat: b[1], kind: 'board', label: `Сісти на ${l.route ?? legLabel(l)}` });
+      markers.push({ lng: b[0], lat: b[1], kind: 'board', label: `Сісти на ${l.route || l.label}` });
       markers.push({ lng: a[0], lat: a[1], kind: 'alight', label: l.toName ? `Вийти: ${trunc(l.toName, 26)}` : 'Вийти' });
     }
   }
@@ -323,16 +317,17 @@ export function RouteTabContent({
     if (travelMode === 'transit') {
       setTransitNotice(null);
       setSteps([]); setSummary(null); setFallback(false);
-      // Transit coverage is Lviv-only for now.
-      if (!isTransitCovered(start!, end!)) {
-        setTransitIts([]);
-        onRouteDisplay?.(null);
-        setTransitNotice('Маршрути громадським транспортом наразі доступні лише у Львові.');
-        setStatus('ready');
-        return;
-      }
       try {
-        const its = await planTransit(start!, end!);
+        const plan = await planTransit(start!, end!);
+        // Coverage is decided by the API (Lviv-only for now) — it sends the notice.
+        if (!plan.covered) {
+          setTransitIts([]);
+          onRouteDisplay?.(null);
+          setTransitNotice(plan.notice ?? 'Маршрути громадським транспортом наразі недоступні.');
+          setStatus('ready');
+          return;
+        }
+        const its = plan.itineraries;
         setTransitIts(its);
         setSelectedIt(0);
         onRouteDisplay?.(its.length ? transitDisplay(its, 0) : null);
@@ -342,25 +337,9 @@ export function RouteTabContent({
     }
 
     try {
+      // Barrier avoidance polygons are built server-side from confirmed problems.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      let data: any;
-      if (apiEnabled) {
-        try {
-          data = await api.post('/route', { from: start, to: end, via, profile: primary }, { auth: false });
-        } catch { setStatus('error'); return; }
-      } else {
-        const allLng = waypoints.map((p) => p[0]);
-        const allLat = waypoints.map((p) => p[1]);
-        const box = { minLng: Math.min(...allLng) - 0.003, minLat: Math.min(...allLat) - 0.003, maxLng: Math.max(...allLng) + 0.003, maxLat: Math.max(...allLat) + 0.003 };
-        let avoid: number[][][][] = [];
-        try {
-          const probs = await problemsInBbox(box.minLng, box.minLat, box.maxLng, box.maxLat);
-          avoid = probs.filter((p) => p.status === 'confirmed' || p.status === 'escalated').map((p) => avoidSquare(p.lng, p.lat));
-        } catch { /* best-effort */ }
-        const res = await fetch('/api/route', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: start, to: end, via, profile: primary, avoid }) });
-        if (!res.ok) { setStatus('error'); return; }
-        data = await res.json();
-      }
+      const data: any = await api.post('/route', { from: start, to: end, via, profile: primary }, { auth: false });
       onRouteDisplay?.(walkDisplay(data.coordinates ?? []));
       setSteps(data.steps ?? []);
       setSummary(data.summary ?? null);
@@ -525,14 +504,14 @@ export function RouteTabContent({
                   {transitLegs.map((l, j) => (
                     <span key={j} style={{
                       fontSize: '0.78em', fontWeight: 700, padding: '0.1em 0.5em', borderRadius: '0.45em',
-                      background: l.accessible === 'yes'
+                      background: l.access === 'yes'
                         ? 'color-mix(in srgb, var(--sc-ok) 13%, transparent)'
-                        : l.accessible === 'no'
+                        : l.access === 'no'
                           ? 'color-mix(in srgb, var(--sc-bad) 11%, transparent)'
                           : 'color-mix(in srgb, var(--sc-muted) 13%, transparent)',
-                      color: l.accessible === 'yes' ? 'var(--sc-ok)' : l.accessible === 'no' ? 'var(--sc-bad)' : 'var(--sc-text)',
+                      color: l.access === 'yes' ? 'var(--sc-ok)' : l.access === 'no' ? 'var(--sc-bad)' : 'var(--sc-text)',
                     }}>
-                      {legLabel(l)}
+                      {l.label}
                     </span>
                   ))}
                 </div>
@@ -544,7 +523,7 @@ export function RouteTabContent({
                         <span style={{ minWidth: 0 }}>
                           {l.mode === 'WALK'
                             ? 'Пішки'
-                            : `${legLabel(l)}: «${l.fromName}» → «${l.toName}»`}
+                            : `${l.label}: «${l.fromName}» → «${l.toName}»`}
                         </span>
                       </li>
                     ))}
