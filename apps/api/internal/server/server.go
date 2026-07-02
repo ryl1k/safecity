@@ -49,6 +49,17 @@ type DataStore interface {
 	SignPetition(ctx context.Context, userID, petitionID string) (store.SignResult, error)
 	// account profile
 	UpdateProfileNeeds(ctx context.Context, userID string, needs []string, primary string) error
+	// moderation
+	UnverifiedPoints(ctx context.Context) ([]store.AdminPoint, error)
+	SetPointVerify(ctx context.Context, userID, pointID, status string) error
+	DeletePoint(ctx context.Context, userID, pointID string) error
+	OpenProblems(ctx context.Context) ([]store.AdminProblem, error)
+	ResolveProblem(ctx context.Context, userID, problemID string) error
+	DeleteProblem(ctx context.Context, userID, problemID string) error
+	RecentReviews(ctx context.Context, limit int) ([]store.AdminReview, error)
+	DeleteReview(ctx context.Context, userID, reviewID string) error
+	ListUsers(ctx context.Context, limit int) ([]store.AdminUser, error)
+	SetUserRole(ctx context.Context, userID, targetID, role string) error
 	// routing support
 	BarriersInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.LngLat, error)
 }
@@ -113,7 +124,7 @@ func New(d Deps) *Server {
 		// Authorization header (not cookies), so no credentials needed.
 		r.Use(cors.Handler(cors.Options{
 			AllowedOrigins: d.CORSOrigins,
-			AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodOptions},
+			AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodDelete, http.MethodOptions},
 			AllowedHeaders: []string{"Authorization", "Content-Type"},
 			MaxAge:         300,
 		}))
@@ -190,6 +201,25 @@ func (s *Server) routes() {
 		s.router.Group(func(r chi.Router) {
 			s.limited(r)
 			r.Post("/auth/signup", s.handleSignup)
+		})
+	}
+
+	// Moderation surface — moderators only (role check + RLS inside writes).
+	if s.store != nil && s.roles != nil {
+		s.router.Route("/admin", func(r chi.Router) {
+			r.Use(auth.RequireUser)
+			r.Use(auth.RequireRole(s.roles, "moderator"))
+			s.limited(r)
+			r.Get("/points/unverified", s.handleAdminUnverifiedPoints)
+			r.Post("/points/{id}/verify", s.handleAdminSetPointVerify)
+			r.Delete("/points/{id}", s.handleAdminDeletePoint)
+			r.Get("/problems", s.handleAdminOpenProblems)
+			r.Post("/problems/{id}/resolve", s.handleAdminResolveProblem)
+			r.Delete("/problems/{id}", s.handleAdminDeleteProblem)
+			r.Get("/reviews", s.handleAdminRecentReviews)
+			r.Delete("/reviews/{id}", s.handleAdminDeleteReview)
+			r.Get("/users", s.handleAdminListUsers)
+			r.Post("/users/{id}/role", s.handleAdminSetUserRole)
 		})
 	}
 

@@ -90,6 +90,24 @@ type fakeStore struct {
 	gotNeeds   []string
 	gotPrimary string
 	needsErr   error
+
+	// moderation
+	adminPoints    []store.AdminPoint
+	adminPointsErr error
+	gotVerifyID    string
+	gotVerify      string
+	verifyErr      error
+	gotDeleteID    string
+	deleteErr      error
+	adminProblems  []store.AdminProblem
+	adminProbErr   error
+	adminReviews   []store.AdminReview
+	adminRevErr    error
+	adminUsers     []store.AdminUser
+	adminUsersErr  error
+	gotRoleID      string
+	gotRole        string
+	roleErr        error
 }
 
 func (f *fakeStore) CreateProblem(_ context.Context, userID string, in store.NewProblem) (store.Problem, error) {
@@ -183,6 +201,52 @@ func (f *fakeStore) UpdateProfileNeeds(_ context.Context, userID string, needs [
 	f.gotNeeds = needs
 	f.gotPrimary = primary
 	return f.needsErr
+}
+
+func (f *fakeStore) UnverifiedPoints(_ context.Context) ([]store.AdminPoint, error) {
+	return f.adminPoints, f.adminPointsErr
+}
+
+func (f *fakeStore) SetPointVerify(_ context.Context, userID, pointID, status string) error {
+	f.gotUser, f.gotVerifyID, f.gotVerify = userID, pointID, status
+	return f.verifyErr
+}
+
+func (f *fakeStore) DeletePoint(_ context.Context, userID, pointID string) error {
+	f.gotUser, f.gotDeleteID = userID, pointID
+	return f.deleteErr
+}
+
+func (f *fakeStore) OpenProblems(_ context.Context) ([]store.AdminProblem, error) {
+	return f.adminProblems, f.adminProbErr
+}
+
+func (f *fakeStore) ResolveProblem(_ context.Context, userID, problemID string) error {
+	f.gotUser, f.gotVerifyID = userID, problemID
+	return f.verifyErr
+}
+
+func (f *fakeStore) DeleteProblem(_ context.Context, userID, problemID string) error {
+	f.gotUser, f.gotDeleteID = userID, problemID
+	return f.deleteErr
+}
+
+func (f *fakeStore) RecentReviews(_ context.Context, _ int) ([]store.AdminReview, error) {
+	return f.adminReviews, f.adminRevErr
+}
+
+func (f *fakeStore) DeleteReview(_ context.Context, userID, reviewID string) error {
+	f.gotUser, f.gotDeleteID = userID, reviewID
+	return f.deleteErr
+}
+
+func (f *fakeStore) ListUsers(_ context.Context, _ int) ([]store.AdminUser, error) {
+	return f.adminUsers, f.adminUsersErr
+}
+
+func (f *fakeStore) SetUserRole(_ context.Context, userID, targetID, role string) error {
+	f.gotUser, f.gotRoleID, f.gotRole = userID, targetID, role
+	return f.roleErr
 }
 
 // fakeGeo is a configurable GeoService for handler unit tests.
