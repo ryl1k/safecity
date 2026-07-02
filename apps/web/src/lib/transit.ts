@@ -150,9 +150,20 @@ export async function planTransit(
     };
   });
 
-  // Confirmed-accessible journeys first, then unknown, then faster ones.
+  // Accessible journeys first — but don't bury a much faster option: an
+  // accessible itinerary is promoted to the top only while it takes no more
+  // than 2× the fastest non-accessible alternative. Everything else sorts by
+  // duration, with accessibility as the tiebreak.
   const rank: Record<LegAccess, number> = { yes: 0, unknown: 1, no: 2 };
-  its.sort((a, b) => rank[a.access] - rank[b.access] || a.durationMin - b.durationMin);
+  const others = its.filter((i) => i.access !== 'yes').map((i) => i.durationMin);
+  const fastestOther = others.length ? Math.min(...others) : Infinity;
+  const promoted = (i: TransitItinerary) => i.access === 'yes' && i.durationMin <= 2 * fastestOther;
+  its.sort(
+    (a, b) =>
+      Number(promoted(b)) - Number(promoted(a)) ||
+      a.durationMin - b.durationMin ||
+      rank[a.access] - rank[b.access],
+  );
   return its.slice(0, 6);
 }
 
