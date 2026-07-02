@@ -7,7 +7,9 @@
 //   node --env-file=.env tooling/importers/bezbarrier.mjs            # dry-run (no DB writes)
 //   node --env-file=.env tooling/importers/bezbarrier.mjs --apply    # write to DB
 //   flags: --data <dir>  --oblast (whole Lviv oblast, default city bbox)  --only <file.geojson>
-//          --national [--per-city N]   top-N showcase points per oblast capital (Lviv kept full)
+//          --national [--per-city N] [--prune]   top-N showcase points per city (75 most
+//          populated gov-controlled cities with data; --prune deletes bezbar points
+//          that fall outside the current selection, e.g. after shrinking a city)
 //
 // Dataset: https://data.gov.ua/dataset/.../  id 38997a1f-2e86-4bd7-9054-cd9cd206d825
 import { mkdir, readFile, writeFile, access } from 'node:fs/promises';
@@ -17,7 +19,8 @@ const args = process.argv.slice(2);
 const APPLY = args.includes('--apply');
 const OBLAST = args.includes('--oblast');
 const NATIONAL = args.includes('--national');
-const PER_CITY = Number(argVal('--per-city') || 28);
+const PRUNE = args.includes('--prune');
+const PER_CITY = Number(argVal('--per-city') || 35);
 const DATA_DIR = argVal('--data') || path.resolve('.bezbar-data');
 const ONLY = argVal('--only');
 
@@ -53,32 +56,85 @@ const TARGETS = [
 // Lviv city bounding box (matches the mobile/web map extent).
 const LVIV = { minLng: 23.9, minLat: 49.78, maxLng: 24.15, maxLat: 49.92 };
 
-// Oblast capitals for the --national showcase (government-controlled; Donetsk
-// oblast is represented by Kramatorsk, Luhansk oblast has no monitored objects).
-// Lviv is excluded — it is imported in full as the flagship city.
+// Top-75 most-populated government-controlled cities that have monitored
+// objects in the dataset (population-ordered; occupied cities excluded, renamed
+// cities under their current names). Generated from the data — see docs.
 const CAPITALS = [
-  { oblast: 'м. Київ', city: 'Київ' },
-  { oblast: 'Волинська область', city: 'Луцьк' },
-  { oblast: 'Рівненська область', city: 'Рівне' },
-  { oblast: 'Житомирська область', city: 'Житомир' },
-  { oblast: 'Вінницька область', city: 'Вінниця' },
-  { oblast: 'Хмельницька область', city: 'Хмельницький' },
-  { oblast: 'Тернопільська область', city: 'Тернопіль' },
-  { oblast: 'Івано-Франківська область', city: 'Івано-Франківськ' },
-  { oblast: 'Закарпатська область', city: 'Ужгород' },
-  { oblast: 'Чернівецька область', city: 'Чернівці' },
-  { oblast: 'Одеська область', city: 'Одеса' },
-  { oblast: 'Миколаївська область', city: 'Миколаїв' },
-  { oblast: 'Дніпропетровська область', city: 'Дніпро' },
-  { oblast: 'Запорізька область', city: 'Запоріжжя' },
-  { oblast: 'Полтавська область', city: 'Полтава' },
-  { oblast: 'Черкаська область', city: 'Черкаси' },
-  { oblast: 'Кіровоградська область', city: 'Кропивницький' },
-  { oblast: 'Чернігівська область', city: 'Чернігів' },
-  { oblast: 'Сумська область', city: 'Суми' },
-  { oblast: 'Харківська область', city: 'Харків' },
-  { oblast: 'Херсонська область', city: 'Херсон' },
-  { oblast: 'Донецька область', city: 'Краматорськ' },
+  { oblast: "м. Київ", city: "Київ" },
+  { oblast: "Харківська область", city: "Харків" },
+  { oblast: "Одеська область", city: "Одеса" },
+  { oblast: "Дніпропетровська область", city: "Дніпро" },
+  { oblast: "Львівська область", city: "Львів" },
+  { oblast: "Запорізька область", city: "Запоріжжя" },
+  { oblast: "Дніпропетровська область", city: "Кривий Ріг" },
+  { oblast: "Миколаївська область", city: "Миколаїв" },
+  { oblast: "Вінницька область", city: "Вінниця" },
+  { oblast: "Херсонська область", city: "Херсон" },
+  { oblast: "Чернігівська область", city: "Чернігів" },
+  { oblast: "Полтавська область", city: "Полтава" },
+  { oblast: "Хмельницька область", city: "Хмельницький" },
+  { oblast: "Черкаська область", city: "Черкаси" },
+  { oblast: "Чернівецька область", city: "Чернівці" },
+  { oblast: "Житомирська область", city: "Житомир" },
+  { oblast: "Сумська область", city: "Суми" },
+  { oblast: "Рівненська область", city: "Рівне" },
+  { oblast: "Івано-Франківська область", city: "Івано-Франківськ" },
+  { oblast: "Дніпропетровська область", city: "Кам'янське" },
+  { oblast: "Кіровоградська область", city: "Кропивницький" },
+  { oblast: "Тернопільська область", city: "Тернопіль" },
+  { oblast: "Полтавська область", city: "Кременчук" },
+  { oblast: "Волинська область", city: "Луцьк" },
+  { oblast: "Київська область", city: "Біла Церква" },
+  { oblast: "Донецька область", city: "Краматорськ" },
+  { oblast: "Закарпатська область", city: "Ужгород" },
+  { oblast: "Київська область", city: "Бровари" },
+  { oblast: "Дніпропетровська область", city: "Нікополь" },
+  { oblast: "Донецька область", city: "Слов'янськ" },
+  { oblast: "Дніпропетровська область", city: "Павлоград" },
+  { oblast: "Хмельницька область", city: "Кам'янець-Подільський" },
+  { oblast: "Сумська область", city: "Конотоп" },
+  { oblast: "Черкаська область", city: "Умань" },
+  { oblast: "Житомирська область", city: "Бердичів" },
+  { oblast: "Закарпатська область", city: "Мукачево" },
+  { oblast: "Кіровоградська область", city: "Олександрія" },
+  { oblast: "Сумська область", city: "Шостка" },
+  { oblast: "Одеська область", city: "Ізмаїл" },
+  { oblast: "Львівська область", city: "Дрогобич" },
+  { oblast: "Чернігівська область", city: "Ніжин" },
+  { oblast: "Дніпропетровська область", city: "Самар" },
+  { oblast: "Київська область", city: "Ірпінь" },
+  { oblast: "Львівська область", city: "Шептицький" },
+  { oblast: "Івано-Франківська область", city: "Калуш" },
+  { oblast: "Івано-Франківська область", city: "Коломия" },
+  { oblast: "Львівська область", city: "Стрий" },
+  { oblast: "Волинська область", city: "Ковель" },
+  { oblast: "Черкаська область", city: "Сміла" },
+  { oblast: "Волинська область", city: "Володимир" },
+  { oblast: "Одеська область", city: "Чорноморськ" },
+  { oblast: "Харківська область", city: "Лозова" },
+  { oblast: "Житомирська область", city: "Звягель" },
+  { oblast: "Київська область", city: "Фастів" },
+  { oblast: "Житомирська область", city: "Коростень" },
+  { oblast: "Полтавська область", city: "Миргород" },
+  { oblast: "Київська область", city: "Вишневе" },
+  { oblast: "Київська область", city: "Обухів" },
+  { oblast: "Київська область", city: "Буча" },
+  { oblast: "Київська область", city: "Васильків" },
+  { oblast: "Одеська область", city: "Білгород-Дністровський" },
+  { oblast: "Київська область", city: "Бориспіль" },
+  { oblast: "Миколаївська область", city: "Первомайськ" },
+  { oblast: "Сумська область", city: "Охтирка" },
+  { oblast: "Сумська область", city: "Ромни" },
+  { oblast: "Чернігівська область", city: "Прилуки" },
+  { oblast: "Полтавська область", city: "Лубни" },
+  { oblast: "Полтавська область", city: "Горішні Плавні" },
+  { oblast: "Волинська область", city: "Нововолинськ" },
+  { oblast: "Закарпатська область", city: "Виноградів" },
+  { oblast: "Львівська область", city: "Трускавець" },
+  { oblast: "Львівська область", city: "Борислав" },
+  { oblast: "Львівська область", city: "Новояворівськ" },
+  { oblast: "Одеська область", city: "Подільськ" },
+  { oblast: "Миколаївська область", city: "Вознесенськ" },
 ];
 
 // Which SafeCity categories each feature key is valid for (from the catalog).
@@ -312,13 +368,15 @@ async function main() {
   }
 
   if (NATIONAL) {
-    console.log('\n=== Showcase selection per capital ===');
+    console.log('\n=== Showcase selection per city ===');
+    const keepIds = [];
     for (const { city } of CAPITALS) {
       const rows = byCity.get(city) ?? [];
       const picked = selectShowcase(rows, PER_CITY);
       const nVenue = picked.filter((r) => r.category === 'venue').length;
+      keepIds.push(...picked.map((pt) => pt.osmId));
       console.log(
-        `  ${city.padEnd(18)} candidates ${String(rows.length).padStart(5)} → picked ${String(picked.length).padStart(3)} (venue ${nVenue}, transit ${picked.length - nVenue})`,
+        `  ${city.padEnd(24)} candidates ${String(rows.length).padStart(5)} → picked ${String(picked.length).padStart(3)} (venue ${nVenue}, transit ${picked.length - nVenue})`,
       );
       if (APPLY) {
         for (const pt of picked) {
@@ -326,6 +384,20 @@ async function main() {
           totals.upserts++;
         }
       }
+    }
+    // Remove previously imported bezbar points that are no longer selected
+    // (e.g. Lviv's full import shrinking to the showcase size). Only touches
+    // source='imported' bezbar rows — user-added and OSM points are untouched.
+    if (PRUNE && APPLY) {
+      const [{ count }] = await sql`
+        select count(*)::int as count from points
+        where osm_id like 'bezbar/%' and source = 'imported' and not (osm_id = any(${keepIds}))`;
+      await sql`
+        delete from points
+        where osm_id like 'bezbar/%' and source = 'imported' and not (osm_id = any(${keepIds}))`;
+      console.log(`\nPruned ${count} bezbar points outside the current selection.`);
+    } else if (PRUNE) {
+      console.log('\n(--prune requires --apply; skipped)');
     }
   }
 

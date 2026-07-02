@@ -12,8 +12,14 @@ to a Lviv bbox. Measured from the live files:
   Дніпро 398 · Кривий Ріг 380 · Житомир 278 · Хмельницький 269 · Вінниця 268 · Харків 174.
 - Occupied/front-line regions are naturally near-empty (Херсонська 61, Донецька 56,
   Луганська 0, Crimea absent) — the "exclude occupied" requirement handles itself.
-- **To go nationwide: parametrize/remove the bbox filter in `bezbarrier.mjs`**
-  (an `--oblast` flag already exists) and run `--apply`. Supabase holds 22k points easily.
+- **IMPLEMENTED (2026-07-02):** `bezbarrier.mjs --national --apply --prune` imports the
+  top ~35 showcase points (ranked by documented amenities + monitoring rating,
+  venue/transit 2:1) for each of the **75 most-populated government-controlled cities
+  that have data** (candidates without ≥5 monitored objects are skipped; renamed
+  cities under current names — Самар, Шептицький, Звягель). `--prune` removes bezbar
+  points outside the selection, so Lviv was trimmed from 781 → 35 for an even demo.
+  The web city registry (`apps/web/src/lib/cities.ts`) is generated from the same
+  selection with data-derived city centres.
 
 ## 2. Transport (GTFS with wheelchair flags) — patchy, per-city
 
