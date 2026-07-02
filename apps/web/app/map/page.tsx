@@ -7,6 +7,7 @@ import { SlidersHorizontal, Check, MapPin as MapPinIcon, Search, X } from 'lucid
 import type { AccessibilityFeature, Category, PointSummary } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
 import { PointDetailModal, RouteTabContent } from '@/components/PointDetailModal';
+import type { RouteDisplay } from '@/components/ExploreMap';
 import { LoadingState } from '@/components/ui';
 import { getCatalog } from '@/lib/catalog';
 import { pointsInBbox, pointById, searchPointsByName, type PointHit } from '@/lib/points';
@@ -43,7 +44,7 @@ export default function MapPage() {
   const [dropped, setDropped] = useState<{ lng: number; lat: number; address: string | null } | null>(null);
   const [routeDir, setRouteDir] = useState<'to' | 'from' | null>(null);
   const [pickFromCb, setPickFromCb] = useState<((lng: number, lat: number) => void) | null>(null);
-  const [routeLine, setRouteLine] = useState<[number, number][]>([]);
+  const [routeDisplay, setRouteDisplay] = useState<RouteDisplay | null>(null);
   const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number; zoom?: number } | null>(null);
   const lastBbox = useRef<Bbox | null>(null);
   const loadedBboxRef = useRef<Bbox | null>(null);
@@ -177,7 +178,7 @@ export default function MapPage() {
       setDropped((d) => (d && d.lng === lng && d.lat === lat ? { ...d, address: addr } : d)),
     );
   }
-  function clearDropped() { setDropped(null); setRouteDir(null); setRouteLine([]); setPickFromCb(null); }
+  function clearDropped() { setDropped(null); setRouteDir(null); setRouteDisplay(null); setPickFromCb(null); }
 
   // Picking a search result drops a marker there with its known address (no reverse lookup needed).
   function pickPlace(place: GeoPlace) {
@@ -295,7 +296,7 @@ export default function MapPage() {
               if (pickFromCb) { pickFromCb(lng, lat); setPickFromCb(null); }
               else if (!routeDir) dropAt(lng, lat); // plain click drops/moves a pin
             }}
-            line={routeLine}
+            route={routeDisplay}
             marker={dropped ? { lng: dropped.lng, lat: dropped.lat } : null}
             onMarkerMove={dropAt}
           />
@@ -385,13 +386,13 @@ export default function MapPage() {
               </div>
             ) : (
               <>
-                <button type="button" className="sc-foc" onClick={() => { setRouteDir(null); setRouteLine([]); setPickFromCb(null); }} style={panelBack}>← Змінити напрямок</button>
+                <button type="button" className="sc-foc" onClick={() => { setRouteDir(null); setRouteDisplay(null); setPickFromCb(null); }} style={panelBack}>← Змінити напрямок</button>
                 <RouteTabContent
                   seedFrom={routeDir === 'from' ? markerSeed ?? undefined : undefined}
                   seedTo={routeDir === 'to' ? markerSeed ?? undefined : undefined}
                   onRequestMapPick={(cb) => setPickFromCb(() => cb)}
                   onCancelMapPick={() => setPickFromCb(null)}
-                  onRouteLine={setRouteLine}
+                  onRouteDisplay={setRouteDisplay}
                 />
               </>
             )}
@@ -401,10 +402,10 @@ export default function MapPage() {
         {modalId && (
           <PointDetailModal
             id={modalId}
-            onClose={() => { setModalId(null); setPickFromCb(null); setRouteLine([]); }}
+            onClose={() => { setModalId(null); setPickFromCb(null); setRouteDisplay(null); }}
             onRequestMapPick={(cb) => setPickFromCb(() => cb)}
             onCancelMapPick={() => setPickFromCb(null)}
-            onRouteLine={setRouteLine}
+            onRouteDisplay={setRouteDisplay}
           />
         )}
       </main>

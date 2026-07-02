@@ -51,6 +51,27 @@ export interface Bbox {
   zoom: number;
 }
 
+// A styled route rendering: multiple lines (walk legs dashed, transit legs
+// solid, alternatives muted) + marker cues (start/end, board/alight stops).
+export interface RouteLineStyle {
+  coords: [number, number][];
+  color: string;
+  width: number;
+  opacity: number;
+  dash?: boolean;
+  sort?: number; // higher renders on top (selected itinerary above alternatives)
+}
+export interface RouteMarkerCue {
+  lng: number;
+  lat: number;
+  kind: 'start' | 'end' | 'board' | 'alight';
+  label?: string;
+}
+export interface RouteDisplay {
+  lines: RouteLineStyle[];
+  markers: RouteMarkerCue[];
+}
+
 function basemapStyle(dark: boolean) {
   const variant = dark ? 'dark_all' : 'light_all';
   return {
@@ -82,6 +103,74 @@ function featureCollection(points: ExploreMarker[]): any {
   };
 }
 
+// (Re)creates the route sources/layers and pushes the current display into them.
+// Safe to call repeatedly and after style swaps.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function syncRoute(map: any, route: RouteDisplay | null) {
+  const lines = {
+    type: 'FeatureCollection',
+    features: (route?.lines ?? []).map((l) => ({
+      type: 'Feature',
+      properties: { color: l.color, width: l.width, opacity: l.opacity, dash: l.dash ? 1 : 0, sort: l.sort ?? 0 },
+      geometry: { type: 'LineString', coordinates: l.coords },
+    })),
+  };
+  const markers = {
+    type: 'FeatureCollection',
+    features: (route?.markers ?? []).map((m) => ({
+      type: 'Feature',
+      properties: { kind: m.kind, label: m.label ?? '' },
+      geometry: { type: 'Point', coordinates: [m.lng, m.lat] },
+    })),
+  };
+  try {
+    if (!map.getSource('sc-route')) {
+      map.addSource('sc-route', { type: 'geojson', data: lines });
+      map.addSource('sc-route-pts', { type: 'geojson', data: markers });
+      // Solid legs (transit + selected walk core).
+      map.addLayer({
+        id: 'sc-route-solid', type: 'line', source: 'sc-route',
+        filter: ['!=', ['get', 'dash'], 1],
+        layout: { 'line-join': 'round', 'line-cap': 'round', 'line-sort-key': ['get', 'sort'] },
+        paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'], 'line-opacity': ['get', 'opacity'] },
+      });
+      // Dashed legs (walking).
+      map.addLayer({
+        id: 'sc-route-dash', type: 'line', source: 'sc-route',
+        filter: ['==', ['get', 'dash'], 1],
+        layout: { 'line-join': 'round', 'line-cap': 'round', 'line-sort-key': ['get', 'sort'] },
+        paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'], 'line-opacity': ['get', 'opacity'], 'line-dasharray': [0.8, 1.6] },
+      });
+      // Marker cues: start/end + board/alight stops.
+      map.addLayer({
+        id: 'sc-route-cue', type: 'circle', source: 'sc-route-pts',
+        paint: {
+          'circle-radius': ['match', ['get', 'kind'], 'end', 8, 'start', 7, 5.5],
+          'circle-color': ['match', ['get', 'kind'], 'start', '#ffffff', 'alight', '#ffffff', '#1d4ed8'],
+          'circle-stroke-color': ['match', ['get', 'kind'], 'start', '#1d4ed8', 'alight', '#1d4ed8', '#ffffff'],
+          'circle-stroke-width': 2.5,
+        },
+      });
+      map.addLayer({
+        id: 'sc-route-cue-label', type: 'symbol', source: 'sc-route-pts',
+        layout: {
+          'text-field': ['get', 'label'],
+          'text-font': ['Noto Sans Bold'],
+          'text-size': 11.5,
+          'text-anchor': 'top',
+          'text-offset': [0, 0.9],
+          'text-optional': true,
+          'text-max-width': 12,
+        },
+        paint: { 'text-color': '#1d4ed8', 'text-halo-color': '#ffffff', 'text-halo-width': 1.6 },
+      });
+    } else {
+      map.getSource('sc-route').setData(lines);
+      map.getSource('sc-route-pts').setData(markers);
+    }
+  } catch { /* style mid-swap — style.load will re-add */ }
+}
+
 /**
  * Immersive full-viewport map. Points live in a clustered GeoJSON source: dense
  * areas collapse into count bubbles that split apart as you zoom in, and every
@@ -98,7 +187,7 @@ export function ExploreMap({
   focus,
   pickMode = false,
   onMapClick,
-  line,
+  route,
   marker,
   onMarkerMove,
 }: {
@@ -111,7 +200,7 @@ export function ExploreMap({
   focus?: { lng: number; lat: number; nonce: number; zoom?: number } | null;
   pickMode?: boolean;
   onMapClick?: (lng: number, lat: number) => void;
-  line?: [number, number][];
+  route?: RouteDisplay | null; // styled route lines + marker cues
   marker?: { lng: number; lat: number } | null; // user-dropped pin
   onMarkerMove?: (lng: number, lat: number) => void; // drag to reposition
 }) {
@@ -129,7 +218,7 @@ export function ExploreMap({
   const onMoveEndRef = useRef(onMoveEnd);
   const pickModeRef = useRef(pickMode);
   const onMapClickRef = useRef(onMapClick);
-  const lineRef = useRef(line ?? []);
+  const routeRef = useRef<RouteDisplay | null>(route ?? null);
   const onMarkerMoveRef = useRef(onMarkerMove);
   pointsRef.current = points;
   onSelectRef.current = onSelect;
@@ -137,7 +226,7 @@ export function ExploreMap({
   onMoveEndRef.current = onMoveEnd;
   pickModeRef.current = pickMode;
   onMapClickRef.current = onMapClick;
-  lineRef.current = line ?? [];
+  routeRef.current = route ?? null;
   onMarkerMoveRef.current = onMarkerMove;
 
   // Init map once.
@@ -250,14 +339,7 @@ export function ExploreMap({
 
       // Re-add style-owned layers after a theme swap.
       map.on('style.load', () => {
-        void addPointLayers();
-        const coords = lineRef.current;
-        if (coords.length >= 2) {
-          try {
-            map.addSource('sc-route', { type: 'geojson', data: { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } } });
-            map.addLayer({ id: 'sc-route', type: 'line', source: 'sc-route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#2563eb', 'line-width': 5, 'line-opacity': 0.85 } });
-          } catch { /* ignore */ }
-        }
+        void addPointLayers().then(() => syncRoute(map, routeRef.current));
       });
 
       // Cluster click → zoom into it (maplibre-gl v5 returns a Promise).
@@ -337,25 +419,26 @@ export function ExploreMap({
     return () => { cancelled = true; };
   }, [problems]);
 
-  // Draw / update the route line.
+  // Draw / update the route display, and shrink/dim POI pins while a route is
+  // shown so the path stays readable.
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-    const coords = line ?? [];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const geojson: any = { type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: coords } };
-    const trySync = () => {
+    const active = !!route && route.lines.length > 0;
+    const apply = () => {
+      syncRoute(map, route ?? null);
       try {
-        if (map.getSource('sc-route')) {
-          map.getSource('sc-route').setData(geojson);
-        } else if (coords.length >= 2) {
-          map.addSource('sc-route', { type: 'geojson', data: geojson });
-          map.addLayer({ id: 'sc-route', type: 'line', source: 'sc-route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#2563eb', 'line-width': 5, 'line-opacity': 0.85 } });
+        if (map.getLayer('pt')) {
+          map.setLayoutProperty('pt', 'icon-size', active ? 0.85 : 1.3);
+          map.setPaintProperty('pt', 'icon-opacity', active ? 0.45 : 1);
+          map.setPaintProperty('pt', 'text-opacity', active ? 0.3 : 1);
         }
-      } catch { /* ignore */ }
+        if (map.getLayer('clusters')) map.setPaintProperty('clusters', 'circle-opacity', active ? 0.3 : 0.95);
+        if (map.getLayer('cluster-count')) map.setPaintProperty('cluster-count', 'text-opacity', active ? 0.4 : 1);
+      } catch { /* style mid-swap */ }
     };
-    if (map.isStyleLoaded()) trySync(); else map.once('load', trySync);
-  }, [line]);
+    if (map.isStyleLoaded()) apply(); else map.once('load', apply);
+  }, [route]);
 
   // User-dropped marker: create/move/remove a draggable pin.
   useEffect(() => {

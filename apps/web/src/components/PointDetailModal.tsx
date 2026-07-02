@@ -11,7 +11,8 @@ import { distanceLabel } from '@/lib/format';
 import { speak, stopSpeech } from '@/lib/tts';
 import { geocodePlaces, reverseGeocode } from '@/lib/geocode';
 import type { GeoPlace } from '@/lib/geocode';
-import { planTransit, itineraryCoords, legLabel, fmtTime, type TransitItinerary } from '@/lib/transit';
+import { planTransit, isTransitCovered, legLabel, fmtTime, type TransitItinerary } from '@/lib/transit';
+import type { RouteDisplay } from './ExploreMap';
 import { PointDetailContent } from './PointDetailContent';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
@@ -21,6 +22,61 @@ interface Step { instruction: string; distance: number }
 function avoidSquare(lng: number, lat: number): number[][][] {
   const d = 0.0002;
   return [[[lng-d,lat-d],[lng+d,lat-d],[lng+d,lat+d],[lng-d,lat+d],[lng-d,lat-d]]];
+}
+
+const trunc = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
+
+// Walking route: one solid line + start/finish cues.
+function walkDisplay(coords: [number, number][]): RouteDisplay {
+  if (coords.length < 2) return { lines: [], markers: [] };
+  const first = coords[0]!, last = coords[coords.length - 1]!;
+  return {
+    lines: [{ coords, color: '#1d4ed8', width: 5, opacity: 0.9, sort: 2 }],
+    markers: [
+      { lng: first[0], lat: first[1], kind: 'start', label: 'Старт' },
+      { lng: last[0], lat: last[1], kind: 'end', label: 'Фініш' },
+    ],
+  };
+}
+
+// Transit routes: up to 3 itineraries in monochromatic blues (selected =
+// saturated + on top, alternatives muted), walking legs dashed, and cues for
+// where to board/alight each vehicle.
+function transitDisplay(its: TransitItinerary[], selected: number): RouteDisplay {
+  const shown = its.slice(0, 3);
+  const altShades = ['#8fa8c8', '#bccadd'];
+  const lines: RouteDisplay['lines'] = [];
+  let alt = 0;
+  shown.forEach((it, i) => {
+    const sel = i === selected;
+    const color = sel ? '#1d4ed8' : altShades[Math.min(alt++, altShades.length - 1)]!;
+    for (const l of it.legs) {
+      if (l.coords.length < 2) continue;
+      lines.push({
+        coords: l.coords,
+        color,
+        width: sel ? (l.mode === 'WALK' ? 3.5 : 5.5) : l.mode === 'WALK' ? 2 : 3,
+        opacity: sel ? 0.95 : 0.5,
+        dash: l.mode === 'WALK',
+        sort: sel ? 2 : 1,
+      });
+    }
+  });
+  const markers: RouteDisplay['markers'] = [];
+  const it = shown[selected];
+  if (it) {
+    const firstLeg = it.legs[0], lastLeg = it.legs[it.legs.length - 1];
+    const first = firstLeg?.coords[0], last = lastLeg?.coords[lastLeg.coords.length - 1];
+    if (first) markers.push({ lng: first[0], lat: first[1], kind: 'start', label: 'Старт' });
+    if (last) markers.push({ lng: last[0], lat: last[1], kind: 'end', label: 'Фініш' });
+    for (const l of it.legs) {
+      if (l.mode === 'WALK' || l.coords.length < 2) continue;
+      const b = l.coords[0]!, a = l.coords[l.coords.length - 1]!;
+      markers.push({ lng: b[0], lat: b[1], kind: 'board', label: `Сісти на ${l.route ?? legLabel(l)}` });
+      markers.push({ lng: a[0], lat: a[1], kind: 'alight', label: l.toName ? `Вийти: ${trunc(l.toName, 26)}` : 'Вийти' });
+    }
+  }
+  return { lines, markers };
 }
 
 // ── Single address field with autocomplete ─────────────────────────────────
@@ -97,14 +153,14 @@ export function RouteTabContent({
   seedTo,
   onRequestMapPick,
   onCancelMapPick,
-  onRouteLine,
+  onRouteDisplay,
 }: {
   pointId?: string;
   seedFrom?: { coords: [number, number]; label: string }; // pre-fill start (e.g. from a dropped marker)
   seedTo?: { coords: [number, number]; label: string }; // pre-fill destination
   onRequestMapPick?: (cb: (lng: number, lat: number) => void) => void;
   onCancelMapPick?: () => void;
-  onRouteLine?: (coords: [number, number][]) => void;
+  onRouteDisplay?: (d: RouteDisplay | null) => void;
 }) {
   const { primary } = useProfile();
 
@@ -130,7 +186,6 @@ export function RouteTabContent({
 
   // Route result
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
-  const [line, setLine] = useState<[number, number][]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
   const [summary, setSummary] = useState<{ distance: number; duration: number } | null>(null);
   const [fallback, setFallback] = useState(false);
@@ -140,6 +195,7 @@ export function RouteTabContent({
   const [travelMode, setTravelMode] = useState<'walk' | 'transit'>('walk');
   const [transitIts, setTransitIts] = useState<TransitItinerary[]>([]);
   const [selectedIt, setSelectedIt] = useState(0);
+  const [transitNotice, setTransitNotice] = useState<string | null>(null);
   const stepsRef = useRef<Step[]>([]);
   stepsRef.current = steps;
   const lastPlanKey = useRef<string>(''); // dedupes auto-routing against re-renders
@@ -166,9 +222,8 @@ export function RouteTabContent({
 
   useEffect(() => () => stopSpeech(), []);
 
-  // Push route line to parent map; clear on unmount.
-  useEffect(() => { onRouteLine?.(line); }, [line, onRouteLine]);
-  useEffect(() => () => { onRouteLine?.([]); }, [onRouteLine]);
+  // Clear the route display on unmount.
+  useEffect(() => () => { onRouteDisplay?.(null); }, [onRouteDisplay]);
 
   // Auto-route when all waypoints are ready (from + all stops filled + to).
   // Dedupe by the actual waypoint set so re-renders can't fire a storm of
@@ -252,12 +307,21 @@ export function RouteTabContent({
     const via = waypoints.slice(1, -1);
 
     if (travelMode === 'transit') {
+      setTransitNotice(null);
+      setSteps([]); setSummary(null); setFallback(false);
+      // Transit coverage is Lviv-only for now.
+      if (!isTransitCovered(start!, end!)) {
+        setTransitIts([]);
+        onRouteDisplay?.(null);
+        setTransitNotice('Маршрути громадським транспортом наразі доступні лише у Львові.');
+        setStatus('ready');
+        return;
+      }
       try {
         const its = await planTransit(start!, end!);
         setTransitIts(its);
         setSelectedIt(0);
-        setLine(its[0] ? itineraryCoords(its[0]) : []);
-        setSteps([]); setSummary(null); setFallback(false);
+        onRouteDisplay?.(its.length ? transitDisplay(its, 0) : null);
         setStatus(its.length ? 'ready' : 'error');
       } catch { setStatus('error'); }
       return;
@@ -283,7 +347,7 @@ export function RouteTabContent({
         if (!res.ok) { setStatus('error'); return; }
         data = await res.json();
       }
-      setLine(data.coordinates ?? []);
+      onRouteDisplay?.(walkDisplay(data.coordinates ?? []));
       setSteps(data.steps ?? []);
       setSummary(data.summary ?? null);
       setFallback(Boolean(data.fallback));
@@ -410,13 +474,18 @@ export function RouteTabContent({
 
       {status === 'ready' && travelMode === 'transit' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6em' }}>
-          {transitIts.map((it, i) => {
+          {transitNotice && (
+            <p role="status" style={{ margin: 0, padding: '0.6em 0.85em', borderRadius: '0.7em', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', border: 'var(--sc-bw) solid var(--sc-primary)', fontSize: '0.85em', fontWeight: 700 }}>
+              {transitNotice}
+            </p>
+          )}
+          {transitIts.slice(0, 3).map((it, i) => {
             const active = i === selectedIt;
             const transitLegs = it.legs.filter((l) => l.mode !== 'WALK');
             return (
               <button
                 key={i} type="button" className="sc-foc"
-                onClick={() => { setSelectedIt(i); setLine(itineraryCoords(it)); }}
+                onClick={() => { setSelectedIt(i); onRouteDisplay?.(transitDisplay(transitIts, i)); }}
                 aria-pressed={active}
                 style={{
                   textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', padding: '0.7em 0.9em', borderRadius: '0.8em',
@@ -429,18 +498,21 @@ export function RouteTabContent({
                   <span style={{ color: 'var(--sc-muted)', fontSize: '0.82em' }}>
                     {fmtTime(it.startTime)}–{fmtTime(it.endTime)} · {it.transfers === 0 ? 'без пересадок' : `${it.transfers} перес.`}
                   </span>
-                  {it.allAccessible ? (
+                  {it.access === 'yes' ? (
                     <span style={{ marginLeft: 'auto', fontSize: '0.75em', fontWeight: 800, color: 'var(--sc-ok)' }}>♿ доступний</span>
-                  ) : (
+                  ) : it.access === 'no' ? (
                     <span style={{ marginLeft: 'auto', fontSize: '0.75em', fontWeight: 800, color: 'var(--sc-warn)' }}>частково недоступний</span>
+                  ) : (
+                    <span style={{ marginLeft: 'auto', fontSize: '0.75em', fontWeight: 700, color: 'var(--sc-muted)' }}>доступність невідома</span>
                   )}
                 </div>
                 <div style={{ display: 'flex', gap: '0.35em', flexWrap: 'wrap', marginTop: '0.45em' }}>
                   {transitLegs.map((l, j) => (
                     <span key={j} style={{
                       fontSize: '0.8em', fontWeight: 800, padding: '0.15em 0.5em', borderRadius: '0.5em',
-                      background: l.accessible === 'yes' ? 'var(--sc-ok)' : l.accessible === 'no' ? 'var(--sc-bad)' : 'var(--sc-border-strong)',
-                      color: '#fff',
+                      background: l.accessible === 'yes' ? 'var(--sc-ok)' : l.accessible === 'no' ? 'var(--sc-bad)' : 'var(--sc-surface-2, #e5e7eb)',
+                      color: l.accessible === 'unknown' ? 'var(--sc-text)' : '#fff',
+                      border: l.accessible === 'unknown' ? 'var(--sc-bw) solid var(--sc-border-strong)' : 'none',
                     }}>
                       {legLabel(l)}{l.accessible === 'no' ? ' ✕' : l.accessible === 'yes' ? ' ✓' : ''}
                     </span>
@@ -452,8 +524,9 @@ export function RouteTabContent({
                       <li key={j} style={{ display: 'flex', gap: '0.5em', padding: '0.25em 0', fontSize: '0.85em' }}>
                         <span style={{ color: 'var(--sc-muted)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{fmtTime(l.startTime)}</span>
                         <span style={{ minWidth: 0 }}>
-                          {legLabel(l)}
-                          {l.mode !== 'WALK' && l.fromName ? ` · ${l.fromName} → ${l.toName}` : ''}
+                          {l.mode === 'WALK'
+                            ? 'Пішки'
+                            : `Сядьте на ${legLabel(l).toLowerCase()} на «${l.fromName}» → вийдіть на «${l.toName}»`}
                         </span>
                       </li>
                     ))}
@@ -462,9 +535,11 @@ export function RouteTabContent({
               </button>
             );
           })}
-          <p style={{ margin: 0, fontSize: '0.72em', color: 'var(--sc-muted)' }}>
-            Дані маршрутів: Transitous / міський GTFS. ✓ — низькопідлоговий транспорт.
-          </p>
+          {transitIts.length > 0 && (
+            <p style={{ margin: 0, fontSize: '0.72em', color: 'var(--sc-muted)' }}>
+              ✓ — підтверджено низькопідлоговий транспорт; сірий — немає даних про доступність. Дані: міський GTFS + Transitous.
+            </p>
+          )}
         </div>
       )}
 
@@ -509,13 +584,13 @@ export function PointDetailModal({
   onClose,
   onRequestMapPick,
   onCancelMapPick,
-  onRouteLine,
+  onRouteDisplay,
 }: {
   id: string;
   onClose: () => void;
   onRequestMapPick?: (cb: (lng: number, lat: number) => void) => void;
   onCancelMapPick?: () => void;
-  onRouteLine?: (coords: [number, number][]) => void;
+  onRouteDisplay?: (d: RouteDisplay | null) => void;
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -565,7 +640,7 @@ export function PointDetailModal({
       {/* Tab content */}
       <div style={{ padding: '1.2em 1.4em 2.5em' }}>
         {tab === 'info' && <PointDetailContent id={id} onRouteClick={() => setTab('route')} />}
-        {tab === 'route' && <RouteTabContent pointId={id} onRequestMapPick={onRequestMapPick} onCancelMapPick={onCancelMapPick} onRouteLine={onRouteLine} />}
+        {tab === 'route' && <RouteTabContent pointId={id} onRequestMapPick={onRequestMapPick} onCancelMapPick={onCancelMapPick} onRouteDisplay={onRouteDisplay} />}
       </div>
     </div>
   );

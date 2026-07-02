@@ -1,9 +1,26 @@
 // Public-transport journey planning via Transitous (free community MOTIS API).
 // City surface transport only (bus/tram/metro — no rail), wheelchair walking
-// profile, and per-leg vehicle accessibility straight from the GTFS flags.
+// profile, and per-leg vehicle accessibility from the GTFS flags.
+//
+// Coverage: Lviv only for now (the only Ukrainian city whose feed we've
+// verified end-to-end). isTransitCovered() gates the UI.
 const BASE = 'https://api.transitous.org/api/v3';
 
 export type LegAccess = 'yes' | 'no' | 'unknown';
+
+// Lviv city bounds — transit planning is offered only inside them.
+const LVIV_BBOX = { minLng: 23.85, minLat: 49.74, maxLng: 24.22, maxLat: 49.96 };
+
+export function isTransitCovered(from: [number, number], to: [number, number]): boolean {
+  const inLviv = ([lng, lat]: [number, number]) =>
+    lng >= LVIV_BBOX.minLng && lng <= LVIV_BBOX.maxLng && lat >= LVIV_BBOX.minLat && lat <= LVIV_BBOX.maxLat;
+  return inLviv(from) && inLviv(to);
+}
+
+// Routes verified accessible beyond the GTFS flags (the feed marks only 8
+// routes and uses 0 = "no information" for the rest, which MOTIS collapses
+// into NOT_ACCESSIBLE). User-verified low-floor routes go here.
+const LVIV_VERIFIED_ACCESSIBLE = new Set(['А47']);
 
 export interface TransitLeg {
   mode: string; // WALK | BUS | TRAM | SUBWAY | …
@@ -21,7 +38,9 @@ export interface TransitItinerary {
   transfers: number;
   startTime: string;
   endTime: string;
-  allAccessible: boolean; // every transit leg is wheelchair-accessible
+  /** 'yes' — every transit leg confirmed accessible; 'unknown' — no leg is
+   *  confirmed inaccessible but some lack data; 'no' — has an inaccessible leg. */
+  access: LegAccess;
   legs: TransitLeg[];
 }
 
@@ -47,9 +66,13 @@ function decodePolyline(str: string, precision: number): [number, number][] {
   return out;
 }
 
-function accessOf(v: unknown): LegAccess {
+// GTFS uses 0 = "no information", but MOTIS collapses it into NOT_ACCESSIBLE.
+// Lviv's feed has NO explicit "not accessible" trips, so NOT_ACCESSIBLE here
+// really means "unknown" — never paint it as a hard no. Confirmed-accessible
+// comes from the feed flag OR the verified override list.
+function accessOf(v: unknown, route: string | null): LegAccess {
+  if (route && LVIV_VERIFIED_ACCESSIBLE.has(route.toUpperCase())) return 'yes';
   if (v === 'ACCESSIBLE') return 'yes';
-  if (v === 'NOT_ACCESSIBLE') return 'no';
   return 'unknown';
 }
 
@@ -75,29 +98,38 @@ export async function planTransit(
 
   const its = raw.map((it): TransitItinerary => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const legs: TransitLeg[] = (it.legs ?? []).map((l: any): TransitLeg => ({
-      mode: l.mode,
-      route: l.routeShortName ?? null,
-      fromName: l.from?.name === 'START' ? '' : (l.from?.name ?? ''),
-      toName: l.to?.name === 'END' ? '' : (l.to?.name ?? ''),
-      startTime: l.startTime,
-      endTime: l.endTime,
-      accessible: l.mode === 'WALK' ? 'unknown' : accessOf(l.wheelchairAccessible),
-      coords: l.legGeometry?.points ? decodePolyline(l.legGeometry.points, l.legGeometry.precision ?? 6) : [],
-    }));
+    const legs: TransitLeg[] = (it.legs ?? []).map((l: any): TransitLeg => {
+      const route = l.routeShortName ?? null;
+      return {
+        mode: l.mode,
+        route,
+        fromName: l.from?.name === 'START' ? '' : (l.from?.name ?? ''),
+        toName: l.to?.name === 'END' ? '' : (l.to?.name ?? ''),
+        startTime: l.startTime,
+        endTime: l.endTime,
+        accessible: l.mode === 'WALK' ? 'unknown' : accessOf(l.wheelchairAccessible, route),
+        coords: l.legGeometry?.points ? decodePolyline(l.legGeometry.points, l.legGeometry.precision ?? 6) : [],
+      };
+    });
     const transit = legs.filter((l) => l.mode !== 'WALK');
+    const access: LegAccess = transit.some((l) => l.accessible === 'no')
+      ? 'no'
+      : transit.length > 0 && transit.every((l) => l.accessible === 'yes')
+        ? 'yes'
+        : 'unknown';
     return {
       durationMin: Math.round((it.duration ?? 0) / 60),
       transfers: it.transfers ?? Math.max(0, transit.length - 1),
       startTime: it.startTime,
       endTime: it.endTime,
-      allAccessible: transit.length > 0 && transit.every((l) => l.accessible === 'yes'),
+      access,
       legs,
     };
   });
 
-  // Fully accessible journeys first, then faster ones.
-  its.sort((a, b) => Number(b.allAccessible) - Number(a.allAccessible) || a.durationMin - b.durationMin);
+  // Confirmed-accessible journeys first, then unknown, then faster ones.
+  const rank: Record<LegAccess, number> = { yes: 0, unknown: 1, no: 2 };
+  its.sort((a, b) => rank[a.access] - rank[b.access] || a.durationMin - b.durationMin);
   return its.slice(0, 6);
 }
 
