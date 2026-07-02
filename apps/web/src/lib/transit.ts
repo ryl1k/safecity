@@ -17,10 +17,31 @@ export function isTransitCovered(from: [number, number], to: [number, number]): 
   return inLviv(from) && inLviv(to);
 }
 
-// Routes verified accessible beyond the GTFS flags (the feed marks only 8
-// routes and uses 0 = "no information" for the rest, which MOTIS collapses
-// into NOT_ACCESSIBLE). User-verified low-floor routes go here.
-const LVIV_VERIFIED_ACCESSIBLE = new Set(['А47']);
+// Full per-route accessibility for Lviv, keyed by the GTFS route_short_name.
+// Derived from eway.in.ua/ua/cities/lviv/routes (2026-07-02): категорії
+// «Автобус» і «Тролейбус» = низькопідлогові (accessible), «Трамвай» і
+// «Маршрутка» = ні. An explicit per-trip ACCESSIBLE flag from the city's GTFS
+// still upgrades a trip to 'yes' (e.g. the new low-floor trams on Т08).
+const LVIV_ROUTE_ACCESS: Record<string, 'yes' | 'no'> = {
+  // Автобуси (низькопідлогові)
+  А01: 'yes', А03: 'yes', А05: 'yes', А06: 'yes', А08а: 'yes', А09: 'yes', А10: 'yes', А11: 'yes',
+  А16: 'yes', А18: 'yes', А19: 'yes', А20: 'yes', А23: 'yes', А29: 'yes', А32: 'yes', А37: 'yes',
+  А40: 'yes', А46: 'yes', А47: 'yes', А48: 'yes', А49: 'yes', А51: 'yes', А52: 'yes', А53: 'yes',
+  А55: 'yes', А56: 'yes', А60: 'yes', А61: 'yes', А80: 'yes', А84: 'yes', А92: 'yes', А99: 'yes',
+  // Тролейбуси (низькопідлогові)
+  Тр22: 'yes', Тр23: 'yes', Тр24: 'yes', Тр25: 'yes', Тр27: 'yes', Тр30: 'yes', Тр31: 'yes', Тр32: 'yes', Тр38: 'yes',
+  // Трамваї
+  Т01: 'no', Т02: 'no', Т03: 'no', Т04: 'no', Т06: 'no', Т07: 'no', Т08: 'no', Т09: 'no',
+  // Маршрутки
+  А07: 'no', А12: 'no', А14: 'no', А15: 'no', А17: 'no', А21: 'no', А22: 'no', А25: 'no',
+  А27: 'no', А31: 'no', А33: 'no', А34: 'no', А39: 'no', А39а: 'no', А41: 'no', А43: 'no',
+  А45: 'no', А57: 'no', А58: 'no', А59: 'no', А62: 'no', А63: 'no',
+};
+
+// Normalise a route name for lookup (latin lookalikes → cyrillic, trim).
+function routeKey(route: string): string {
+  return route.trim().replace(/A/g, 'А').replace(/a/g, 'а').replace(/T/g, 'Т').replace(/p/g, 'р');
+}
 
 export interface TransitLeg {
   mode: string; // WALK | BUS | TRAM | SUBWAY | …
@@ -66,13 +87,15 @@ function decodePolyline(str: string, precision: number): [number, number][] {
   return out;
 }
 
-// GTFS uses 0 = "no information", but MOTIS collapses it into NOT_ACCESSIBLE.
-// Lviv's feed has NO explicit "not accessible" trips, so NOT_ACCESSIBLE here
-// really means "unknown" — never paint it as a hard no. Confirmed-accessible
-// comes from the feed flag OR the verified override list.
+// Priority: the city's explicit per-trip ACCESSIBLE flag → the per-route
+// category map (eway) → unknown. MOTIS's NOT_ACCESSIBLE is ignored as a
+// signal because GTFS 0 = "no information" gets collapsed into it.
 function accessOf(v: unknown, route: string | null): LegAccess {
-  if (route && LVIV_VERIFIED_ACCESSIBLE.has(route.toUpperCase())) return 'yes';
   if (v === 'ACCESSIBLE') return 'yes';
+  if (route) {
+    const cat = LVIV_ROUTE_ACCESS[routeKey(route)];
+    if (cat) return cat;
+  }
   return 'unknown';
 }
 

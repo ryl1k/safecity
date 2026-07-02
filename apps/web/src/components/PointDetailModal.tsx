@@ -537,7 +537,7 @@ export function RouteTabContent({
           })}
           {transitIts.length > 0 && (
             <p style={{ margin: 0, fontSize: '0.72em', color: 'var(--sc-muted)' }}>
-              ✓ — підтверджено низькопідлоговий транспорт; сірий — немає даних про доступність. Дані: міський GTFS + Transitous.
+              ✓ — низькопідлогові автобуси й тролейбуси; ✕ — маршрутки та старі трамваї. Дані: міський GTFS + Transitous + eway.
             </p>
           )}
         </div>
