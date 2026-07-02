@@ -11,6 +11,7 @@ import { distanceLabel } from '@/lib/format';
 import { speak, stopSpeech } from '@/lib/tts';
 import { geocodePlaces, reverseGeocode } from '@/lib/geocode';
 import type { GeoPlace } from '@/lib/geocode';
+import { planTransit, itineraryCoords, legLabel, fmtTime, type TransitItinerary } from '@/lib/transit';
 import { PointDetailContent } from './PointDetailContent';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
@@ -135,6 +136,10 @@ export function RouteTabContent({
   const [fallback, setFallback] = useState(false);
   const [avoided, setAvoided] = useState(0);
   const [speaking, setSpeaking] = useState(false);
+  // Travel mode: on-foot (ORS wheelchair) or public transport (Transitous).
+  const [travelMode, setTravelMode] = useState<'walk' | 'transit'>('walk');
+  const [transitIts, setTransitIts] = useState<TransitItinerary[]>([]);
+  const [selectedIt, setSelectedIt] = useState(0);
   const stepsRef = useRef<Step[]>([]);
   stepsRef.current = steps;
   const lastPlanKey = useRef<string>(''); // dedupes auto-routing against re-renders
@@ -171,14 +176,14 @@ export function RouteTabContent({
   useEffect(() => {
     if (!fromCoords || !toCoords) return;
     if (stops.some((s) => !s.coords)) return;
-    const via = stops.map((s) => s.coords!);
+    const via = travelMode === 'transit' ? [] : stops.map((s) => s.coords!); // transit ignores stops
     const wps = [fromCoords, ...via, toCoords];
-    const key = `${primary}|${JSON.stringify(wps)}`;
+    const key = `${travelMode}|${primary}|${JSON.stringify(wps)}`;
     if (key === lastPlanKey.current) return;
     lastPlanKey.current = key;
     void plan(wps);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromCoords, toCoords, stops, primary]);
+  }, [fromCoords, toCoords, stops, primary, travelMode]);
 
   // Set a waypoint's coords immediately (with a coord label), then upgrade the
   // label to a real address once reverse geocoding resolves.
@@ -245,6 +250,19 @@ export function RouteTabContent({
     setStatus('loading'); setAvoided(0);
     const [start, end] = [waypoints[0], waypoints[waypoints.length - 1]];
     const via = waypoints.slice(1, -1);
+
+    if (travelMode === 'transit') {
+      try {
+        const its = await planTransit(start!, end!);
+        setTransitIts(its);
+        setSelectedIt(0);
+        setLine(its[0] ? itineraryCoords(its[0]) : []);
+        setSteps([]); setSummary(null); setFallback(false);
+        setStatus(its.length ? 'ready' : 'error');
+      } catch { setStatus('error'); }
+      return;
+    }
+
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       let data: any;
@@ -282,6 +300,24 @@ export function RouteTabContent({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.7em' }}>
+
+      {/* Travel mode: on foot vs public transport */}
+      <div role="radiogroup" aria-label="Спосіб пересування" style={{ display: 'flex', gap: '0.4em' }}>
+        {([['walk', 'Пішки'], ['transit', 'Транспортом']] as const).map(([m, label]) => (
+          <button
+            key={m} type="button" role="radio" aria-checked={travelMode === m} className="sc-foc"
+            onClick={() => setTravelMode(m)}
+            style={{
+              flex: 1, minHeight: '2.5em', borderRadius: '0.7em', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.9em',
+              border: `var(--sc-bw) solid ${travelMode === m ? 'var(--sc-primary)' : 'var(--sc-border-strong)'}`,
+              background: travelMode === m ? 'var(--sc-primary)' : 'var(--sc-surface)',
+              color: travelMode === m ? 'var(--sc-on-primary)' : 'var(--sc-text)',
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
       {/* Map pick hint — only shown when a field is active */}
       {activeField !== null && (
@@ -354,20 +390,85 @@ export function RouteTabContent({
         });
       })()}
 
-      {/* Add stop button */}
-      <button type="button" onClick={addStop}
-        style={{ display: 'flex', alignItems: 'center', gap: '0.5em', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sc-primary)', fontFamily: 'inherit', fontSize: '0.88em', fontWeight: 700, padding: '0.1em 0', alignSelf: 'flex-start' }}>
-        <span style={{ width: '1.4em', height: '1.4em', borderRadius: '50%', border: '2px solid var(--sc-primary)', display: 'grid', placeItems: 'center', fontSize: '1em', lineHeight: 1 }}>+</span>
-        Додати зупинку
-      </button>
+      {/* Add stop button (walking mode only — transit plans A→B) */}
+      {travelMode === 'walk' && (
+        <button type="button" onClick={addStop}
+          style={{ display: 'flex', alignItems: 'center', gap: '0.5em', background: 'none', border: 'none', cursor: 'pointer', color: 'var(--sc-primary)', fontFamily: 'inherit', fontSize: '0.88em', fontWeight: 700, padding: '0.1em 0', alignSelf: 'flex-start' }}>
+          <span style={{ width: '1.4em', height: '1.4em', borderRadius: '50%', border: '2px solid var(--sc-primary)', display: 'grid', placeItems: 'center', fontSize: '1em', lineHeight: 1 }}>+</span>
+          Додати зупинку
+        </button>
+      )}
 
       {/* Route result */}
       {status === 'loading' && <LoadingState label="Прокладання маршруту" />}
       {status === 'error' && fromCoords && toCoords && !stops.some((s) => !s.coords) && (
-        <ErrorState title="Не вдалося прокласти маршрут" onRetry={() => void plan([fromCoords, ...stops.map((s) => s.coords!), toCoords])} />
+        <ErrorState
+          title={travelMode === 'transit' ? 'Маршрутів транспортом не знайдено' : 'Не вдалося прокласти маршрут'}
+          onRetry={() => { lastPlanKey.current = ''; void plan([fromCoords, ...stops.map((s) => s.coords!), toCoords]); }}
+        />
       )}
 
-      {status === 'ready' && (
+      {status === 'ready' && travelMode === 'transit' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6em' }}>
+          {transitIts.map((it, i) => {
+            const active = i === selectedIt;
+            const transitLegs = it.legs.filter((l) => l.mode !== 'WALK');
+            return (
+              <button
+                key={i} type="button" className="sc-foc"
+                onClick={() => { setSelectedIt(i); setLine(itineraryCoords(it)); }}
+                aria-pressed={active}
+                style={{
+                  textAlign: 'left', fontFamily: 'inherit', cursor: 'pointer', padding: '0.7em 0.9em', borderRadius: '0.8em',
+                  border: `var(--sc-bw) solid ${active ? 'var(--sc-primary)' : 'var(--sc-border)'}`,
+                  background: active ? 'var(--sc-primary-tint)' : 'var(--sc-surface)', color: 'var(--sc-text)',
+                }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6em', flexWrap: 'wrap' }}>
+                  <strong style={{ fontSize: '0.95em' }}>{it.durationMin} хв</strong>
+                  <span style={{ color: 'var(--sc-muted)', fontSize: '0.82em' }}>
+                    {fmtTime(it.startTime)}–{fmtTime(it.endTime)} · {it.transfers === 0 ? 'без пересадок' : `${it.transfers} перес.`}
+                  </span>
+                  {it.allAccessible ? (
+                    <span style={{ marginLeft: 'auto', fontSize: '0.75em', fontWeight: 800, color: 'var(--sc-ok)' }}>♿ доступний</span>
+                  ) : (
+                    <span style={{ marginLeft: 'auto', fontSize: '0.75em', fontWeight: 800, color: 'var(--sc-warn)' }}>частково недоступний</span>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: '0.35em', flexWrap: 'wrap', marginTop: '0.45em' }}>
+                  {transitLegs.map((l, j) => (
+                    <span key={j} style={{
+                      fontSize: '0.8em', fontWeight: 800, padding: '0.15em 0.5em', borderRadius: '0.5em',
+                      background: l.accessible === 'yes' ? 'var(--sc-ok)' : l.accessible === 'no' ? 'var(--sc-bad)' : 'var(--sc-border-strong)',
+                      color: '#fff',
+                    }}>
+                      {legLabel(l)}{l.accessible === 'no' ? ' ✕' : l.accessible === 'yes' ? ' ✓' : ''}
+                    </span>
+                  ))}
+                </div>
+                {active && (
+                  <ol style={{ listStyle: 'none', margin: '0.55em 0 0', padding: 0 }}>
+                    {it.legs.map((l, j) => (
+                      <li key={j} style={{ display: 'flex', gap: '0.5em', padding: '0.25em 0', fontSize: '0.85em' }}>
+                        <span style={{ color: 'var(--sc-muted)', flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>{fmtTime(l.startTime)}</span>
+                        <span style={{ minWidth: 0 }}>
+                          {legLabel(l)}
+                          {l.mode !== 'WALK' && l.fromName ? ` · ${l.fromName} → ${l.toName}` : ''}
+                        </span>
+                      </li>
+                    ))}
+                  </ol>
+                )}
+              </button>
+            );
+          })}
+          <p style={{ margin: 0, fontSize: '0.72em', color: 'var(--sc-muted)' }}>
+            Дані маршрутів: Transitous / міський GTFS. ✓ — низькопідлоговий транспорт.
+          </p>
+        </div>
+      )}
+
+      {status === 'ready' && travelMode === 'walk' && (
         <>
           {fallback && (
             <p role="status" style={{ margin: 0, padding: '0.55em 0.8em', borderRadius: '0.7em', background: 'var(--sc-warn-bg)', color: 'var(--sc-warn)', border: 'var(--sc-bw) solid var(--sc-warn-line)', fontSize: '0.82em', fontWeight: 700 }}>
