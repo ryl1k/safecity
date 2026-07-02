@@ -22,6 +22,7 @@ import (
 	"github.com/safecity/api/internal/ratelimit"
 	"github.com/safecity/api/internal/server"
 	"github.com/safecity/api/internal/store"
+	"github.com/safecity/api/internal/transit"
 )
 
 func main() {
@@ -57,6 +58,7 @@ func main() {
 	limiter.StartJanitor(stopJanitor)
 
 	geoClient := geo.New(cfg.ORSAPIKey, cfg.ORSBaseURL, cfg.NominatimURL, 15*time.Second)
+	transitClient := transit.New(cfg.TransitousURL, 20*time.Second)
 
 	// ML gRPC client (optional; connection is lazy so this never blocks startup).
 	if cfg.MLGRPCAddr != "" {
@@ -79,6 +81,7 @@ func main() {
 		Limiter:     limiter,
 		Store:       store.New(database),
 		Geo:         geoClient,
+		Transit:     transitClient,
 		Metrics:     metrics.New(),
 		CORSOrigins: cfg.CORSOrigins,
 	})

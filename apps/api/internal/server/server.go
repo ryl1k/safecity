@@ -21,6 +21,7 @@ import (
 	"github.com/safecity/api/internal/metrics"
 	"github.com/safecity/api/internal/ratelimit"
 	"github.com/safecity/api/internal/store"
+	"github.com/safecity/api/internal/transit"
 )
 
 // DataStore is the subset of the data layer the handlers need. It grows as more
@@ -50,6 +51,11 @@ type GeoService interface {
 	Reverse(ctx context.Context, lng, lat float64) (*geo.Place, error)
 }
 
+// TransitService plans public-transport journeys (Transitous/MOTIS).
+type TransitService interface {
+	Plan(ctx context.Context, from, to [2]float64) (transit.Result, error)
+}
+
 // Deps are the dependencies wired into the server. Log is required; the rest are
 // optional so tests can construct a minimal server.
 type Deps struct {
@@ -60,6 +66,7 @@ type Deps struct {
 	Limiter     *ratelimit.Limiter          // throttles writes/proxies; nil disables limiting
 	Store       DataStore                   // data access; nil disables data routes
 	Geo         GeoService                  // routing/geocoding proxy; nil disables proxy routes
+	Transit     TransitService              // public-transport planning; nil disables /transit
 	Metrics     *metrics.Metrics            // Prometheus hook; nil disables /metrics
 	CORSOrigins []string                    // allowed browser origins; empty disables CORS
 }
@@ -74,6 +81,7 @@ type Server struct {
 	limiter  *ratelimit.Limiter
 	store    DataStore
 	geo      GeoService
+	transit  TransitService
 	metrics  *metrics.Metrics
 }
 
@@ -103,7 +111,7 @@ func New(d Deps) *Server {
 		r.Use(auth.Authenticate(d.Verifier))
 	}
 
-	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles, limiter: d.Limiter, store: d.Store, geo: d.Geo, metrics: d.Metrics}
+	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles, limiter: d.Limiter, store: d.Store, geo: d.Geo, transit: d.Transit, metrics: d.Metrics}
 	s.routes()
 	return s
 }
@@ -141,6 +149,14 @@ func (s *Server) routes() {
 			r.Post("/route", s.handleRoute)
 			r.Get("/geocode", s.handleGeocode)
 			r.Get("/geocode/reverse", s.handleReverseGeocode)
+		})
+	}
+
+	// Public-transport planning (public, rate-limited).
+	if s.transit != nil {
+		s.router.Group(func(r chi.Router) {
+			s.limited(r)
+			r.Get("/transit/plan", s.handleTransitPlan)
 		})
 	}
 

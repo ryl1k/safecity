@@ -21,10 +21,11 @@ type Config struct {
 	SupabasePublicKey string // publishable key (apikey header for Supabase REST)
 	SupabaseSecretKey string // service key for admin ops (keep server-side only)
 
-	ORSAPIKey    string // OpenRouteService key (routing proxy)
-	ORSBaseURL   string
-	NominatimURL string // geocoding base (self-host door)
-	MLGRPCAddr   string // Python ML gRPC service address
+	ORSAPIKey     string // OpenRouteService key (routing proxy)
+	ORSBaseURL    string
+	NominatimURL  string // geocoding base (self-host door)
+	TransitousURL string // public-transport planning base (MOTIS API)
+	MLGRPCAddr    string // Python ML gRPC service address
 
 	RateRPS   float64 // per-key sustained requests/second on throttled routes
 	RateBurst int     // per-key burst allowance
@@ -45,6 +46,7 @@ func Load() (Config, error) {
 		ORSAPIKey:         os.Getenv("ORS_API_KEY"),
 		ORSBaseURL:        env("ORS_BASE_URL", "https://api.openrouteservice.org"),
 		NominatimURL:      env("NOMINATIM_URL", "https://nominatim.openstreetmap.org"),
+		TransitousURL:     env("TRANSITOUS_URL", "https://api.transitous.org/api/v3"),
 		MLGRPCAddr:        os.Getenv("ML_GRPC_URL"),
 		RateRPS:           envFloat("RATE_LIMIT_RPS", 10),
 		RateBurst:         envInt("RATE_LIMIT_BURST", 20),
