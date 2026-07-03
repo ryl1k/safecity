@@ -17,6 +17,9 @@ import { geocodePlaces, reverseGeocode, type GeoPlace } from '@/lib/geocode';
 import { featuresForCategories, isAccessible, suggestFilters } from '@/lib/filters';
 import { categoryLabel } from '@/lib/format';
 import { CITIES, DEFAULT_CITY_ID, cityBbox, cityById, loadCity, saveCity, type City } from '@/lib/cities';
+import { segmentsInBbox, type StreetSegment } from '@/lib/segments';
+import { StreetSegmentPanel } from '@/components/StreetSegmentPanel';
+import type { ExploreSegment } from '@/components/ExploreMap';
 
 const CATEGORIES: Category[] = ['venue', 'transit', 'crossing', 'toilet', 'parking'];
 
@@ -45,6 +48,8 @@ export default function MapPage() {
   const [routeDir, setRouteDir] = useState<'to' | 'from' | null>(null);
   const [pickFromCb, setPickFromCb] = useState<((lng: number, lat: number) => void) | null>(null);
   const [routeDisplay, setRouteDisplay] = useState<RouteDisplay | null>(null);
+  const [segments, setSegments] = useState<StreetSegment[]>([]);
+  const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number; zoom?: number } | null>(null);
   const lastBbox = useRef<Bbox | null>(null);
   const loadedBboxRef = useRef<Bbox | null>(null);
@@ -77,6 +82,12 @@ export default function MapPage() {
     }
   }
 
+  async function loadSegments(bb: Bbox) {
+    try {
+      setSegments(await segmentsInBbox(bb.minLng, bb.minLat, bb.maxLng, bb.maxLat));
+    } catch { /* segments are non-critical — silently skip */ }
+  }
+
   useEffect(() => {
     void getCatalog().then(setCatalog).catch(() => setCatalog([]));
     void reviewStats().then(setStats).catch(() => {});
@@ -87,6 +98,7 @@ export default function MapPage() {
       setFocus({ lng: c.lng, lat: c.lat, nonce: nonceRef.current, zoom: 12.5 });
     }
     void loadPoints(cityBbox(c));
+    void loadSegments(cityBbox(c));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -98,6 +110,7 @@ export default function MapPage() {
     nonceRef.current += 1;
     setFocus({ lng: c.lng, lat: c.lat, nonce: nonceRef.current, zoom: 12.5 });
     void loadPoints(cityBbox(c));
+    void loadSegments(cityBbox(c));
   }
 
   function onMoveEnd(b: Bbox) {
@@ -112,6 +125,7 @@ export default function MapPage() {
         const w = b.maxLng - b.minLng;
         const h = b.maxLat - b.minLat;
         void loadPoints({ minLng: b.minLng - w, minLat: b.minLat - h, maxLng: b.maxLng + w, maxLat: b.maxLat + h });
+        void loadSegments({ minLng: b.minLng - w, minLat: b.minLat - h, maxLng: b.maxLng + w, maxLat: b.maxLat + h });
       }
       if (showProblems) problemsInBbox(b.minLng, b.minLat, b.maxLng, b.maxLat).then(setProblems).catch(() => {});
     }, 300);
@@ -157,6 +171,14 @@ export default function MapPage() {
         accessible: isAccessible(p, catalog),
       }));
   }, [points, enabled, features, showInaccessible, catalog]);
+
+  // Shape segments for ExploreMap (only the fields the map layer needs).
+  const exploreSegments = useMemo<ExploreSegment[]>(
+    () => segments.map((s) => ({ id: s.id, streetName: s.streetName, rating: s.rating, geojson: s.geojson })),
+    [segments],
+  );
+
+  const selectedSegment = selectedSegmentId ? segments.find((s) => s.id === selectedSegmentId) ?? null : null;
 
   // Stable seed for routing from/to the dropped marker (identity changes only
   // when the marker moves / its address resolves — never every render).
@@ -290,11 +312,20 @@ export default function MapPage() {
         {status === 'error' ? (
           <div style={{ padding: '2em 1.25em' }}><LoadingState label="Повторне завантаження…" /></div>
         ) : (
-          <ExploreMap points={matching} problems={problems} center={[city.lng, city.lat]} onSelect={setModalId} onSelectProblem={(id) => router.push(`/problem/${id}`)} onMoveEnd={onMoveEnd} focus={focus}
+          <ExploreMap
+            points={matching}
+            problems={problems}
+            segments={exploreSegments}
+            center={[city.lng, city.lat]}
+            onSelect={(id) => { setModalId(id); setSelectedSegmentId(null); }}
+            onSelectProblem={(id) => router.push(`/problem/${id}`)}
+            onSelectSegment={(id) => { setSelectedSegmentId(id); setModalId(null); setDropped(null); }}
+            onMoveEnd={onMoveEnd}
+            focus={focus}
             pickMode={pickFromCb !== null}
             onMapClick={(lng, lat) => {
               if (pickFromCb) { pickFromCb(lng, lat); setPickFromCb(null); }
-              else if (!routeDir) dropAt(lng, lat); // plain click drops/moves a pin
+              else if (!routeDir) dropAt(lng, lat);
             }}
             route={routeDisplay}
             marker={dropped ? { lng: dropped.lng, lat: dropped.lat } : null}
@@ -362,6 +393,14 @@ export default function MapPage() {
         <span aria-live="polite" style={{ position: 'absolute', right: '0.8em', bottom: '0.8em', fontSize: '0.8em', fontWeight: 700, color: 'var(--sc-text)', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', padding: '0.3em 0.7em', boxShadow: 'var(--sc-shadow-1)' }}>
           {status === 'ready' ? `${matching.length} місць` : '…'}
         </span>
+
+        {/* Street segment panel */}
+        {selectedSegment && !modalId && !dropped && (
+          <StreetSegmentPanel
+            segment={selectedSegment}
+            onClose={() => setSelectedSegmentId(null)}
+          />
+        )}
 
         {/* Dropped-marker panel: address + route actions */}
         {dropped && !modalId && (

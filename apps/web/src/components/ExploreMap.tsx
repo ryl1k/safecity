@@ -43,6 +43,13 @@ export interface ExploreProblem {
   lat: number;
 }
 
+export interface ExploreSegment {
+  id: string;
+  streetName: string;
+  rating: 'full' | 'partial' | 'none' | 'unknown';
+  geojson: string; // GeoJSON LineString geometry string
+}
+
 export interface Bbox {
   minLng: number;
   minLat: number;
@@ -101,6 +108,49 @@ function featureCollection(points: ExploreMarker[]): any {
       properties: { id: p.id, name: p.name, icon: placeKind(p.category, p.name), accessible: p.accessible },
     })),
   };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function segmentCollection(segs: ExploreSegment[]): any {
+  return {
+    type: 'FeatureCollection',
+    features: segs.map((s) => ({
+      type: 'Feature',
+      geometry: JSON.parse(s.geojson),
+      properties: { id: s.id, street_name: s.streetName, rating: s.rating },
+    })),
+  };
+}
+
+// (Re)creates the segment source/layer and pushes the current data into it.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function syncSegments(map: any, segs: ExploreSegment[]) {
+  const data = segmentCollection(segs);
+  try {
+    if (!map.getSource('sc-segs')) {
+      map.addSource('sc-segs', { type: 'geojson', data });
+      map.addLayer(
+        {
+          id: 'sc-segs', type: 'line', source: 'sc-segs',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: {
+            'line-width': 5,
+            'line-opacity': 0.85,
+            'line-color': ['match', ['get', 'rating'],
+              'full',    '#22c55e',
+              'partial', '#f59e0b',
+              'none',    '#ef4444',
+              '#9ca3af',
+            ],
+          },
+        },
+        'clusters', // render below point markers
+      );
+    } else {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (map.getSource('sc-segs') as any).setData(data);
+    }
+  } catch { /* style mid-swap — style.load will re-add */ }
 }
 
 // (Re)creates the route sources/layers and pushes the current display into them.
@@ -180,9 +230,11 @@ function syncRoute(map: any, route: RouteDisplay | null) {
 export function ExploreMap({
   points,
   problems = [],
+  segments = [],
   center,
   onSelect,
   onSelectProblem,
+  onSelectSegment,
   onMoveEnd,
   focus,
   pickMode = false,
@@ -193,9 +245,11 @@ export function ExploreMap({
 }: {
   points: ExploreMarker[];
   problems?: ExploreProblem[];
+  segments?: ExploreSegment[];
   center: [number, number];
   onSelect: (id: string) => void;
   onSelectProblem?: (id: string) => void;
+  onSelectSegment?: (id: string) => void;
   onMoveEnd?: (b: Bbox) => void;
   focus?: { lng: number; lat: number; nonce: number; zoom?: number } | null;
   pickMode?: boolean;
@@ -213,16 +267,20 @@ export function ExploreMap({
   const dropMarkerRef = useRef<any>(null);
   const observerRef = useRef<MutationObserver | null>(null);
   const pointsRef = useRef<ExploreMarker[]>(points);
+  const segmentsRef = useRef<ExploreSegment[]>(segments);
   const onSelectRef = useRef(onSelect);
   const onSelectProblemRef = useRef(onSelectProblem);
+  const onSelectSegmentRef = useRef(onSelectSegment);
   const onMoveEndRef = useRef(onMoveEnd);
   const pickModeRef = useRef(pickMode);
   const onMapClickRef = useRef(onMapClick);
   const routeRef = useRef<RouteDisplay | null>(route ?? null);
   const onMarkerMoveRef = useRef(onMarkerMove);
   pointsRef.current = points;
+  segmentsRef.current = segments;
   onSelectRef.current = onSelect;
   onSelectProblemRef.current = onSelectProblem;
+  onSelectSegmentRef.current = onSelectSegment;
   onMoveEndRef.current = onMoveEnd;
   pickModeRef.current = pickMode;
   onMapClickRef.current = onMapClick;
@@ -332,6 +390,7 @@ export function ExploreMap({
 
       map.on('load', async () => {
         await addPointLayers();
+        syncSegments(map, segmentsRef.current);
         emit();
         try { geolocate.trigger(); } catch { /* denied — stay at center */ }
       });
@@ -339,7 +398,10 @@ export function ExploreMap({
 
       // Re-add style-owned layers after a theme swap.
       map.on('style.load', () => {
-        void addPointLayers().then(() => syncRoute(map, routeRef.current));
+        void addPointLayers().then(() => {
+          syncRoute(map, routeRef.current);
+          syncSegments(map, segmentsRef.current);
+        });
       });
 
       // Cluster click → zoom into it (maplibre-gl v5 returns a Promise).
@@ -360,14 +422,20 @@ export function ExploreMap({
         const f = e.features?.[0];
         if (f) onSelectRef.current(f.properties.id);
       });
+      // Segment click → open segment panel.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      map.on('click', 'sc-segs', (e: any) => {
+        const f = e.features?.[0];
+        if (f) onSelectSegmentRef.current?.(f.properties.id);
+      });
       // Empty-map click → drop/route pick (skip when a feature was hit).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       map.on('click', (e: any) => {
-        const hits = map.queryRenderedFeatures(e.point, { layers: ['clusters', 'pt'] });
+        const hits = map.queryRenderedFeatures(e.point, { layers: ['clusters', 'pt', 'sc-segs'] });
         if (hits.length) return;
         onMapClickRef.current?.(e.lngLat.lng, e.lngLat.lat);
       });
-      for (const layer of ['clusters', 'pt']) {
+      for (const layer of ['clusters', 'pt', 'sc-segs']) {
         map.on('mouseenter', layer, () => { map.getCanvas().style.cursor = 'pointer'; });
         map.on('mouseleave', layer, () => { map.getCanvas().style.cursor = pickModeRef.current ? 'crosshair' : ''; });
       }
@@ -393,6 +461,13 @@ export function ExploreMap({
     const src = map?.getSource?.('pts');
     if (src) src.setData(featureCollection(points));
   }, [points]);
+
+  // Push new segment data into the segment source.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !map.isStyleLoaded?.()) return;
+    syncSegments(map, segments);
+  }, [segments]);
 
   // Sync the problems layer (distinct warning markers — few, kept as DOM).
   useEffect(() => {

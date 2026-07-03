@@ -84,6 +84,10 @@ type fakeStore struct {
 	viewerState    store.ProblemViewerState
 	viewerStateErr error
 
+	// SegmentsInBBox
+	segments    []store.StreetSegment
+	segmentsErr error
+
 	// FeatureCatalog
 	catalog    []store.Feature
 	catalogErr error
@@ -192,6 +196,10 @@ func (f *fakeStore) ProblemsInBBox(_ context.Context, _, _, _, _ float64) ([]sto
 func (f *fakeStore) ProblemByID(_ context.Context, id string) (*store.ProblemDetail, error) {
 	f.gotProblemID = id
 	return f.problemDetail, f.problemDetErr
+}
+
+func (f *fakeStore) SegmentsInBBox(_ context.Context, _, _, _, _ float64) ([]store.StreetSegment, error) {
+	return f.segments, f.segmentsErr
 }
 
 func (f *fakeStore) FeatureCatalog(_ context.Context) ([]store.Feature, error) {
