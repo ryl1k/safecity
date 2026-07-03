@@ -1,13 +1,14 @@
-// Thin client for the SafeCity Go API. Hybrid + incremental: data paths use the
-// API when NEXT_PUBLIC_API_URL is set, and fall back to Supabase-direct otherwise
-// (so the app keeps working before the API is deployed). Auth, Storage uploads,
-// and Realtime always stay on Supabase.
+// Thin client for the SafeCity Go API — the single entrypoint for all data and
+// business logic (web and mobile render what it returns). Only identity (auth
+// sessions), Storage uploads, and Realtime stay on Supabase directly.
 import { supabase } from './supabase';
 
-const BASE = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/+$/, '');
-
-/** True when the Go API is configured; callers branch on this. */
-export const apiEnabled = BASE.length > 0;
+// In dev the API runs on :8080 next to the web server; deployments must set
+// NEXT_PUBLIC_API_URL explicitly (build fails loudly at request time otherwise).
+const BASE = (
+  process.env.NEXT_PUBLIC_API_URL ??
+  (process.env.NODE_ENV === 'development' ? 'http://localhost:8080' : '')
+).replace(/\/+$/, '');
 
 export interface ApiFieldError {
   field: string;
@@ -35,6 +36,9 @@ async function request<T>(
   auth = false,
   signal?: AbortSignal,
 ): Promise<T> {
+  if (!BASE) {
+    throw new ApiError(0, 'not_configured', 'NEXT_PUBLIC_API_URL is not set — the app cannot reach the API');
+  }
   const headers: Record<string, string> = {};
   let payload: string | undefined;
   if (body !== undefined) {
@@ -59,11 +63,13 @@ async function request<T>(
 }
 
 export const api = {
-  get: <T>(path: string, opts?: { signal?: AbortSignal }) =>
-    request<T>('GET', path, undefined, false, opts?.signal),
+  get: <T>(path: string, opts?: { signal?: AbortSignal; auth?: boolean }) =>
+    request<T>('GET', path, undefined, opts?.auth ?? false, opts?.signal),
   /** POST defaults to authenticated (most writes need it); pass {auth:false} for public posts. */
   post: <T>(path: string, body?: unknown, opts?: { auth?: boolean }) =>
     request<T>('POST', path, body, opts?.auth ?? true),
+  /** DELETE is always authenticated (only moderation uses it). */
+  del: <T>(path: string) => request<T>('DELETE', path, undefined, true),
 };
 
 /** Build a query string from defined, non-empty params. */

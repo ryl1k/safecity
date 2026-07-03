@@ -13,7 +13,7 @@ const onest = Onest({
 });
 
 export const metadata: Metadata = {
-  title: 'SafeCity — інклюзивна мапа Львова',
+  title: 'SafeCity — інклюзивна мапа міст України',
   description:
     'Інклюзивна мапа міста, що адаптується під кожного. Доступність — це продукт.',
 };

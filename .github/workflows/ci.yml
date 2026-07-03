@@ -51,6 +51,7 @@ jobs:
         env:
           NEXT_PUBLIC_SUPABASE_URL: https://placeholder.supabase.co
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: placeholder-anon-key
+          NEXT_PUBLIC_API_URL: http://localhost:8080
         run: pnpm --filter @safecity/web run build
 
   # api — Go service (vet, lint, test, build). Guarded so CI stays green during the

@@ -7,6 +7,9 @@
 //   node --env-file=.env tooling/importers/bezbarrier.mjs            # dry-run (no DB writes)
 //   node --env-file=.env tooling/importers/bezbarrier.mjs --apply    # write to DB
 //   flags: --data <dir>  --oblast (whole Lviv oblast, default city bbox)  --only <file.geojson>
+//          --national [--per-city N] [--prune]   top-N showcase points per city (75 most
+//          populated gov-controlled cities with data; --prune deletes bezbar points
+//          that fall outside the current selection, e.g. after shrinking a city)
 //
 // Dataset: https://data.gov.ua/dataset/.../  id 38997a1f-2e86-4bd7-9054-cd9cd206d825
 import { mkdir, readFile, writeFile, access } from 'node:fs/promises';
@@ -15,6 +18,9 @@ import path from 'node:path';
 const args = process.argv.slice(2);
 const APPLY = args.includes('--apply');
 const OBLAST = args.includes('--oblast');
+const NATIONAL = args.includes('--national');
+const PRUNE = args.includes('--prune');
+const PER_CITY = Number(argVal('--per-city') || 35);
 const DATA_DIR = argVal('--data') || path.resolve('.bezbar-data');
 const ONLY = argVal('--only');
 
@@ -49,6 +55,87 @@ const TARGETS = [
 
 // Lviv city bounding box (matches the mobile/web map extent).
 const LVIV = { minLng: 23.9, minLat: 49.78, maxLng: 24.15, maxLat: 49.92 };
+
+// Top-75 most-populated government-controlled cities that have monitored
+// objects in the dataset (population-ordered; occupied cities excluded, renamed
+// cities under their current names). Generated from the data — see docs.
+const CAPITALS = [
+  { oblast: "м. Київ", city: "Київ" },
+  { oblast: "Харківська область", city: "Харків" },
+  { oblast: "Одеська область", city: "Одеса" },
+  { oblast: "Дніпропетровська область", city: "Дніпро" },
+  { oblast: "Львівська область", city: "Львів" },
+  { oblast: "Запорізька область", city: "Запоріжжя" },
+  { oblast: "Дніпропетровська область", city: "Кривий Ріг" },
+  { oblast: "Миколаївська область", city: "Миколаїв" },
+  { oblast: "Вінницька область", city: "Вінниця" },
+  { oblast: "Херсонська область", city: "Херсон" },
+  { oblast: "Чернігівська область", city: "Чернігів" },
+  { oblast: "Полтавська область", city: "Полтава" },
+  { oblast: "Хмельницька область", city: "Хмельницький" },
+  { oblast: "Черкаська область", city: "Черкаси" },
+  { oblast: "Чернівецька область", city: "Чернівці" },
+  { oblast: "Житомирська область", city: "Житомир" },
+  { oblast: "Сумська область", city: "Суми" },
+  { oblast: "Рівненська область", city: "Рівне" },
+  { oblast: "Івано-Франківська область", city: "Івано-Франківськ" },
+  { oblast: "Дніпропетровська область", city: "Кам'янське" },
+  { oblast: "Кіровоградська область", city: "Кропивницький" },
+  { oblast: "Тернопільська область", city: "Тернопіль" },
+  { oblast: "Полтавська область", city: "Кременчук" },
+  { oblast: "Волинська область", city: "Луцьк" },
+  { oblast: "Київська область", city: "Біла Церква" },
+  { oblast: "Донецька область", city: "Краматорськ" },
+  { oblast: "Закарпатська область", city: "Ужгород" },
+  { oblast: "Київська область", city: "Бровари" },
+  { oblast: "Дніпропетровська область", city: "Нікополь" },
+  { oblast: "Донецька область", city: "Слов'янськ" },
+  { oblast: "Дніпропетровська область", city: "Павлоград" },
+  { oblast: "Хмельницька область", city: "Кам'янець-Подільський" },
+  { oblast: "Сумська область", city: "Конотоп" },
+  { oblast: "Черкаська область", city: "Умань" },
+  { oblast: "Житомирська область", city: "Бердичів" },
+  { oblast: "Закарпатська область", city: "Мукачево" },
+  { oblast: "Кіровоградська область", city: "Олександрія" },
+  { oblast: "Сумська область", city: "Шостка" },
+  { oblast: "Одеська область", city: "Ізмаїл" },
+  { oblast: "Львівська область", city: "Дрогобич" },
+  { oblast: "Чернігівська область", city: "Ніжин" },
+  { oblast: "Дніпропетровська область", city: "Самар" },
+  { oblast: "Київська область", city: "Ірпінь" },
+  { oblast: "Львівська область", city: "Шептицький" },
+  { oblast: "Івано-Франківська область", city: "Калуш" },
+  { oblast: "Івано-Франківська область", city: "Коломия" },
+  { oblast: "Львівська область", city: "Стрий" },
+  { oblast: "Волинська область", city: "Ковель" },
+  { oblast: "Черкаська область", city: "Сміла" },
+  { oblast: "Волинська область", city: "Володимир" },
+  { oblast: "Одеська область", city: "Чорноморськ" },
+  { oblast: "Харківська область", city: "Лозова" },
+  { oblast: "Житомирська область", city: "Звягель" },
+  { oblast: "Київська область", city: "Фастів" },
+  { oblast: "Житомирська область", city: "Коростень" },
+  { oblast: "Полтавська область", city: "Миргород" },
+  { oblast: "Київська область", city: "Вишневе" },
+  { oblast: "Київська область", city: "Обухів" },
+  { oblast: "Київська область", city: "Буча" },
+  { oblast: "Київська область", city: "Васильків" },
+  { oblast: "Одеська область", city: "Білгород-Дністровський" },
+  { oblast: "Київська область", city: "Бориспіль" },
+  { oblast: "Миколаївська область", city: "Первомайськ" },
+  { oblast: "Сумська область", city: "Охтирка" },
+  { oblast: "Сумська область", city: "Ромни" },
+  { oblast: "Чернігівська область", city: "Прилуки" },
+  { oblast: "Полтавська область", city: "Лубни" },
+  { oblast: "Полтавська область", city: "Горішні Плавні" },
+  { oblast: "Волинська область", city: "Нововолинськ" },
+  { oblast: "Закарпатська область", city: "Виноградів" },
+  { oblast: "Львівська область", city: "Трускавець" },
+  { oblast: "Львівська область", city: "Борислав" },
+  { oblast: "Львівська область", city: "Новояворівськ" },
+  { oblast: "Одеська область", city: "Подільськ" },
+  { oblast: "Миколаївська область", city: "Вознесенськ" },
+];
 
 // Which SafeCity categories each feature key is valid for (from the catalog).
 const KEY_CATS = {
@@ -96,6 +183,19 @@ const MATCHERS = [
   { re: /пониження бордюрного каменю/, keys: ['dropped_curb'] },
 ];
 
+// Short UA labels for the mapped feature keys (used to compose readable descriptions).
+const FEATURE_LABELS = {
+  step_free_entrance: 'вхід без сходів', ramp: 'пандус', ramp_slope_ok: 'пологий пандус', door_width: 'широкий вхід',
+  elevator: 'ліфт', accessible_toilet: 'доступний туалет', level_interior: 'рівна підлога',
+  accessible_parking_near: 'паркування для людей з інвалідністю', tactile_guidance_entrance: 'тактильна навігація',
+  braille_signage: 'шрифт Брайля', staff_assistance: 'допомога персоналу', good_lighting: 'добре освітлення',
+  guide_dog_welcome: 'із собакою-поводирем', level_boarding: 'посадка врівень', step_free_to_stop: 'підхід без сходів',
+  low_floor_vehicles: 'низькопідлоговий транспорт', tactile_paving: 'тактильна плитка', audio_announcements: 'аудіооголошення',
+  high_contrast_edge: 'контрастний край', dropped_curb: 'занижений бордюр', acoustic_signal: 'звуковий сигнал',
+  accessible_stall: 'доступна кабіна', grab_bars: 'поручні', turning_space: 'місце для розвороту',
+  emergency_cord: 'тривожна кнопка', disabled_bay: 'місце для авто', bay_width: 'широке місце', near_entrance: 'біля входу',
+};
+
 const norm = (s) => (s || '').toLowerCase().replace(/[ʼ’]/g, "'").trim();
 const VAL = { так: 'yes', ні: 'no', 'не застосовується': null };
 
@@ -122,6 +222,70 @@ function inLviv(p) {
   return p.lng >= LVIV.minLng && p.lng <= LVIV.maxLng && p.lat >= LVIV.minLat && p.lat <= LVIV.maxLat;
 }
 
+const capKey = (oblast, city) => `${norm(oblast)}|${norm(city)}`;
+const CAPITAL_KEYS = new Map(CAPITALS.map((c) => [capKey(c.oblast, c.city), c.city]));
+
+// Which showcase city (if any) a row belongs to. Matches oblast+city so that
+// e.g. Миколаїв (Львівська обл.) doesn't collide with the oblast capital.
+function capitalOf(p) {
+  return CAPITAL_KEYS.get(capKey(p.addressAdminUnitL2, p.addressPostName)) ?? null;
+}
+
+// Build the upsertable record for one dataset feature (shared by both modes).
+function preparePoint(p, category, idTitle) {
+  const features = mapFeatures(p, category, idTitle);
+  const name = (p.title || '').trim() || 'Без назви';
+  const address = [p.addressThoroughfare, p.addressPostName].filter(Boolean).join(', ') || null;
+  const present = Object.entries(features)
+    .filter(([, v]) => v === 'yes')
+    .map(([k]) => FEATURE_LABELS[k])
+    .filter(Boolean);
+  const kindStr = (p.kind || '').trim();
+  const cls = (p.ratingAuthority || '').trim();
+  const a11y = present.length
+    ? `Зручності для крісла колісного: ${present.slice(0, 5).join(', ')}.`
+    : cls
+      ? `${cls.charAt(0).toUpperCase()}${cls.slice(1)}.`
+      : '';
+  const description = [kindStr ? `${kindStr}.` : '', a11y].filter(Boolean).join(' ') || null;
+  // Demo-quality score: documented wheelchair amenities first, then the
+  // dataset's own monitoring rating.
+  const score = present.length * 2 + (Number.isFinite(p.rating) ? p.rating * 10 : 0);
+  return { name, category, address, description, features, osmId: `bezbar/${p.id}`, lng: p.lng, lat: p.lat, score };
+}
+
+async function upsertPoint(sql, pt) {
+  const [row] = await sql`
+    insert into points (name, category, geom, address, description, source, verify_status, osm_id)
+    values (${pt.name}, ${pt.category},
+            ST_SetSRID(ST_MakePoint(${pt.lng}, ${pt.lat}), 4326)::geography,
+            ${pt.address}, ${pt.description}, 'imported', 'unverified', ${pt.osmId})
+    on conflict (osm_id) where osm_id is not null
+    do update set name = excluded.name, geom = excluded.geom,
+                  address = coalesce(excluded.address, points.address),
+                  description = excluded.description, updated_at = now()
+    returning id`;
+  for (const [key, value] of Object.entries(pt.features)) {
+    await sql`
+      insert into point_feature_values (point_id, feature_key, value)
+      values (${row.id}, ${key}, ${value}::feature_value)
+      on conflict (point_id, feature_key) do update set value = excluded.value`;
+  }
+}
+
+// Pick the top-N showcase points for one city: venue/transit interleaved 2:1
+// (by score) so the demo shows a mix of pin types, not just shops.
+function selectShowcase(rows, n) {
+  const venues = rows.filter((r) => r.category === 'venue').sort((a, b) => b.score - a.score);
+  const transit = rows.filter((r) => r.category !== 'venue').sort((a, b) => b.score - a.score);
+  const out = [];
+  while (out.length < n && (venues.length || transit.length)) {
+    for (let i = 0; i < 2 && venues.length && out.length < n; i++) out.push(venues.shift());
+    if (transit.length && out.length < n) out.push(transit.shift());
+  }
+  return out;
+}
+
 // Map one feature's criteria → { featureKey: 'yes'|'no' } for the given category.
 function mapFeatures(props, category, idTitle) {
   const out = {};
@@ -145,7 +309,8 @@ function mapFeatures(props, category, idTitle) {
 
 async function main() {
   await mkdir(DATA_DIR, { recursive: true });
-  console.log(`Mode: ${APPLY ? 'APPLY (writing to DB)' : 'DRY-RUN (no writes)'} · scope: ${OBLAST ? 'Lviv oblast' : 'Lviv city bbox'} · data: ${DATA_DIR}\n`);
+  const scope = NATIONAL ? `national showcase (top ${PER_CITY}/capital)` : OBLAST ? 'Lviv oblast' : 'Lviv city bbox';
+  console.log(`Mode: ${APPLY ? 'APPLY (writing to DB)' : 'DRY-RUN (no writes)'} · scope: ${scope} · data: ${DATA_DIR}\n`);
 
   console.log('Loading criteria dictionary…');
   const criteria = JSON.parse(await readFile(await ensureFile('criteria.json'), 'utf8'));
@@ -159,68 +324,91 @@ async function main() {
   }
 
   const targets = ONLY ? TARGETS.filter(([f]) => f === ONLY) : TARGETS;
-  const totals = { features: 0, lviv: 0, withFeatures: 0, featureValues: 0, upserts: 0 };
+  const totals = { features: 0, matched: 0, withFeatures: 0, featureValues: 0, upserts: 0 };
   const samples = [];
+  const byCity = new Map(); // national mode: city -> prepared rows
 
   for (const [file, category] of targets) {
     const fc = JSON.parse(await readFile(await ensureFile(file), 'utf8'));
-    let lviv = 0, withFeat = 0, fvals = 0;
+    let matched = 0, withFeat = 0, fvals = 0;
     for (const f of fc.features || []) {
       const p = f.properties || {};
       const lng = Number(p.lon), lat = Number(p.lat);
       if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
       const row = { ...p, lng, lat };
       totals.features++;
-      if (!inLviv(row)) continue;
-      lviv++;
 
-      const features = mapFeatures(p, category, idTitle);
-      const nKeys = Object.keys(features).length;
+      let city = null;
+      if (NATIONAL) {
+        city = capitalOf(row);
+        if (!city) continue;
+      } else if (!inLviv(row)) continue;
+      matched++;
+
+      const pt = preparePoint(row, category, idTitle);
+      const nKeys = Object.keys(pt.features).length;
       if (nKeys) withFeat++;
       fvals += nKeys;
+      if (samples.length < 6 && nKeys >= 2) samples.push(pt);
 
-      const name = (p.title || '').trim() || 'Без назви';
-      const address = [p.addressThoroughfare, p.addressPostName].filter(Boolean).join(', ') || null;
-      const osmId = `bezbar/${p.id}`;
-
-      if (samples.length < 6 && nKeys >= 2) {
-        samples.push({ name, category, address, features });
-      }
-
-      if (APPLY) {
-        const [pt] = await sql`
-          insert into points (name, category, geom, address, source, verify_status, osm_id)
-          values (${name}, ${category},
-                  ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography,
-                  ${address}, 'imported', 'unverified', ${osmId})
-          on conflict (osm_id) where osm_id is not null
-          do update set name = excluded.name, geom = excluded.geom,
-                        address = coalesce(excluded.address, points.address), updated_at = now()
-          returning id`;
+      if (NATIONAL) {
+        if (!byCity.has(city)) byCity.set(city, []);
+        byCity.get(city).push(pt);
+      } else if (APPLY) {
+        await upsertPoint(sql, pt);
         totals.upserts++;
-        for (const [key, value] of Object.entries(features)) {
-          await sql`
-            insert into point_feature_values (point_id, feature_key, value)
-            values (${pt.id}, ${key}, ${value}::feature_value)
-            on conflict (point_id, feature_key) do update set value = excluded.value`;
-        }
       }
     }
-    totals.lviv += lviv;
+    totals.matched += matched;
     totals.withFeatures += withFeat;
     totals.featureValues += fvals;
     console.log(
-      `  ${file.padEnd(24)} total ${String(fc.features.length).padStart(6)} · Lviv ${String(lviv).padStart(5)} · with-features ${String(withFeat).padStart(5)} · feature-values ${fvals}`,
+      `  ${file.padEnd(24)} total ${String(fc.features.length).padStart(6)} · matched ${String(matched).padStart(5)} · with-features ${String(withFeat).padStart(5)} · feature-values ${fvals}`,
     );
   }
 
+  if (NATIONAL) {
+    console.log('\n=== Showcase selection per city ===');
+    const keepIds = [];
+    for (const { city } of CAPITALS) {
+      const rows = byCity.get(city) ?? [];
+      const picked = selectShowcase(rows, PER_CITY);
+      const nVenue = picked.filter((r) => r.category === 'venue').length;
+      keepIds.push(...picked.map((pt) => pt.osmId));
+      console.log(
+        `  ${city.padEnd(24)} candidates ${String(rows.length).padStart(5)} → picked ${String(picked.length).padStart(3)} (venue ${nVenue}, transit ${picked.length - nVenue})`,
+      );
+      if (APPLY) {
+        for (const pt of picked) {
+          await upsertPoint(sql, pt);
+          totals.upserts++;
+        }
+      }
+    }
+    // Remove previously imported bezbar points that are no longer selected
+    // (e.g. Lviv's full import shrinking to the showcase size). Only touches
+    // source='imported' bezbar rows — user-added and OSM points are untouched.
+    if (PRUNE && APPLY) {
+      const [{ count }] = await sql`
+        select count(*)::int as count from points
+        where osm_id like 'bezbar/%' and source = 'imported' and not (osm_id = any(${keepIds}))`;
+      await sql`
+        delete from points
+        where osm_id like 'bezbar/%' and source = 'imported' and not (osm_id = any(${keepIds}))`;
+      console.log(`\nPruned ${count} bezbar points outside the current selection.`);
+    } else if (PRUNE) {
+      console.log('\n(--prune requires --apply; skipped)');
+    }
+  }
+
   console.log('\n=== Summary ===');
-  console.log(`Lviv points: ${totals.lviv}  (with ≥1 mapped feature: ${totals.withFeatures})`);
+  console.log(`Matched points: ${totals.matched}  (with ≥1 mapped feature: ${totals.withFeatures})`);
   console.log(`Total mapped feature-values: ${totals.featureValues}`);
   if (APPLY) console.log(`Upserted: ${totals.upserts} points`);
   console.log('\n=== Sample mapped points ===');
   for (const s of samples) {
     console.log(`• [${s.category}] ${s.name}${s.address ? ' — ' + s.address : ''}`);
+    if (s.description) console.log(`    ${s.description}`);
     console.log(`    ${JSON.stringify(s.features)}`);
   }
   if (!APPLY) console.log('\n(DRY-RUN — re-run with --apply to write. Then run dedupe to merge with OSM.)');

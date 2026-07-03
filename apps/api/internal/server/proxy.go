@@ -16,6 +16,7 @@ import (
 type routeRequest struct {
 	From    *[2]float64  `json:"from" validate:"required"`
 	To      *[2]float64  `json:"to" validate:"required"`
+	Via     [][2]float64 `json:"via" validate:"omitempty,max=10"` // intermediate stops, in order
 	Profile string       `json:"profile" validate:"omitempty,oneof=wheelchair blind"`
 	Params  *routeParams `json:"params"`
 }
@@ -38,6 +39,12 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 	if !validLngLat(from[0], from[1]) || !validLngLat(to[0], to[1]) {
 		httpx.Error(w, http.StatusBadRequest, "invalid_query", "from/to must be [lng,lat] within range")
 		return
+	}
+	for _, v := range req.Via {
+		if !validLngLat(v[0], v[1]) {
+			httpx.Error(w, http.StatusBadRequest, "invalid_query", "via must be [lng,lat] within range")
+			return
+		}
 	}
 
 	// blind users route on foot; everyone else gets the wheelchair profile.
@@ -62,8 +69,14 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 	// Best-effort: a barrier-lookup failure must not block routing.
 	var avoid [][][][]float64
 	if s.store != nil {
-		minLng, maxLng := math.Min(from[0], to[0])-avoidPad, math.Max(from[0], to[0])+avoidPad
-		minLat, maxLat := math.Min(from[1], to[1])-avoidPad, math.Max(from[1], to[1])+avoidPad
+		// Span every leg (from → via… → to) so barriers near a stop are caught too.
+		minLng, maxLng, minLat, maxLat := from[0], from[0], from[1], from[1]
+		for _, p := range append([][2]float64{to}, req.Via...) {
+			minLng, maxLng = math.Min(minLng, p[0]), math.Max(maxLng, p[0])
+			minLat, maxLat = math.Min(minLat, p[1]), math.Max(maxLat, p[1])
+		}
+		minLng, maxLng = minLng-avoidPad, maxLng+avoidPad
+		minLat, maxLat = minLat-avoidPad, maxLat+avoidPad
 		if barriers, err := s.store.BarriersInBBox(r.Context(), minLng, minLat, maxLng, maxLat); err != nil {
 			s.log.Warn("route barrier lookup failed", "err", err)
 		} else if len(barriers) > 0 {
@@ -78,6 +91,7 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 	res, err := s.geo.Route(r.Context(), geo.RouteInput{
 		From:         from,
 		To:           to,
+		Via:          req.Via,
 		Profile:      wanted,
 		Restrictions: rest,
 		Avoid:        avoid,
@@ -110,4 +124,25 @@ func (s *Server) handleGeocode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, places)
+}
+
+// handleReverseGeocode: GET /geocode/reverse?lng=&lat= — coords → nearest address.
+func (s *Server) handleReverseGeocode(w http.ResponseWriter, r *http.Request) {
+	lng, okLng := floatQuery(r.URL.Query().Get("lng"))
+	lat, okLat := floatQuery(r.URL.Query().Get("lat"))
+	if !okLng || !okLat || !validLngLat(lng, lat) {
+		httpx.Error(w, http.StatusBadRequest, "invalid_query", "lng and lat are required numbers in range")
+		return
+	}
+	place, err := s.geo.Reverse(r.Context(), lng, lat)
+	if err != nil {
+		s.log.Error("reverse geocode", "err", err)
+		httpx.Error(w, http.StatusBadGateway, "upstream_error", "reverse geocoding failed")
+		return
+	}
+	if place == nil {
+		httpx.Error(w, http.StatusNotFound, "not_found", "no address for this location")
+		return
+	}
+	httpx.JSON(w, http.StatusOK, place)
 }

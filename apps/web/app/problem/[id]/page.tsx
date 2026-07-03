@@ -9,15 +9,11 @@ import { StatusPill } from '@/components/StatusPill';
 import { Button, LoadingState, ErrorState } from '@/components/ui';
 import { PhotoGallery } from '@/components/PhotoGallery';
 import { problemById, createPetition, type ProblemRow, type PetitionRow } from '@/lib/civic';
-import { api, apiEnabled, ApiError } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
 
 const PETITION_GOAL = 250;
 const ESCALATE_AT = 5; // confirmations needed before we suggest a petition
-
-function isDuplicate(message?: string): boolean {
-  return Boolean(message && /(duplicate|already exists|23505)/i.test(message));
-}
 
 export default function ProblemPage({ params }: { params: { id: string } }) {
   const router = useRouter();
@@ -46,17 +42,17 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
       setStatus('ready');
       // Reflect whether the signed-in user already confirmed / signed (so we don't
       // re-POST and hit a 409, and the buttons show the right state).
-      const { data: auth } = await supabase.auth.getUser();
-      if (auth.user) {
-        const { data: conf } = await supabase
-          .from('problem_confirmations').select('problem_id')
-          .eq('problem_id', params.id).eq('user_id', auth.user.id).maybeSingle();
-        if (conf) setConfirmed(true);
-        if (res.petition) {
-          const { data: sig } = await supabase
-            .from('petition_signatures').select('petition_id')
-            .eq('petition_id', res.petition.id).eq('user_id', auth.user.id).maybeSingle();
-          if (sig) setSigned(true);
+      const { data: auth } = await supabase.auth.getSession();
+      if (auth.session) {
+        try {
+          const me = await api.get<{ confirmed: boolean; signed: boolean }>(
+            `/problems/${params.id}/me`,
+            { auth: true },
+          );
+          setConfirmed(me.confirmed);
+          if (res.petition) setSigned(me.signed);
+        } catch {
+          /* best-effort — buttons fall back to 409 handling */
         }
       }
     } catch {
@@ -80,23 +76,15 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
   async function confirm() {
     const uid = await requireUser();
     if (!uid) return;
-    if (apiEnabled) {
-      try {
-        const res = await api.post<{ confirmations: number; status: string }>(
-          `/problems/${params.id}/confirm`,
-        );
-        setConfirms(res.confirmations);
-      } catch (e) {
-        // 409 = already confirmed → treat as success; anything else is a genuine error.
-        if (!(e instanceof ApiError && e.status === 409)) return;
-      }
-      setConfirmed(true);
-      return;
+    try {
+      const res = await api.post<{ confirmations: number; status: string }>(
+        `/problems/${params.id}/confirm`,
+      );
+      setConfirms(res.confirmations);
+    } catch (e) {
+      // 409 = already confirmed → treat as success; anything else is a genuine error.
+      if (!(e instanceof ApiError && e.status === 409)) return;
     }
-    const { error } = await supabase.from('problem_confirmations').insert({ problem_id: params.id, user_id: uid });
-    // No error = a new confirmation. Duplicate = the user already confirmed (treat as success, no extra count).
-    if (!error) setConfirms((c) => c + 1);
-    else if (!isDuplicate(error.message)) return; // genuine error — leave state unchanged
     setConfirmed(true);
   }
 
@@ -130,17 +118,11 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
     if (!petition) return;
     const uid = await requireUser();
     if (!uid) return;
-    if (apiEnabled) {
-      try {
-        await api.post(`/petitions/${petition.id}/sign`);
-      } catch (e) {
-        if (!(e instanceof ApiError && e.status === 409)) return; // 409 = already signed
-      }
-      setSigned(true);
-      return;
+    try {
+      await api.post(`/petitions/${petition.id}/sign`);
+    } catch (e) {
+      if (!(e instanceof ApiError && e.status === 409)) return; // 409 = already signed
     }
-    const { error } = await supabase.from('petition_signatures').insert({ petition_id: petition.id, user_id: uid });
-    if (error && !isDuplicate(error.message)) return;
     setSigned(true);
   }
 

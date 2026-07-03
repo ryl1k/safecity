@@ -3,19 +3,12 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { Profile } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
-import { Button, Segmented } from '@/components/ui';
+import { Button } from '@/components/ui';
 import { ThemeSwitcher } from '@/theme/ThemeSwitcher';
-import { useProfile } from '@/profile/ProfileProvider';
 import { getMyRole } from '@/lib/admin';
 import { supabase } from '@/lib/supabase';
-
-const PROFILE_OPTIONS: { value: Profile; label: string }[] = [
-  { value: 'wheelchair', label: 'Крісло колісне' },
-  { value: 'blind', label: 'Незрячі / слабкозорі' },
-];
 
 const card = {
   background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)',
@@ -25,14 +18,8 @@ const title = { margin: '0 0 0.8em', fontSize: '1.05em', fontWeight: 800 } as co
 
 export default function SettingsPage() {
   const router = useRouter();
-  const { primary, setPrimary, setNeeds } = useProfile();
   const [email, setEmail] = useState<string | null>(null);
   const [isModerator, setIsModerator] = useState(false);
-
-  function changePrimary(p: Profile) {
-    setPrimary(p);
-    setNeeds([p]); // settings selects a single need; re-run onboarding to pick both
-  }
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => setEmail(data.user?.email ?? null));
@@ -52,20 +39,8 @@ export default function SettingsPage() {
         <h1 style={{ margin: '0 0 1em', fontSize: '1.7em', fontWeight: 800 }}>Налаштування</h1>
 
         <section style={card}>
-          <h2 style={title}>Основна потреба</h2>
-          <Segmented ariaLabel="Основна потреба" value={primary} onChange={changePrimary} options={PROFILE_OPTIONS} />
-          <p style={{ margin: '0.7em 0 0', color: 'var(--sc-muted)', fontSize: '0.85em' }}>
-            Визначає вигляд інтерфейсу й оцінки доступності, які ви бачите.
-          </p>
-          <div style={{ marginTop: '0.8em' }}>
-            <Link href="/onboarding" style={{ color: 'var(--sc-primary)', fontWeight: 700, fontSize: '0.9em' }}>Пройти налаштування знову</Link>
-          </div>
-        </section>
-
-        <section style={card}>
-          <h2 style={title}>Вигляд</h2>
+          <h2 style={title}>Тема</h2>
           <ThemeSwitcher />
-          <p style={{ margin: '0.7em 0 0', color: 'var(--sc-muted)', fontSize: '0.85em' }}>Тема та розмір тексту.</p>
         </section>
 
         <section style={card}>

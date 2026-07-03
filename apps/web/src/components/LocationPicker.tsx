@@ -2,8 +2,7 @@
 
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef } from 'react';
-
-const LVIV: [number, number] = [24.0316, 49.8419];
+import { loadCity } from '@/lib/cities';
 
 function styleFor(dark: boolean) {
   const v = dark ? 'dark_all' : 'light_all';
@@ -43,7 +42,8 @@ export function LocationPicker({
       mlRef.current = maplibregl;
       if (cancelled || !containerRef.current || mapRef.current) return;
       const dark = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
-      const map = new maplibregl.Map({ container: containerRef.current, style: styleFor(dark) as any, center: value ?? LVIV, zoom: 14 });
+      const c = loadCity();
+      const map = new maplibregl.Map({ container: containerRef.current, style: styleFor(dark) as any, center: value ?? [c.lng, c.lat], zoom: 14 });
       mapRef.current = map;
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 

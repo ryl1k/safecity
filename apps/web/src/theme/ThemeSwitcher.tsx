@@ -2,7 +2,6 @@
 
 import type { ThemeName } from '@safecity/design-tokens';
 import { useTheme } from './ThemeProvider';
-import { FontSizeSlider } from '@/components/FontSizeSlider';
 
 const THEMES: { key: ThemeName; label: string }[] = [
   { key: 'standard', label: 'Стандартна' },
@@ -14,9 +13,8 @@ export function ThemeSwitcher() {
   const { theme, setTheme } = useTheme();
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1em' }}>
-      <div role="radiogroup" aria-label="Тема" style={{ display: 'flex', gap: '0.4em', flexWrap: 'wrap' }}>
-        {THEMES.map((t) => {
+    <div role="radiogroup" aria-label="Тема" style={{ display: 'flex', gap: '0.4em', flexWrap: 'wrap' }}>
+      {THEMES.map((t) => {
           const active = theme === t.key;
           return (
             <button
@@ -37,11 +35,6 @@ export function ThemeSwitcher() {
             </button>
           );
         })}
-      </div>
-      <div>
-        <div style={{ fontSize: '0.85em', fontWeight: 700, marginBottom: '0.5em' }}>Розмір тексту</div>
-        <FontSizeSlider />
-      </div>
     </div>
   );
 }

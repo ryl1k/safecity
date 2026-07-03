@@ -4,60 +4,50 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SlidersHorizontal, Check, MapPin as MapPinIcon, Search, X } from 'lucide-react';
-import type { AccessibilityFeature, Category, PointSummary, Rating } from '@safecity/shared';
-import { computeRating } from '@safecity/shared';
+import type { AccessibilityFeature, Category, PointSummary } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
-import { PointDetailModal } from '@/components/PointDetailModal';
+import { PointDetailModal, RouteTabContent } from '@/components/PointDetailModal';
+import type { RouteDisplay } from '@/components/ExploreMap';
 import { LoadingState } from '@/components/ui';
-import { useProfile } from '@/profile/ProfileProvider';
 import { getCatalog } from '@/lib/catalog';
-import { pointsNear, pointById, searchPointsByName, type PointHit } from '@/lib/points';
+import { pointsInBbox, pointById, searchPointsByName, type PointHit } from '@/lib/points';
 import { problemsInBbox, type ProblemMarker } from '@/lib/civic';
-import { geocodePlaces, type GeoPlace } from '@/lib/geocode';
+import { reviewStats, type ReviewStat } from '@/lib/reviews';
+import { geocodePlaces, reverseGeocode, type GeoPlace } from '@/lib/geocode';
+import { featuresForCategories, isAccessible, suggestFilters } from '@/lib/filters';
 import { categoryLabel } from '@/lib/format';
+import { CITIES, DEFAULT_CITY_ID, cityBbox, cityById, loadCity, saveCity, type City } from '@/lib/cities';
 
-const LVIV: [number, number] = [24.0316, 49.8419];
 const CATEGORIES: Category[] = ['venue', 'transit', 'crossing', 'toilet', 'parking'];
 
 const ExploreMap = dynamic(() => import('@/components/ExploreMap').then((m) => m.ExploreMap), { ssr: false });
 
-interface Bbox { minLng: number; minLat: number; maxLng: number; maxLat: number; zoom: number }
-
-// Drop low-value pins first when zoomed out: none → unknown → partial → full always visible.
-function visibleRatings(zoom: number): Set<string> {
-  if (zoom >= 14) return new Set(['full', 'partial', 'unknown', 'none']);
-  if (zoom >= 12) return new Set(['full', 'partial', 'unknown']);
-  if (zoom >= 10) return new Set(['full', 'partial']);
-  return new Set(['full']);
-}
-
-function metersBetween(a: [number, number], b: [number, number]): number {
-  const R = 6371000;
-  const dLat = ((b[1] - a[1]) * Math.PI) / 180;
-  const dLng = ((b[0] - a[0]) * Math.PI) / 180;
-  const lat = ((a[1] + b[1]) / 2) * (Math.PI / 180);
-  const x = dLng * Math.cos(lat);
-  return Math.sqrt(x * x + dLat * dLat) * R;
-}
+interface Bbox { minLng: number; minLat: number; maxLng: number; maxLat: number; zoom?: number }
 
 export default function MapPage() {
-  const { primary } = useProfile();
   const router = useRouter();
+  // Selected city (persisted). SSR renders the default; the stored city is
+  // synced on mount to avoid a hydration mismatch.
+  const [city, setCityState] = useState<City>(() => cityById(DEFAULT_CITY_ID));
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
   const [points, setPoints] = useState<PointSummary[]>([]);
-  const [onlyAccessible, setOnlyAccessible] = useState(false);
+  const [stats, setStats] = useState<Record<string, ReviewStat>>({});
+  const [showInaccessible, setShowInaccessible] = useState(false);
+  const [features, setFeatures] = useState<Set<string>>(new Set());
   const [enabled, setEnabled] = useState<Set<Category>>(new Set(CATEGORIES));
   const [showProblems, setShowProblems] = useState(false);
   const [problems, setProblems] = useState<ProblemMarker[]>([]);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const filterRef = useRef<HTMLDivElement>(null);
-  const [zoom, setZoom] = useState(14);
   const [modalId, setModalId] = useState<string | null>(null);
+  const [dropped, setDropped] = useState<{ lng: number; lat: number; address: string | null } | null>(null);
+  const [routeDir, setRouteDir] = useState<'to' | 'from' | null>(null);
   const [pickFromCb, setPickFromCb] = useState<((lng: number, lat: number) => void) | null>(null);
-  const [routeLine, setRouteLine] = useState<[number, number][]>([]);
-  const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number } | null>(null);
+  const [routeDisplay, setRouteDisplay] = useState<RouteDisplay | null>(null);
+  const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number; zoom?: number } | null>(null);
   const lastBbox = useRef<Bbox | null>(null);
+  const loadedBboxRef = useRef<Bbox | null>(null);
   const nonceRef = useRef(0);
   const bboxTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -67,10 +57,20 @@ export default function MapPage() {
   const [placeHits, setPlaceHits] = useState<GeoPlace[]>([]);
   const [searching, setSearching] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
+  // Desktop puts search in the navbar; mobile floats it on the map.
+  const [isDesktop, setIsDesktop] = useState(true);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)');
+    const sync = () => setIsDesktop(mq.matches);
+    sync();
+    mq.addEventListener('change', sync);
+    return () => mq.removeEventListener('change', sync);
+  }, []);
 
-  async function loadNear(lng: number, lat: number, radius: number) {
+  async function loadPoints(bb: Bbox) {
     try {
-      setPoints(await pointsNear(lng, lat, radius));
+      setPoints(await pointsInBbox(bb.minLng, bb.minLat, bb.maxLng, bb.maxLat));
+      loadedBboxRef.current = bb;
       setStatus('ready');
     } catch {
       setStatus('error');
@@ -79,19 +79,42 @@ export default function MapPage() {
 
   useEffect(() => {
     void getCatalog().then(setCatalog).catch(() => setCatalog([]));
-    void loadNear(LVIV[0], LVIV[1], 2500);
+    void reviewStats().then(setStats).catch(() => {});
+    const c = loadCity();
+    setCityState(c);
+    if (c.id !== DEFAULT_CITY_ID) {
+      nonceRef.current += 1;
+      setFocus({ lng: c.lng, lat: c.lat, nonce: nonceRef.current, zoom: 12.5 });
+    }
+    void loadPoints(cityBbox(c));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function switchCity(id: string) {
+    const c = cityById(id);
+    setCityState(c);
+    saveCity(c.id);
+    setModalId(null);
+    nonceRef.current += 1;
+    setFocus({ lng: c.lng, lat: c.lat, nonce: nonceRef.current, zoom: 12.5 });
+    void loadPoints(cityBbox(c));
+  }
+
   function onMoveEnd(b: Bbox) {
-    setZoom(b.zoom);
     lastBbox.current = b;
-    const center: [number, number] = [(b.minLng + b.maxLng) / 2, (b.minLat + b.maxLat) / 2];
-    const radius = Math.min(9000, Math.max(800, metersBetween(center, [b.maxLng, b.maxLat])));
+    const loaded = loadedBboxRef.current;
+    const covered =
+      !!loaded && b.minLng >= loaded.minLng && b.maxLng <= loaded.maxLng && b.minLat >= loaded.minLat && b.maxLat <= loaded.maxLat;
     if (bboxTimer.current) clearTimeout(bboxTimer.current);
     bboxTimer.current = setTimeout(() => {
-      void loadNear(center[0], center[1], radius);
+      // Only fetch when the viewport leaves the loaded area (e.g. panning far out).
+      if (!covered) {
+        const w = b.maxLng - b.minLng;
+        const h = b.maxLat - b.minLat;
+        void loadPoints({ minLng: b.minLng - w, minLat: b.minLat - h, maxLng: b.maxLng + w, maxLat: b.maxLat + h });
+      }
       if (showProblems) problemsInBbox(b.minLng, b.minLat, b.maxLng, b.maxLat).then(setProblems).catch(() => {});
-    }, 250);
+    }, 300);
   }
 
   useEffect(() => {
@@ -114,17 +137,56 @@ export default function MapPage() {
     return () => { clearTimeout(handle); ctrl.abort(); };
   }, [query]);
 
-  const markers = useMemo(() => {
-    const allowed = visibleRatings(zoom);
+  // All points matching the filters (the count shown to the user).
+  const matching = useMemo(() => {
+    const keys = [...features];
     return points
       .filter((p) => enabled.has(p.category))
-      .map((p) => ({ id: p.id, name: p.name, lng: p.lng, lat: p.lat, category: p.category, rating: computeRating(p.features, catalog, p.category, primary) as Rating }))
-      .filter((m) => (onlyAccessible ? m.rating === 'full' : allowed.has(m.rating)));
-  }, [points, enabled, onlyAccessible, catalog, primary, zoom]);
+      .filter((p) => {
+        // Feature chips act as the accessibility filter; otherwise default hides
+        // non-accessible points unless "show inaccessible" is on.
+        if (keys.length) return keys.every((k) => p.features[k] === 'yes');
+        return showInaccessible || isAccessible(p, catalog);
+      })
+      .map((p) => ({
+        id: p.id,
+        name: p.name,
+        lng: p.lng,
+        lat: p.lat,
+        category: p.category,
+        accessible: isAccessible(p, catalog),
+      }));
+  }, [points, enabled, features, showInaccessible, catalog]);
+
+  // Stable seed for routing from/to the dropped marker (identity changes only
+  // when the marker moves / its address resolves — never every render).
+  const markerSeed = useMemo(
+    () => (dropped ? { coords: [dropped.lng, dropped.lat] as [number, number], label: dropped.address ?? `${dropped.lat.toFixed(5)}, ${dropped.lng.toFixed(5)}` } : null),
+    [dropped],
+  );
+
 
   function flyTo(lng: number, lat: number) { nonceRef.current += 1; setFocus({ lng, lat, nonce: nonceRef.current }); }
   async function pickPoint(id: string) { setOpen(false); setQuery(''); const p = await pointById(id).catch(() => null); if (p) flyTo(p.lng, p.lat); setModalId(id); }
-  function pickPlace(place: GeoPlace) { setOpen(false); setQuery(place.label.split(',')[0] ?? ''); flyTo(place.lng, place.lat); }
+
+  // Drop a marker at coords, then resolve its address in the background.
+  function dropAt(lng: number, lat: number) {
+    setRouteDir(null);
+    setModalId(null);
+    setDropped({ lng, lat, address: null });
+    void reverseGeocode(lng, lat).then((addr) =>
+      setDropped((d) => (d && d.lng === lng && d.lat === lat ? { ...d, address: addr } : d)),
+    );
+  }
+  function clearDropped() { setDropped(null); setRouteDir(null); setRouteDisplay(null); setPickFromCb(null); }
+
+  // Picking a search result drops a marker there with its known address (no reverse lookup needed).
+  function pickPlace(place: GeoPlace) {
+    setOpen(false); setQuery(place.label.split(',')[0] ?? '');
+    setRouteDir(null); setModalId(null);
+    setDropped({ lng: place.lng, lat: place.lat, address: place.label });
+    flyTo(place.lng, place.lat);
+  }
 
   const flat = useMemo(
     () => [...pointHits.map((p) => ({ kind: 'point' as const, p })), ...placeHits.map((pl) => ({ kind: 'place' as const, pl }))],
@@ -141,9 +203,12 @@ export default function MapPage() {
   }
   const hasResults = pointHits.length > 0 || placeHits.length > 0;
   const placeBase = pointHits.length;
+  const filterSugs = suggestFilters(query, catalog);
+  const featureChips = featuresForCategories(catalog, enabled);
 
   function toggleCat(c: Category) { setEnabled((prev) => { const n = new Set(prev); n.has(c) ? n.delete(c) : n.add(c); return n; }); }
-  const activeFilters = (onlyAccessible ? 1 : 0) + (showProblems ? 1 : 0) + (CATEGORIES.length - enabled.size);
+  function toggleFeature(id: string) { setFeatures((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
+  const activeFilters = (showInaccessible ? 1 : 0) + features.size + (showProblems ? 1 : 0) + (CATEGORIES.length - enabled.size);
 
   useEffect(() => {
     if (!filtersOpen) return;
@@ -156,57 +221,106 @@ export default function MapPage() {
     return () => document.removeEventListener('mousedown', onClickOutside);
   }, [filtersOpen]);
 
+  // The search UI, reused in the navbar (desktop) or floating on the map (mobile).
+  const searchBox = (
+    <>
+      <div style={searchWrap}>
+        <Search size={18} aria-hidden style={{ color: 'var(--sc-muted)', flexShrink: 0 }} />
+        <input
+          className="sc-foc" role="combobox" aria-expanded={open && hasResults} aria-controls="map-results" aria-autocomplete="list"
+          aria-activedescendant={activeIndex >= 0 ? `map-opt-${activeIndex}` : undefined}
+          aria-label="Пошук місць або адрес" placeholder="Пошук місць, адрес…" value={query}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={onSearchKeyDown} style={searchInput}
+        />
+        {query ? <button type="button" className="sc-foc" aria-label="Очистити" onClick={() => { setQuery(''); setOpen(false); }} style={clearBtn}><X size={16} aria-hidden /></button> : null}
+      </div>
+      {open && query.trim().length >= 2 && (
+        <ul id="map-results" role="listbox" aria-label="Результати пошуку" style={results}>
+          {filterSugs.categories.length + filterSugs.features.length > 0 && (
+            <>
+              <li style={resultHead} aria-hidden>Додати фільтр</li>
+              {filterSugs.categories.map((c) => (
+                <li key={`fc-${c}`} role="option" aria-selected={false} onMouseDown={(e) => e.preventDefault()} onClick={() => { setEnabled(new Set([c])); setOpen(false); setQuery(''); }} style={resultRow}>
+                  <SlidersHorizontal size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={resultTitle}>{categoryLabel[c]}</span>
+                    <span style={resultSub}>Лише ця категорія</span>
+                  </span>
+                </li>
+              ))}
+              {filterSugs.features.map((f) => (
+                <li key={`ff-${f.key}`} role="option" aria-selected={false} onMouseDown={(e) => e.preventDefault()} onClick={() => { toggleFeature(f.key); setOpen(false); setQuery(''); }} style={resultRow}>
+                  <SlidersHorizontal size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
+                  <span style={{ minWidth: 0 }}>
+                    <span style={resultTitle}>{f.label}</span>
+                    <span style={resultSub}>Зручність доступності</span>
+                  </span>
+                </li>
+              ))}
+            </>
+          )}
+          {searching && !hasResults && <li style={resultMuted}>Пошук…</li>}
+          {!searching && !hasResults && <li style={resultMuted}>Нічого не знайдено</li>}
+          {pointHits.length > 0 && <li style={resultHead} aria-hidden>Місця SafeCity</li>}
+          {pointHits.map((p, i) => (
+            <li key={p.id} id={`map-opt-${i}`} role="option" aria-selected={activeIndex === i} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setActiveIndex(i)} onClick={() => void pickPoint(p.id)} style={{ ...resultRow, background: activeIndex === i ? 'var(--sc-primary-tint)' : 'transparent' }}>
+              <MapPinIcon size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
+              <span style={{ minWidth: 0, flex: 1 }}><span style={resultTitle}>{p.name}</span><span style={resultSub}>{categoryLabel[p.category]}{p.address ? ` · ${p.address}` : ''}</span></span>
+              {((s) => (s ? <span style={{ flexShrink: 0, fontSize: '0.8em', fontWeight: 800, color: 'var(--sc-warn)' }}>★ {s.avg.toFixed(1)}</span> : null))(stats[p.id])}
+            </li>
+          ))}
+          {placeHits.length > 0 && <li style={resultHead} aria-hidden>Адреси та місця</li>}
+          {placeHits.map((pl, j) => { const idx = placeBase + j; return (
+            <li key={pl.id} id={`map-opt-${idx}`} role="option" aria-selected={activeIndex === idx} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setActiveIndex(idx)} onClick={() => pickPlace(pl)} style={{ ...resultRow, background: activeIndex === idx ? 'var(--sc-primary-tint)' : 'transparent' }}>
+              <Search size={16} aria-hidden style={{ color: 'var(--sc-muted)', flexShrink: 0 }} />
+              <span style={{ minWidth: 0 }}><span style={resultTitle}>{pl.label.split(',')[0]}</span><span style={resultSub}>{pl.label.split(',').slice(1).join(',').trim()}</span></span>
+            </li>
+          ); })}
+        </ul>
+      )}
+    </>
+  );
+
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column' }}>
-      <AppHeader active="map" />
+      <AppHeader active="map" search={isDesktop ? searchBox : undefined} />
       <main id="main-content" tabIndex={-1} style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <h1 className="sc-sr">Мапа доступних місць</h1>
 
         {status === 'error' ? (
           <div style={{ padding: '2em 1.25em' }}><LoadingState label="Повторне завантаження…" /></div>
         ) : (
-          <ExploreMap points={markers} problems={problems} center={LVIV} onSelect={setModalId} onSelectProblem={(id) => router.push(`/problem/${id}`)} onMoveEnd={onMoveEnd} focus={focus}
+          <ExploreMap points={matching} problems={problems} center={[city.lng, city.lat]} onSelect={setModalId} onSelectProblem={(id) => router.push(`/problem/${id}`)} onMoveEnd={onMoveEnd} focus={focus}
             pickMode={pickFromCb !== null}
-            onMapClick={(lng, lat) => { pickFromCb?.(lng, lat); setPickFromCb(null); }}
-            line={routeLine}
+            onMapClick={(lng, lat) => {
+              if (pickFromCb) { pickFromCb(lng, lat); setPickFromCb(null); }
+              else if (!routeDir) dropAt(lng, lat); // plain click drops/moves a pin
+            }}
+            route={routeDisplay}
+            marker={dropped ? { lng: dropped.lng, lat: dropped.lat } : null}
+            onMarkerMove={dropAt}
           />
         )}
 
-        {/* Floating search (top) */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '0.8em', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
-          <div style={{ position: 'relative', width: '100%', maxWidth: 560, pointerEvents: 'auto' }}>
-            <div style={searchWrap}>
-              <Search size={18} aria-hidden style={{ color: 'var(--sc-muted)', flexShrink: 0 }} />
-              <input
-                className="sc-foc" role="combobox" aria-expanded={open && hasResults} aria-controls="map-results" aria-autocomplete="list"
-                aria-activedescendant={activeIndex >= 0 ? `map-opt-${activeIndex}` : undefined}
-                aria-label="Пошук місць або адрес" placeholder="Пошук місць, адрес…" value={query}
-                onChange={(e) => { setQuery(e.target.value); setOpen(true); }} onFocus={() => setOpen(true)} onKeyDown={onSearchKeyDown} style={searchInput}
-              />
-              {query ? <button type="button" className="sc-foc" aria-label="Очистити" onClick={() => { setQuery(''); setOpen(false); }} style={clearBtn}><X size={16} aria-hidden /></button> : null}
-            </div>
-            {open && query.trim().length >= 2 && (
-              <ul id="map-results" role="listbox" aria-label="Результати пошуку" style={results}>
-                {searching && !hasResults && <li style={resultMuted}>Пошук…</li>}
-                {!searching && !hasResults && <li style={resultMuted}>Нічого не знайдено</li>}
-                {pointHits.length > 0 && <li style={resultHead} aria-hidden>Місця SafeCity</li>}
-                {pointHits.map((p, i) => (
-                  <li key={p.id} id={`map-opt-${i}`} role="option" aria-selected={activeIndex === i} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setActiveIndex(i)} onClick={() => void pickPoint(p.id)} style={{ ...resultRow, background: activeIndex === i ? 'var(--sc-primary-tint)' : 'transparent' }}>
-                    <MapPinIcon size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
-                    <span style={{ minWidth: 0 }}><span style={resultTitle}>{p.name}</span><span style={resultSub}>{categoryLabel[p.category]}{p.address ? ` · ${p.address}` : ''}</span></span>
-                  </li>
-                ))}
-                {placeHits.length > 0 && <li style={resultHead} aria-hidden>Адреси та місця</li>}
-                {placeHits.map((pl, j) => { const idx = placeBase + j; return (
-                  <li key={pl.id} id={`map-opt-${idx}`} role="option" aria-selected={activeIndex === idx} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setActiveIndex(idx)} onClick={() => pickPlace(pl)} style={{ ...resultRow, background: activeIndex === idx ? 'var(--sc-primary-tint)' : 'transparent' }}>
-                    <Search size={16} aria-hidden style={{ color: 'var(--sc-muted)', flexShrink: 0 }} />
-                    <span style={{ minWidth: 0 }}><span style={resultTitle}>{pl.label.split(',')[0]}</span><span style={resultSub}>{pl.label.split(',').slice(1).join(',').trim()}</span></span>
-                  </li>
-                ); })}
-              </ul>
-            )}
+        {/* Floating search — mobile only; desktop puts it in the navbar. */}
+        {!isDesktop && (
+          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '0.8em', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+            <div style={{ position: 'relative', width: '100%', maxWidth: 560, pointerEvents: 'auto' }}>{searchBox}</div>
           </div>
-        </div>
+        )}
+
+        {/* City picker (top-left; below the floating search on mobile) */}
+        <select
+          className="sc-foc"
+          aria-label="Місто"
+          value={city.id}
+          onChange={(e) => switchCity(e.target.value)}
+          style={{ ...cityPicker, top: isDesktop ? '0.8em' : '4.5em' }}
+        >
+          {CITIES.map((c) => (
+            <option key={c.id} value={c.id}>{c.name}</option>
+          ))}
+        </select>
 
         {/* Filters popover (top-right) */}
         <div ref={filterRef} style={{ position: 'absolute', right: '0.8em', top: '0.8em' }}>
@@ -220,14 +334,23 @@ export default function MapPage() {
           {filtersOpen && (
             <>
               <div role="dialog" aria-label="Фільтри мапи" style={filterPanel}>
-                <ToggleRow checked={onlyAccessible} onChange={() => setOnlyAccessible((v) => !v)} label="Лише доступні" />
+                <ToggleRow checked={showInaccessible} onChange={() => setShowInaccessible((v) => !v)} label="Показати недоступні" />
                 <ToggleRow checked={showProblems} onChange={() => setShowProblems((v) => !v)} label="Показати проблеми" />
                 <div style={{ height: 1, background: 'var(--sc-border)', margin: '0.5em 0' }} />
+                <div style={{ fontSize: '0.72em', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--sc-muted)', marginBottom: '0.3em' }}>Зручності</div>
+                <div style={grid2}>
+                  {featureChips.map((f) => (
+                    <ToggleRow key={f.key} checked={features.has(f.key)} onChange={() => toggleFeature(f.key)} label={f.label} />
+                  ))}
+                </div>
+                <div style={{ height: 1, background: 'var(--sc-border)', margin: '0.5em 0' }} />
                 <div style={{ fontSize: '0.72em', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--sc-muted)', marginBottom: '0.3em' }}>Категорії</div>
-                {CATEGORIES.map((c) => (
-                  <ToggleRow key={c} checked={enabled.has(c)} onChange={() => toggleCat(c)} label={categoryLabel[c]} />
-                ))}
-                <button type="button" className="sc-foc" onClick={() => { setOnlyAccessible(false); setShowProblems(false); setEnabled(new Set(CATEGORIES)); }} style={{ marginTop: '0.6em', background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.85em' }}>
+                <div style={grid2}>
+                  {CATEGORIES.map((c) => (
+                    <ToggleRow key={c} checked={enabled.has(c)} onChange={() => toggleCat(c)} label={categoryLabel[c]} />
+                  ))}
+                </div>
+                <button type="button" className="sc-foc" onClick={() => { setShowInaccessible(false); setFeatures(new Set()); setShowProblems(false); setEnabled(new Set(CATEGORIES)); }} style={{ marginTop: '0.6em', background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.85em' }}>
                   Скинути фільтри
                 </button>
               </div>
@@ -237,16 +360,52 @@ export default function MapPage() {
 
         {/* Count (bottom-right) */}
         <span aria-live="polite" style={{ position: 'absolute', right: '0.8em', bottom: '0.8em', fontSize: '0.8em', fontWeight: 700, color: 'var(--sc-text)', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', padding: '0.3em 0.7em', boxShadow: 'var(--sc-shadow-1)' }}>
-          {status === 'ready' ? `${markers.length} місць` : '…'}
+          {status === 'ready' ? `${matching.length} місць` : '…'}
         </span>
+
+        {/* Dropped-marker panel: address + route actions */}
+        {dropped && !modalId && (
+          <div role="dialog" aria-label="Мітка на мапі" style={markerPanel}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5em', marginBottom: '0.7em' }}>
+              <MapPinIcon size={18} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
+              <strong style={{ flex: 1, minWidth: 0, fontSize: '1.05em' }}>Мітка на мапі</strong>
+              <button type="button" className="sc-foc" aria-label="Закрити" onClick={clearDropped} style={panelClose}><X size={16} aria-hidden /></button>
+            </div>
+            <p style={{ margin: '0 0 1em', fontSize: '0.92em', lineHeight: 1.45, color: 'var(--sc-text)' }}>
+              {dropped.address ?? 'Визначення адреси…'}
+            </p>
+            {routeDir === null ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6em' }}>
+                <div style={{ display: 'flex', gap: '0.6em', flexWrap: 'wrap' }}>
+                  <button type="button" className="sc-foc" onClick={() => setRouteDir('to')} style={panelPrimary}>Маршрут сюди</button>
+                  <button type="button" className="sc-foc" onClick={() => setRouteDir('from')} style={panelSecondary}>Маршрут звідси</button>
+                </div>
+                <button type="button" className="sc-foc" onClick={() => router.push(`/problem/new?lng=${dropped.lng}&lat=${dropped.lat}&label=${encodeURIComponent(dropped.address ?? '')}`)} style={panelReport}>
+                  Повідомити про проблему
+                </button>
+              </div>
+            ) : (
+              <>
+                <button type="button" className="sc-foc" onClick={() => { setRouteDir(null); setRouteDisplay(null); setPickFromCb(null); }} style={panelBack}>← Змінити напрямок</button>
+                <RouteTabContent
+                  seedFrom={routeDir === 'from' ? markerSeed ?? undefined : undefined}
+                  seedTo={routeDir === 'to' ? markerSeed ?? undefined : undefined}
+                  onRequestMapPick={(cb) => setPickFromCb(() => cb)}
+                  onCancelMapPick={() => setPickFromCb(null)}
+                  onRouteDisplay={setRouteDisplay}
+                />
+              </>
+            )}
+          </div>
+        )}
 
         {modalId && (
           <PointDetailModal
             id={modalId}
-            onClose={() => { setModalId(null); setPickFromCb(null); setRouteLine([]); }}
+            onClose={() => { setModalId(null); setPickFromCb(null); setRouteDisplay(null); }}
             onRequestMapPick={(cb) => setPickFromCb(() => cb)}
             onCancelMapPick={() => setPickFromCb(null)}
-            onRouteLine={setRouteLine}
+            onRouteDisplay={setRouteDisplay}
           />
         )}
       </main>
@@ -279,4 +438,12 @@ const resultTitle = { display: 'block', fontWeight: 700, fontSize: '0.92em', whi
 const resultSub = { display: 'block', fontSize: '0.78em', color: 'var(--sc-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' } as const;
 const filterTrigger = { position: 'relative', display: 'inline-flex', alignItems: 'center', gap: '0.4em', minHeight: '2.6em', padding: '0 0.9em', borderRadius: '1.4em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.9em', cursor: 'pointer', boxShadow: 'var(--sc-shadow-2)' } as const;
 const filterBadge = { minWidth: '1.5em', height: '1.5em', borderRadius: '50%', background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontSize: '0.7em', fontWeight: 800, padding: '0 0.3em' } as const;
-const filterPanel = { position: 'absolute', right: 0, top: 'calc(100% + 0.5em)', zIndex: 6, width: 'min(80vw, 240px)', maxHeight: '60vh', overflowY: 'auto', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '0.9em', boxShadow: 'var(--sc-shadow-2)', padding: '0.7em' } as const;
+const filterPanel = { position: 'absolute', right: 0, top: 'calc(100% + 0.5em)', zIndex: 6, width: 'min(92vw, 380px)', maxHeight: '70vh', overflowY: 'auto', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '0.9em', boxShadow: 'var(--sc-shadow-2)', padding: '0.7em' } as const;
+const grid2 = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0 0.6em' } as const;
+const cityPicker = { position: 'absolute', left: '0.8em', minHeight: '2.6em', padding: '0 0.8em', borderRadius: '1.4em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.9em', cursor: 'pointer', boxShadow: 'var(--sc-shadow-2)' } as const;
+const markerPanel ={ position: 'absolute', top: 0, left: 0, height: '100%', width: 'min(420px, 100vw)', zIndex: 55, background: 'var(--sc-bg)', boxShadow: '4px 0 24px rgba(0,0,0,0.18)', overflowY: 'auto', borderRight: 'var(--sc-bw) solid var(--sc-border)', padding: '1.2em 1.4em 2.5em' } as const;
+const panelClose = { flexShrink: 0, width: '2.2em', height: '2.2em', borderRadius: '50%', cursor: 'pointer', border: 'var(--sc-bw) solid var(--sc-border)', background: 'var(--sc-surface)', color: 'var(--sc-text)', display: 'grid', placeItems: 'center' } as const;
+const panelPrimary = { display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em', borderRadius: '0.7em', fontWeight: 800, background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95em' } as const;
+const panelSecondary = { display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em', borderRadius: '0.7em', fontWeight: 800, background: 'var(--sc-surface)', color: 'var(--sc-primary)', border: 'var(--sc-bw) solid var(--sc-primary)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95em' } as const;
+const panelReport = { display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em', borderRadius: '0.7em', fontWeight: 800, background: 'var(--sc-surface)', color: 'var(--sc-bad)', border: 'var(--sc-bw) solid var(--sc-bad)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95em', width: '100%' } as const;
+const panelBack = { background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.9em', padding: 0, marginBottom: '0.8em' } as const;

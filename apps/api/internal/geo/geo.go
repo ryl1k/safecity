@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -64,6 +65,7 @@ func DefaultRestrictions() Restrictions {
 type RouteInput struct {
 	From         [2]float64 // [lng,lat]
 	To           [2]float64
+	Via          [][2]float64 // optional intermediate waypoints, in order
 	Profile      string
 	Restrictions Restrictions    // applied only for wheelchair
 	Avoid        [][][][]float64 // GeoJSON MultiPolygon coordinates
@@ -140,7 +142,7 @@ func (c *Client) Route(ctx context.Context, in RouteInput) (RouteResult, error) 
 		if len(f.Properties.Segments) > 0 {
 			seg := f.Properties.Segments[0]
 			for _, s := range seg.Steps {
-				res.Steps = append(res.Steps, Step{Instruction: s.Instruction, Distance: s.Distance})
+				res.Steps = append(res.Steps, Step{Instruction: uaInstruction(s.Type, s.Name), Distance: s.Distance})
 			}
 			if res.Summary == nil {
 				res.Summary = &Summary{Distance: seg.Distance, Duration: seg.Duration}
@@ -151,7 +153,11 @@ func (c *Client) Route(ctx context.Context, in RouteInput) (RouteResult, error) 
 }
 
 func (c *Client) orsCall(ctx context.Context, profile string, in RouteInput) ([]byte, int, error) {
-	payload := map[string]any{"coordinates": [][2]float64{in.From, in.To}}
+	coords := make([][2]float64, 0, len(in.Via)+2)
+	coords = append(coords, in.From)
+	coords = append(coords, in.Via...)
+	coords = append(coords, in.To)
+	payload := map[string]any{"coordinates": coords}
 	options := map[string]any{}
 	if len(in.Avoid) > 0 {
 		options["avoid_polygons"] = map[string]any{"type": "MultiPolygon", "coordinates": in.Avoid}
@@ -206,10 +212,65 @@ type orsGeoJSON struct {
 				Steps    []struct {
 					Instruction string  `json:"instruction"`
 					Distance    float64 `json:"distance"`
+					Type        int     `json:"type"`
+					Name        string  `json:"name"`
 				} `json:"steps"`
 			} `json:"segments"`
 		} `json:"properties"`
 	} `json:"features"`
+}
+
+// uaInstruction renders a Ukrainian turn-by-turn line from ORS's maneuver type
+// + way name (the public ORS API has no Ukrainian instruction language, and
+// street names already come back in Ukrainian from OSM).
+func uaInstruction(t int, name string) string {
+	if name == "-" { // ORS uses "-" for unnamed ways
+		name = ""
+	}
+	on := func(v string) string {
+		if name != "" {
+			return v + " на " + name
+		}
+		return v
+	}
+	switch t {
+	case 0:
+		return on("Поверніть ліворуч")
+	case 1:
+		return on("Поверніть праворуч")
+	case 2:
+		return on("Крутий поворот ліворуч")
+	case 3:
+		return on("Крутий поворот праворуч")
+	case 4:
+		return on("Тримайтеся трохи лівіше")
+	case 5:
+		return on("Тримайтеся трохи правіше")
+	case 6:
+		if name != "" {
+			return "Прямо по " + name
+		}
+		return "Прямо"
+	case 7:
+		return "Заїзд на кільце"
+	case 8:
+		return "З’їзд з кільця"
+	case 9:
+		return "Розворот"
+	case 10:
+		return "Прибуття до місця призначення"
+	case 11:
+		if name != "" {
+			return "Рушайте по " + name
+		}
+		return "Рушайте"
+	case 12:
+		return on("Тримайтеся лівіше")
+	case 13:
+		return on("Тримайтеся правіше")
+	default:
+		return "Продовжуйте рух"
+	}
 }
 
 // AvoidSquares turns barrier points into ~30 m square avoidance polygons (a
@@ -292,13 +353,126 @@ func (c *Client) Geocode(ctx context.Context, query string, limit int) ([]Place,
 		lat, _ := strconv.ParseFloat(r.Lat, 64)
 		places = append(places, Place{
 			ID:    fmt.Sprintf("osm-%d", r.PlaceID),
-			Label: r.Display,
+			Label: trimLabel(r.Display),
 			Lng:   lng,
 			Lat:   lat,
 		})
 	}
 	c.geoCache.set(cacheKey, places)
 	return places, nil
+}
+
+// Reverse resolves coordinates to a single nearby address (cached). Returns nil
+// when Nominatim has no result for the spot (e.g. open water).
+func (c *Client) Reverse(ctx context.Context, lng, lat float64) (*Place, error) {
+	cacheKey := fmt.Sprintf("rev:%.5f,%.5f", lng, lat)
+	if v, ok := c.geoCache.get(cacheKey); ok {
+		if len(v) == 0 {
+			return nil, nil
+		}
+		return &v[0], nil
+	}
+
+	u := fmt.Sprintf("%s/reverse?format=jsonv2&lon=%s&lat=%s&accept-language=uk&zoom=18&addressdetails=1",
+		c.nominatimURL,
+		strconv.FormatFloat(lng, 'f', -1, 64), strconv.FormatFloat(lat, 'f', -1, 64))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("User-Agent", userAgent) // required by Nominatim policy
+
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("nominatim reverse request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("nominatim reverse status %d", resp.StatusCode)
+	}
+	var row struct {
+		PlaceID int               `json:"place_id"`
+		Display string            `json:"display_name"`
+		Name    string            `json:"name"`
+		Lon     string            `json:"lon"`
+		Lat     string            `json:"lat"`
+		Address map[string]string `json:"address"`
+	}
+	if err := json.NewDecoder(io.LimitReader(resp.Body, 1<<20)).Decode(&row); err != nil {
+		return nil, fmt.Errorf("decode nominatim reverse: %w", err)
+	}
+	label := shortAddress(row.Name, row.Address, row.Display)
+	if strings.TrimSpace(label) == "" {
+		c.geoCache.set(cacheKey, []Place{}) // cache the "no result" too
+		return nil, nil
+	}
+	rlng, _ := strconv.ParseFloat(row.Lon, 64)
+	rlat, _ := strconv.ParseFloat(row.Lat, 64)
+	p := Place{ID: fmt.Sprintf("osm-%d", row.PlaceID), Label: label, Lng: rlng, Lat: rlat}
+	c.geoCache.set(cacheKey, []Place{p})
+	return &p, nil
+}
+
+// shortAddress builds a compact label — street + house number (+ the feature's
+// own name), or a locality when there's no street (rural). Drops city/oblast/
+// postcode/country noise. Falls back to the full display name if nothing usable.
+func shortAddress(name string, a map[string]string, fallback string) string {
+	if a == nil {
+		return fallback
+	}
+	road := a["road"]
+	if road == "" {
+		road = a["pedestrian"]
+	}
+	street := road
+	if road != "" {
+		if hn := a["house_number"]; hn != "" {
+			street = road + ", " + hn
+		}
+	} else {
+		for _, k := range []string{"suburb", "neighbourhood", "city_district", "hamlet", "village", "town", "city"} {
+			if v := a[k]; v != "" {
+				street = v
+				break
+			}
+		}
+	}
+	parts := make([]string, 0, 2)
+	if name != "" && name != road {
+		parts = append(parts, name)
+	}
+	if street != "" {
+		parts = append(parts, street)
+	}
+	if len(parts) == 0 {
+		return fallback
+	}
+	return strings.Join(parts, ", ")
+}
+
+// dropLabelPart matches the admin tail of a Nominatim display name
+// (oblast/raion/hromada/postcode/country) that only adds noise for users.
+var dropLabelPart = regexp.MustCompile(`(?i)область|район|громад|Україна|^\d{4,6}$`)
+
+// trimLabel keeps the first few meaningful parts of a full display name for
+// search results (street, locality) and drops the admin tail.
+func trimLabel(s string) string {
+	kept := make([]string, 0, 3)
+	for _, p := range strings.Split(s, ",") {
+		p = strings.TrimSpace(p)
+		if p == "" || dropLabelPart.MatchString(p) {
+			continue
+		}
+		kept = append(kept, p)
+		if len(kept) == 3 {
+			break
+		}
+	}
+	if len(kept) == 0 {
+		return s
+	}
+	return strings.Join(kept, ", ")
 }
 
 func truncate(s string, n int) string {

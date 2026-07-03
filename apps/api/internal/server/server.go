@@ -21,6 +21,7 @@ import (
 	"github.com/safecity/api/internal/metrics"
 	"github.com/safecity/api/internal/ratelimit"
 	"github.com/safecity/api/internal/store"
+	"github.com/safecity/api/internal/transit"
 )
 
 // DataStore is the subset of the data layer the handlers need. It grows as more
@@ -31,6 +32,14 @@ type DataStore interface {
 	PointsNear(ctx context.Context, lng, lat, radiusM float64) ([]store.PointSummary, error)
 	PointsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.PointSummary, error)
 	PointDetail(ctx context.Context, id string) (*store.PointDetail, error)
+	SearchPoints(ctx context.Context, query string, limit int) ([]store.PointHit, error)
+	ReviewsFor(ctx context.Context, pointID string) ([]store.Review, error)
+	ReviewStats(ctx context.Context) ([]store.ReviewStat, error)
+	ListProblems(ctx context.Context) ([]store.ProblemListItem, error)
+	ProblemsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.ProblemMarker, error)
+	ProblemByID(ctx context.Context, id string) (*store.ProblemDetail, error)
+	ProblemViewerState(ctx context.Context, userID, problemID string) (store.ProblemViewerState, error)
+	FeatureCatalog(ctx context.Context) ([]store.Feature, error)
 	// contribution writes
 	AddPoint(ctx context.Context, userID string, in store.NewPoint) (string, error)
 	UpsertReview(ctx context.Context, userID, pointID string, in store.NewReview) (store.Review, error)
@@ -39,6 +48,19 @@ type DataStore interface {
 	ConfirmProblem(ctx context.Context, userID, problemID string) (store.ConfirmResult, error)
 	CreatePetition(ctx context.Context, userID string, in store.NewPetition) (store.Petition, error)
 	SignPetition(ctx context.Context, userID, petitionID string) (store.SignResult, error)
+	// account profile
+	UpdateProfileNeeds(ctx context.Context, userID string, needs []string, primary string) error
+	// moderation
+	UnverifiedPoints(ctx context.Context) ([]store.AdminPoint, error)
+	SetPointVerify(ctx context.Context, userID, pointID, status string) error
+	DeletePoint(ctx context.Context, userID, pointID string) error
+	OpenProblems(ctx context.Context) ([]store.AdminProblem, error)
+	ResolveProblem(ctx context.Context, userID, problemID string) error
+	DeleteProblem(ctx context.Context, userID, problemID string) error
+	RecentReviews(ctx context.Context, limit int) ([]store.AdminReview, error)
+	DeleteReview(ctx context.Context, userID, reviewID string) error
+	ListUsers(ctx context.Context, limit int) ([]store.AdminUser, error)
+	SetUserRole(ctx context.Context, userID, targetID, role string) error
 	// routing support
 	BarriersInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.LngLat, error)
 }
@@ -47,6 +69,17 @@ type DataStore interface {
 type GeoService interface {
 	Route(ctx context.Context, in geo.RouteInput) (geo.RouteResult, error)
 	Geocode(ctx context.Context, query string, limit int) ([]geo.Place, error)
+	Reverse(ctx context.Context, lng, lat float64) (*geo.Place, error)
+}
+
+// TransitService plans public-transport journeys (Transitous/MOTIS).
+type TransitService interface {
+	Plan(ctx context.Context, from, to [2]float64) (transit.Result, error)
+}
+
+// AccountService performs server-side account operations (Supabase admin API).
+type AccountService interface {
+	CreateUser(ctx context.Context, email, password string) error
 }
 
 // Deps are the dependencies wired into the server. Log is required; the rest are
@@ -59,6 +92,8 @@ type Deps struct {
 	Limiter     *ratelimit.Limiter          // throttles writes/proxies; nil disables limiting
 	Store       DataStore                   // data access; nil disables data routes
 	Geo         GeoService                  // routing/geocoding proxy; nil disables proxy routes
+	Transit     TransitService              // public-transport planning; nil disables /transit
+	Accounts    AccountService              // server-side signup; nil disables /auth/signup
 	Metrics     *metrics.Metrics            // Prometheus hook; nil disables /metrics
 	CORSOrigins []string                    // allowed browser origins; empty disables CORS
 }
@@ -73,6 +108,8 @@ type Server struct {
 	limiter  *ratelimit.Limiter
 	store    DataStore
 	geo      GeoService
+	transit  TransitService
+	accounts AccountService
 	metrics  *metrics.Metrics
 }
 
@@ -88,7 +125,7 @@ func New(d Deps) *Server {
 		// Authorization header (not cookies), so no credentials needed.
 		r.Use(cors.Handler(cors.Options{
 			AllowedOrigins: d.CORSOrigins,
-			AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodOptions},
+			AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodDelete, http.MethodOptions},
 			AllowedHeaders: []string{"Authorization", "Content-Type"},
 			MaxAge:         300,
 		}))
@@ -102,7 +139,7 @@ func New(d Deps) *Server {
 		r.Use(auth.Authenticate(d.Verifier))
 	}
 
-	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles, limiter: d.Limiter, store: d.Store, geo: d.Geo, metrics: d.Metrics}
+	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles, limiter: d.Limiter, store: d.Store, geo: d.Geo, transit: d.Transit, accounts: d.Accounts, metrics: d.Metrics}
 	s.routes()
 	return s
 }
@@ -124,13 +161,22 @@ func (s *Server) routes() {
 		s.router.Route("/points", func(r chi.Router) {
 			r.Get("/near", s.handlePointsNear)
 			r.Get("/bbox", s.handlePointsBBox)
+			r.Get("/search", s.handlePointsSearch)
 			r.Get("/{id}", s.handlePointDetail)
+			r.Get("/{id}/reviews", s.handlePointReviews)
 			r.Group(func(r chi.Router) {
 				s.authed(r)
 				r.Post("/", s.handleAddPoint)
 				r.Post("/{id}/reviews", s.handleAddReview)
 			})
 		})
+
+		// Public civic + catalog reads.
+		s.router.Get("/problems", s.handleListProblems)
+		s.router.Get("/problems/bbox", s.handleProblemsBBox)
+		s.router.Get("/problems/{id}", s.handleProblemDetail)
+		s.router.Get("/reviews/stats", s.handleReviewStats)
+		s.router.Get("/catalog/features", s.handleFeatureCatalog)
 	}
 
 	// Public, rate-limited proxy surface (guests route + geocode).
@@ -139,6 +185,42 @@ func (s *Server) routes() {
 			s.limited(r)
 			r.Post("/route", s.handleRoute)
 			r.Get("/geocode", s.handleGeocode)
+			r.Get("/geocode/reverse", s.handleReverseGeocode)
+		})
+	}
+
+	// Public-transport planning (public, rate-limited).
+	if s.transit != nil {
+		s.router.Group(func(r chi.Router) {
+			s.limited(r)
+			r.Get("/transit/plan", s.handleTransitPlan)
+		})
+	}
+
+	// Server-side signup (public, rate-limited — keyed per IP).
+	if s.accounts != nil {
+		s.router.Group(func(r chi.Router) {
+			s.limited(r)
+			r.Post("/auth/signup", s.handleSignup)
+		})
+	}
+
+	// Moderation surface — moderators only (role check + RLS inside writes).
+	if s.store != nil && s.roles != nil {
+		s.router.Route("/admin", func(r chi.Router) {
+			r.Use(auth.RequireUser)
+			r.Use(auth.RequireRole(s.roles, "moderator"))
+			s.limited(r)
+			r.Get("/points/unverified", s.handleAdminUnverifiedPoints)
+			r.Post("/points/{id}/verify", s.handleAdminSetPointVerify)
+			r.Delete("/points/{id}", s.handleAdminDeletePoint)
+			r.Get("/problems", s.handleAdminOpenProblems)
+			r.Post("/problems/{id}/resolve", s.handleAdminResolveProblem)
+			r.Delete("/problems/{id}", s.handleAdminDeleteProblem)
+			r.Get("/reviews", s.handleAdminRecentReviews)
+			r.Delete("/reviews/{id}", s.handleAdminDeleteReview)
+			r.Get("/users", s.handleAdminListUsers)
+			r.Post("/users/{id}/role", s.handleAdminSetUserRole)
 		})
 	}
 
@@ -147,6 +229,8 @@ func (s *Server) routes() {
 		s.authed(r)
 		r.Get("/me", s.handleMe)
 		if s.store != nil {
+			r.Post("/me/profile", s.handleProfileSync)
+			r.Get("/problems/{id}/me", s.handleProblemViewerState)
 			r.Post("/problems", s.handleCreateProblem)
 			r.Post("/problems/{id}/confirm", s.handleConfirmProblem)
 			r.Post("/petitions", s.handleCreatePetition)

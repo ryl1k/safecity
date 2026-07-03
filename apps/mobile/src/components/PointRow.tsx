@@ -1,10 +1,14 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import type { AccessibilityFeature, PointSummary, Profile } from '@safecity/shared';
 import { computeRating } from '@safecity/shared';
+import { categoryIcon } from '@/lib/filters';
 import { categoryLabel, distanceLabel, featureSummary } from '@/lib/format';
 import { radii, space, useTheme } from '@/theme/theme';
 import { RatingBadge } from './RatingBadge';
+
+type MciName = keyof typeof MaterialCommunityIcons.glyphMap;
 
 interface Props {
   point: PointSummary;
@@ -33,10 +37,15 @@ export function PointRow({ point, catalog, profile }: Props) {
       ]}
     >
       <View style={styles.head}>
+        <MaterialCommunityIcons
+          name={categoryIcon[point.category] as MciName}
+          size={18 * baseScale}
+          color={palette.muted}
+        />
         <Text style={[styles.name, { color: palette.text, fontSize: 16 * baseScale }]} numberOfLines={1}>
           {point.name}
         </Text>
-        <RatingBadge rating={rating} />
+        {rating !== 'unknown' ? <RatingBadge rating={rating} /> : null}
       </View>
       <Text style={[styles.meta, { color: palette.muted, fontSize: 13 * baseScale }]}>{meta}</Text>
       {summary ? (
