@@ -17,7 +17,10 @@ dependencies = [
     "notebook>=7.0",
     "tqdm>=4.66",
     "sideseeing-tools",
-    "transformers>=4.36",    # SegFormer + HuggingFace model hub
+    "transformers>=4.40",    # SegFormer + GroundingDINO + SAM 2 (GDINO needs >=4.40)
+    "ultralytics>=8.2",      # YOLO-World open-vocabulary detection
+    "sam2>=1.0",             # Meta SAM 2 segmentation (facebook/sam2-hiera-* on HF Hub)
+    "timm>=1.0",             # backbone zoo used by SegFormer + ConvNeXt (Project Sidewalk)
     "tensorflow>=2.16",     # TFLite conversion tooling
     "ai-edge-litert>=1.0",  # lightweight TFLite runtime for inference after conversion
     "numba>=0.59",      # sideseeing-tools->librosa->numba 0.53 caps at py3.9
