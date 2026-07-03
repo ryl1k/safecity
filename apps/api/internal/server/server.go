@@ -65,6 +65,7 @@ type DataStore interface {
 	BarriersInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.LngLat, error)
 	// street segments
 	SegmentsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.StreetSegment, error)
+	AddSegment(ctx context.Context, userID string, in store.NewSegment) (string, error)
 }
 
 // GeoService proxies routing + geocoding (ORS / Nominatim).
@@ -173,8 +174,12 @@ func (s *Server) routes() {
 			})
 		})
 
-		// Street segment reads.
+		// Street segment reads + authenticated writes.
 		s.router.Get("/segments/bbox", s.handleSegmentsBBox)
+		s.router.Group(func(r chi.Router) {
+			s.authed(r)
+			r.Post("/segments", s.handleAddSegment)
+		})
 
 		// Public civic + catalog reads.
 		s.router.Get("/problems", s.handleListProblems)

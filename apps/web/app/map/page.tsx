@@ -419,6 +419,20 @@ export default function MapPage() {
                   <button type="button" className="sc-foc" onClick={() => setRouteDir('to')} style={panelPrimary}>Маршрут сюди</button>
                   <button type="button" className="sc-foc" onClick={() => setRouteDir('from')} style={panelSecondary}>Маршрут звідси</button>
                 </div>
+                <button
+                  type="button" className="sc-foc"
+                  onClick={() => router.push(`/contribute?lng=${dropped.lng}&lat=${dropped.lat}&address=${encodeURIComponent(dropped.address ?? '')}`)}
+                  style={panelSecondary}
+                >
+                  Додати місце тут
+                </button>
+                <button
+                  type="button" className="sc-foc"
+                  onClick={() => router.push(`/contribute/segment?lng=${dropped.lng}&lat=${dropped.lat}`)}
+                  style={panelSecondary}
+                >
+                  Додати шлях тут
+                </button>
                 <button type="button" className="sc-foc" onClick={() => router.push(`/problem/new?lng=${dropped.lng}&lat=${dropped.lat}&label=${encodeURIComponent(dropped.address ?? '')}`)} style={panelReport}>
                   Повідомити про проблему
                 </button>

@@ -202,6 +202,10 @@ func (f *fakeStore) SegmentsInBBox(_ context.Context, _, _, _, _ float64) ([]sto
 	return f.segments, f.segmentsErr
 }
 
+func (f *fakeStore) AddSegment(_ context.Context, _ string, _ store.NewSegment) (string, error) {
+	return "", nil
+}
+
 func (f *fakeStore) FeatureCatalog(_ context.Context) ([]store.Feature, error) {
 	return f.catalog, f.catalogErr
 }
