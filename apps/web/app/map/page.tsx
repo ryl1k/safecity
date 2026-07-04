@@ -50,7 +50,7 @@ export default function MapPage() {
   const [routeDisplay, setRouteDisplay] = useState<RouteDisplay | null>(null);
   const [segments, setSegments] = useState<StreetSegment[]>([]);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
-  const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number; zoom?: number } | null>(null);
+  const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number; zoom?: number; bounds?: [[number, number], [number, number]] } | null>(null);
   const lastBbox = useRef<Bbox | null>(null);
   const loadedBboxRef = useRef<Bbox | null>(null);
   const nonceRef = useRef(0);
@@ -82,10 +82,46 @@ export default function MapPage() {
     }
   }
 
-  async function loadSegments(bb: Bbox) {
+  async function loadSegments(bb: Bbox, fit = false) {
     try {
-      setSegments(await segmentsInBbox(bb.minLng, bb.minLat, bb.maxLng, bb.maxLat));
+      const segs = await segmentsInBbox(bb.minLng, bb.minLat, bb.maxLng, bb.maxLat);
+      setSegments(segs);
+      // On a city switch, frame the map to the segments so the (scattered,
+      // often off-centre) accessibility data is visible instead of an empty
+      // civic-centre view. Bounded to the city bbox, so it can't over-zoom-out.
+      if (fit) {
+        const b = segmentsBounds(segs);
+        if (b) {
+          nonceRef.current += 1;
+          setFocus({
+            lng: (b.minLng + b.maxLng) / 2,
+            lat: (b.minLat + b.maxLat) / 2,
+            nonce: nonceRef.current,
+            bounds: [[b.minLng, b.minLat], [b.maxLng, b.maxLat]],
+          });
+        }
+      }
     } catch { /* segments are non-critical — silently skip */ }
+  }
+
+  // Bounding box of a set of segments (from their LineString geojson), or null.
+  function segmentsBounds(segs: StreetSegment[]): Bbox | null {
+    let minLng = Infinity, minLat = Infinity, maxLng = -Infinity, maxLat = -Infinity;
+    let any = false;
+    for (const s of segs) {
+      try {
+        const g = JSON.parse(s.geojson);
+        const coords: [number, number][] = g?.type === 'LineString' ? g.coordinates : [];
+        for (const [lng, lat] of coords) {
+          any = true;
+          if (lng < minLng) minLng = lng;
+          if (lat < minLat) minLat = lat;
+          if (lng > maxLng) maxLng = lng;
+          if (lat > maxLat) maxLat = lat;
+        }
+      } catch { /* skip malformed geometry */ }
+    }
+    return any ? { minLng, minLat, maxLng, maxLat } : null;
   }
 
   useEffect(() => {
@@ -98,7 +134,7 @@ export default function MapPage() {
       setFocus({ lng: c.lng, lat: c.lat, nonce: nonceRef.current, zoom: 12.5 });
     }
     void loadPoints(cityBbox(c));
-    void loadSegments(cityBbox(c));
+    void loadSegments(cityBbox(c), true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -110,7 +146,7 @@ export default function MapPage() {
     nonceRef.current += 1;
     setFocus({ lng: c.lng, lat: c.lat, nonce: nonceRef.current, zoom: 12.5 });
     void loadPoints(cityBbox(c));
-    void loadSegments(cityBbox(c));
+    void loadSegments(cityBbox(c), true);
   }
 
   function onMoveEnd(b: Bbox) {

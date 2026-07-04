@@ -251,7 +251,7 @@ export function ExploreMap({
   onSelectProblem?: (id: string) => void;
   onSelectSegment?: (id: string) => void;
   onMoveEnd?: (b: Bbox) => void;
-  focus?: { lng: number; lat: number; nonce: number; zoom?: number } | null;
+  focus?: { lng: number; lat: number; nonce: number; zoom?: number; bounds?: [[number, number], [number, number]] } | null;
   pickMode?: boolean;
   onMapClick?: (lng: number, lat: number) => void;
   route?: RouteDisplay | null; // styled route lines + marker cues
@@ -556,10 +556,18 @@ export function ExploreMap({
   }, [pickMode]);
 
   // Fly to a chosen search result / focus (explicit zoom for city switches).
+  // When `bounds` is present (city switch with loaded segments) we frame the
+  // accessibility data instead of a fixed civic-centre zoom — OSM sidewalks are
+  // scattered across the metro, so a tight centre view often lands on empty
+  // space even though the city is well seeded.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !focus) return;
-    map.flyTo({ center: [focus.lng, focus.lat], zoom: focus.zoom ?? Math.max(map.getZoom(), 16), duration: 800 });
+    if (focus.bounds) {
+      map.fitBounds(focus.bounds, { padding: 48, maxZoom: 13, duration: 800 });
+    } else {
+      map.flyTo({ center: [focus.lng, focus.lat], zoom: focus.zoom ?? Math.max(map.getZoom(), 16), duration: 800 });
+    }
   }, [focus]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;
