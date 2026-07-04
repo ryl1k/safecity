@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Map as MapIcon, List as ListIcon, Megaphone, Plus, CircleUserRound, type LucideIcon } from 'lucide-react';
+import { Map as MapIcon, List as ListIcon, Megaphone, Plus, Store, CircleUserRound, type LucideIcon } from 'lucide-react';
 import { AccessibilityMenu } from '@/components/AccessibilityMenu';
 import { supabase } from '@/lib/supabase';
 
-export function AppHeader({ active, search }: { active?: 'map' | 'places' | 'civic' | 'problem'; search?: ReactNode }) {
+export function AppHeader({ active, search }: { active?: 'map' | 'places' | 'civic' | 'problem' | 'business'; search?: ReactNode }) {
   const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
@@ -42,6 +42,7 @@ export function AppHeader({ active, search }: { active?: 'map' | 'places' | 'civ
           <NavLink href="/places" icon={ListIcon} label="Місця" current={active === 'places'} />
           <NavLink href="/problem/new" icon={Megaphone} label="Повідомити" current={active === 'problem'} />
           <NavLink href="/contribute" icon={Plus} label="Додати" />
+          {signedIn && <NavLink href="/business" icon={Store} label="Мій бізнес" current={active === 'business'} />}
         </nav>
 
         {/* Optional search slot (desktop map view puts its search here). */}

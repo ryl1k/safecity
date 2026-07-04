@@ -67,7 +67,7 @@ export default function BusinessPage() {
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
-      <AppHeader />
+      <AppHeader active="business" />
       <main id="main-content" tabIndex={-1} style={{ width: '100%', maxWidth: 'min(100%, 700px)', margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
         <h1 style={{ margin: '0 0 1em', fontSize: '1.7em', fontWeight: 800 }}>Мої точки</h1>
 
