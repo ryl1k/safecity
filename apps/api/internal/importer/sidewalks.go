@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -154,7 +155,8 @@ func upsertSegment(ctx context.Context, pool *pgxpool.Pool, rec SegmentRecord) (
 	return id, err
 }
 
-// ImportSidewalks queries Overpass for sidewalk/footway geometry in bbox and upserts street segments.
+// ImportSidewalks queries Overpass for sidewalk/footway geometry in bbox and
+// upserts street segments (uncapped — every matching way is kept).
 func ImportSidewalks(ctx context.Context, pool *pgxpool.Pool, client *http.Client, endpoint, bbox string) (Stats, error) {
 	if endpoint == "" {
 		endpoint = DefaultOverpassURL
@@ -162,20 +164,91 @@ func ImportSidewalks(ctx context.Context, pool *pgxpool.Pool, client *http.Clien
 	if bbox == "" {
 		bbox = DefaultBBox
 	}
+	return importSidewalksBBox(ctx, pool, client, endpoint, bbox, 0)
+}
+
+// DefaultPerCity matches tooling/importers/bezbarrier.mjs's PER_CITY default —
+// the same showcase density used to seed points, so streets and points look
+// comparably populated per city.
+const DefaultPerCity = 35
+
+// CityProgress reports one city's import outcome (err is non-nil on failure).
+type CityProgress func(city City, st Stats, err error)
+
+// ImportSidewalksNational seeds street segments across the same 75
+// government-controlled cities used for the points showcase (Cities, mirrored
+// from apps/web/src/lib/cities.ts), capping each city at perCity segments
+// (<=0 uses DefaultPerCity). Politely rate-limited between cities — Overpass
+// is a shared public service. Stops and returns on the first city that fails;
+// progress (if non-nil) is called for every city, including the failing one,
+// before the error is returned.
+func ImportSidewalksNational(
+	ctx context.Context, pool *pgxpool.Pool, client *http.Client, endpoint string, perCity int, progress CityProgress,
+) (Stats, error) {
+	if endpoint == "" {
+		endpoint = DefaultOverpassURL
+	}
+	if perCity <= 0 {
+		perCity = DefaultPerCity
+	}
+
+	var total Stats
+	for i, city := range Cities {
+		st, err := importSidewalksBBox(ctx, pool, client, endpoint, CityBBox(city), perCity)
+		if progress != nil {
+			progress(city, st, err)
+		}
+		if err != nil {
+			return total, fmt.Errorf("city %s: %w", city.ID, err)
+		}
+		total.Upserts += st.Upserts
+		total.Skipped += st.Skipped
+
+		if i < len(Cities)-1 {
+			select {
+			case <-ctx.Done():
+				return total, ctx.Err()
+			case <-time.After(1500 * time.Millisecond):
+			}
+		}
+	}
+	return total, nil
+}
+
+// capRecords limits recs to at most cap entries (Overpass's own element order
+// — no quality ranking applied). cap<=0 means unlimited.
+func capRecords(recs []SegmentRecord, cap int) []SegmentRecord {
+	if cap > 0 && len(recs) > cap {
+		return recs[:cap]
+	}
+	return recs
+}
+
+// importSidewalksBBox fetches, maps, and upserts sidewalks for one bbox.
+// cap<=0 means unlimited; otherwise only the first cap named/geometric ways
+// are kept (Overpass's own element order — no quality ranking applied).
+func importSidewalksBBox(
+	ctx context.Context, pool *pgxpool.Pool, client *http.Client, endpoint, bbox string, cap int,
+) (Stats, error) {
 	elements, err := fetchSidewalks(ctx, client, endpoint, bbox)
 	if err != nil {
 		return Stats{}, err
 	}
 
 	var st Stats
+	recs := make([]SegmentRecord, 0, len(elements))
 	for _, el := range elements {
 		rec, ok := mapSidewalkWay(el)
 		if !ok {
 			st.Skipped++
 			continue
 		}
+		recs = append(recs, rec)
+	}
+	recs = capRecords(recs, cap)
+	for _, rec := range recs {
 		if _, err := upsertSegment(ctx, pool, rec); err != nil {
-			return st, fmt.Errorf("upsert way/%d: %w", el.ID, err)
+			return st, fmt.Errorf("upsert way/%d: %w", rec.OSMWayID, err)
 		}
 		st.Upserts++
 	}

@@ -174,6 +174,50 @@ func TestSidewalkQueryHasBBoxAndGeom(t *testing.T) {
 	}
 }
 
+func TestCapRecords(t *testing.T) {
+	recs := []SegmentRecord{{OSMWayID: 1}, {OSMWayID: 2}, {OSMWayID: 3}}
+	if got := capRecords(recs, 0); len(got) != 3 {
+		t.Fatalf("cap<=0 should be unlimited, got %d", len(got))
+	}
+	if got := capRecords(recs, 2); len(got) != 2 || got[0].OSMWayID != 1 || got[1].OSMWayID != 2 {
+		t.Fatalf("cap=2 = %+v", got)
+	}
+	if got := capRecords(recs, 10); len(got) != 3 {
+		t.Fatalf("cap larger than input should return everything, got %d", len(got))
+	}
+}
+
+func TestCitiesIntegrity(t *testing.T) {
+	if len(Cities) != 75 {
+		t.Fatalf("expected 75 cities, got %d", len(Cities))
+	}
+	seen := make(map[string]bool, len(Cities))
+	for _, c := range Cities {
+		if c.ID == "" || c.Name == "" {
+			t.Fatalf("city missing id/name: %+v", c)
+		}
+		if seen[c.ID] {
+			t.Fatalf("duplicate city id %q", c.ID)
+		}
+		seen[c.ID] = true
+		if c.Lat < 44 || c.Lat > 53 || c.Lng < 21 || c.Lng > 41 {
+			t.Errorf("city %s coords out of Ukraine's bounds: %v,%v", c.ID, c.Lat, c.Lng)
+		}
+	}
+	if Cities[4].ID != "lviv" {
+		t.Fatalf("expected Cities[4] to be lviv (matches cities.ts order), got %q", Cities[4].ID)
+	}
+}
+
+func TestCityBBox(t *testing.T) {
+	lviv := City{ID: "lviv", Name: "Львів", Lng: 24.0250, Lat: 49.8389}
+	got := CityBBox(lviv)
+	want := "49.7189,23.8450,49.9589,24.2050"
+	if got != want {
+		t.Fatalf("CityBBox(lviv) = %q, want %q", got, want)
+	}
+}
+
 func TestFetchSidewalks(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		b, _ := io.ReadAll(r.Body)
