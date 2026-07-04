@@ -49,14 +49,14 @@ function PlanCard({
   return (
     <div
       style={{
-        ...card, flex: '1 1 230px', display: 'flex', flexDirection: 'column', gap: '0.2em',
+        ...card, flex: '1 1 240px', maxWidth: 380, display: 'flex', flexDirection: 'column', gap: '0.2em',
         borderColor: current ? 'var(--sc-ok-line)' : highlight ? 'var(--sc-primary)' : 'var(--sc-border)',
         borderWidth: current || highlight ? '2px' : undefined,
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5em' }}>
-        <span style={{ fontWeight: 800, fontSize: '1.05em' }}>{title}</span>
-        {current && <span style={{ fontSize: '0.72em', fontWeight: 800, color: 'var(--sc-ok)', background: 'var(--sc-ok-bg)', border: 'var(--sc-bw) solid var(--sc-ok-line)', borderRadius: '2em', padding: '0.15em 0.6em' }}>Поточний</span>}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5em' }}>
+        <span style={{ fontWeight: 800, fontSize: '1.05em', minWidth: 0 }}>{title}</span>
+        {current && <span style={{ fontSize: '0.72em', fontWeight: 800, whiteSpace: 'nowrap', flexShrink: 0, color: 'var(--sc-ok)', background: 'var(--sc-ok-bg)', border: 'var(--sc-bw) solid var(--sc-ok-line)', borderRadius: '2em', padding: '0.2em 0.6em' }}>Поточний</span>}
       </div>
       <div style={{ margin: '0.15em 0' }}>
         <span style={{ fontSize: '1.7em', fontWeight: 800 }}>{price}</span>
