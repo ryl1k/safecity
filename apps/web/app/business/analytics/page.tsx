@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Eye, Search, MessageSquare, Star, type LucideIcon } from 'lucide-react';
 import { categoryLabel } from '@/lib/format';
 import { useBusiness } from '@/lib/businessContext';
 import type { MyPoint } from '@/lib/business';
@@ -10,7 +11,7 @@ const card = {
   borderRadius: '1em', padding: '1.2em 1.3em',
 } as const;
 
-function StatCard({ label, value, accent }: { label: string; value: string | number; accent?: boolean }) {
+function StatCard({ label, value, accent }: { label: string; value: React.ReactNode; accent?: boolean }) {
   return (
     <div style={{ ...card, padding: '1em 1.2em' }}>
       <div style={{ fontSize: '0.78em', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--sc-muted)' }}>{label}</div>
@@ -19,10 +20,10 @@ function StatCard({ label, value, accent }: { label: string; value: string | num
   );
 }
 
-function Metric({ icon, value, title }: { icon: string; value: string | number; title: string }) {
+function Metric({ icon: Icon, value, title, fill }: { icon: LucideIcon; value: string | number; title: string; fill?: boolean }) {
   return (
-    <span title={title} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3em', fontSize: '0.85em', fontWeight: 700, color: 'var(--sc-muted)' }}>
-      <span aria-hidden>{icon}</span>{value}
+    <span title={title} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35em', fontSize: '0.85em', fontWeight: 700, color: 'var(--sc-muted)' }}>
+      <Icon size={15} aria-hidden fill={fill ? 'currentColor' : 'none'} />{value}
     </span>
   );
 }
@@ -48,7 +49,12 @@ export default function BusinessAnalytics() {
         <StatCard label="Перегляди" value={totalViews} accent />
         <StatCard label="Появи в пошуку" value={totalSearch} accent />
         <StatCard label="Відгуки" value={totalReviews} />
-        <StatCard label="Середня оцінка" value={avgRating != null ? `★ ${avgRating.toFixed(1)}` : '—'} />
+        <StatCard
+          label="Середня оцінка"
+          value={avgRating != null
+            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.25em' }}><Star size={22} fill="currentColor" aria-hidden />{avgRating.toFixed(1)}</span>
+            : '—'}
+        />
       </div>
 
       {/* Per-point breakdown */}
@@ -70,10 +76,10 @@ export default function BusinessAnalytics() {
                 <div style={{ color: 'var(--sc-muted)', fontSize: '0.8em' }}>{catOf(p)}</div>
               </Link>
               <div style={{ display: 'flex', gap: '1em', flexWrap: 'wrap' }}>
-                <Metric icon="👁" value={p.viewCount} title="Перегляди" />
-                <Metric icon="🔎" value={p.searchAppearances} title="Появи в пошуку" />
-                <Metric icon="💬" value={p.reviewCount} title="Відгуки" />
-                <Metric icon="★" value={p.avgRating != null ? p.avgRating.toFixed(1) : '—'} title="Середня оцінка" />
+                <Metric icon={Eye} value={p.viewCount} title="Перегляди" />
+                <Metric icon={Search} value={p.searchAppearances} title="Появи в пошуку" />
+                <Metric icon={MessageSquare} value={p.reviewCount} title="Відгуки" />
+                <Metric icon={Star} value={p.avgRating != null ? p.avgRating.toFixed(1) : '—'} title="Середня оцінка" fill={p.avgRating != null} />
               </div>
             </div>
           ))

@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Eye } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { useBusiness } from '@/lib/businessContext';
 
@@ -63,7 +64,7 @@ export default function BusinessOverview() {
           <div style={{ fontSize: '0.78em', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--sc-muted)', marginBottom: '0.35em' }}>Найпопулярніша точка</div>
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '0.8em', flexWrap: 'wrap', alignItems: 'baseline' }}>
             <strong style={{ fontSize: '1.05em' }}>{mostViewed.name}</strong>
-            <span style={{ color: 'var(--sc-primary)', fontWeight: 800 }}>👁 {mostViewed.viewCount}</span>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3em', color: 'var(--sc-primary)', fontWeight: 800 }}><Eye size={17} aria-hidden /> {mostViewed.viewCount}</span>
           </div>
           <Link href="/business/analytics" style={{ color: 'var(--sc-primary)', fontWeight: 700, fontSize: '0.88em', textDecoration: 'none' }}>Уся аналітика →</Link>
         </section>

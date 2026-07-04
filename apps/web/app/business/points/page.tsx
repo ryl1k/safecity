@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { Eye } from 'lucide-react';
 import { Button } from '@/components/ui';
 import { categoryLabel } from '@/lib/format';
 import { toast } from '@/lib/toast';
@@ -63,7 +64,7 @@ export default function BusinessPoints() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.9em', fontSize: '0.85em' }}>
-                  <span title="Перегляди" style={{ color: 'var(--sc-muted)', fontWeight: 700 }}>👁 {p.viewCount}</span>
+                  <span title="Перегляди" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3em', color: 'var(--sc-muted)', fontWeight: 700 }}><Eye size={15} aria-hidden /> {p.viewCount}</span>
                   <span style={{ color: v.ok ? 'var(--sc-ok)' : 'var(--sc-muted)', fontWeight: 700 }}>{v.label}</span>
                 </div>
                 <div style={{ display: 'flex', gap: '0.4em', flexWrap: 'wrap' }}>
