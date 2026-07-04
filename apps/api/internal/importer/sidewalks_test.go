@@ -224,6 +224,11 @@ func TestFetchSidewalks(t *testing.T) {
 		if !strings.HasPrefix(string(b), "data=") {
 			t.Errorf("expected form-encoded data= body, got %q", string(b))
 		}
+		// Overpass (and similar OSM-adjacent services) reject requests with no
+		// descriptive User-Agent — this is the header that fixed the live 406s.
+		if ua := r.Header.Get("User-Agent"); ua != userAgent {
+			t.Errorf("User-Agent = %q, want %q", ua, userAgent)
+		}
 		_, _ = io.WriteString(w, `{"elements":[{"type":"way","id":1,"geometry":[{"lat":49.8,"lon":24.0},{"lat":49.81,"lon":24.01}],"tags":{"name":"T"}}]}`)
 	}))
 	defer srv.Close()

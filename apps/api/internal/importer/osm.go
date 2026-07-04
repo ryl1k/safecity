@@ -235,6 +235,7 @@ func fetchOverpass(ctx context.Context, client *http.Client, endpoint, bbox stri
 		return nil, err
 	}
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.Header.Set("User-Agent", userAgent)
 
 	resp, err := client.Do(req)
 	if err != nil {
