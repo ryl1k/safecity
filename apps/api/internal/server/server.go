@@ -42,6 +42,9 @@ type DataStore interface {
 	FeatureCatalog(ctx context.Context) ([]store.Feature, error)
 	// contribution writes
 	AddPoint(ctx context.Context, userID string, in store.NewPoint) (string, error)
+	UpdatePoint(ctx context.Context, userID, pointID string, in store.NewPoint) error
+	DeleteOwnPoint(ctx context.Context, userID, pointID string) error
+	IncrementView(ctx context.Context, pointID string)
 	UpsertReview(ctx context.Context, userID, pointID string, in store.NewReview) (store.Review, error)
 	// account-level business (self-serve; payments mocked)
 	SubscribeBusiness(ctx context.Context, userID, plan string) error
@@ -173,6 +176,8 @@ func (s *Server) routes() {
 			r.Group(func(r chi.Router) {
 				s.authed(r)
 				r.Post("/", s.handleAddPoint)
+				r.Patch("/{id}", s.handleUpdatePoint)
+				r.Delete("/{id}", s.handleDeletePoint)
 				r.Post("/{id}/reviews", s.handleAddReview)
 			})
 		})

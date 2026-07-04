@@ -68,7 +68,9 @@ export const api = {
   /** POST defaults to authenticated (most writes need it); pass {auth:false} for public posts. */
   post: <T>(path: string, body?: unknown, opts?: { auth?: boolean }) =>
     request<T>('POST', path, body, opts?.auth ?? true),
-  /** DELETE is always authenticated (only moderation uses it). */
+  /** PATCH is always authenticated (owner edits). */
+  patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body, true),
+  /** DELETE is always authenticated (moderation + owner deletes). */
   del: <T>(path: string) => request<T>('DELETE', path, undefined, true),
 };
 

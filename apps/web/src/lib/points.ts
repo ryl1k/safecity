@@ -36,6 +36,26 @@ export async function searchPointsByName(query: string, limit = 6): Promise<Poin
   return api.get<PointHit[]>(`/points/search${qs({ q, limit })}`);
 }
 
+export interface EditPointInput {
+  name: string;
+  category: PointSummary['category'];
+  lat: number;
+  lng: number;
+  address?: string;
+  description?: string;
+  features?: Record<string, 'yes' | 'no' | 'unknown'>;
+}
+
+/** Edit a point the caller owns. */
+export async function updatePoint(id: string, in_: EditPointInput): Promise<void> {
+  await api.patch(`/points/${id}`, in_);
+}
+
+/** Delete a point the caller owns. */
+export async function deletePoint(id: string): Promise<void> {
+  await api.del(`/points/${id}`);
+}
+
 /** A single point by id (coords + feature values), or null. */
 export async function pointById(id: string): Promise<PointSummary | null> {
   try {

@@ -39,6 +39,8 @@ func classify(err error) error {
 		return ErrInvalid
 	case "PT001": // custom: per-user point cap reached (add_point)
 		return ErrPointLimit
+	case "PT404": // custom: point not owned by caller (update_point/delete_point)
+		return ErrNotFound
 	default:
 		return err
 	}

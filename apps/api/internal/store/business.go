@@ -14,6 +14,7 @@ type MyPoint struct {
 	Category     string    `json:"category"`
 	Address      *string   `json:"address"`
 	VerifyStatus string    `json:"verifyStatus"`
+	ViewCount    int       `json:"viewCount"`
 	CreatedAt    time.Time `json:"createdAt"`
 }
 
@@ -48,7 +49,7 @@ select coalesce(active and (renews_at is null or renews_at > now()), false), pla
 from business_accounts where user_id = auth.uid()`
 
 const myPointsSQL = `
-select id::text, name, category::text, address, verify_status::text, created_at
+select id::text, name, category::text, address, verify_status::text, view_count, created_at
 from points where created_by = auth.uid() order by created_at desc`
 
 // GetBusinessMe returns the caller's business status and the points they created.
@@ -69,7 +70,7 @@ func (s *Store) GetBusinessMe(ctx context.Context, userID string) (BusinessMe, e
 		defer rows.Close()
 		for rows.Next() {
 			var p MyPoint
-			if err := rows.Scan(&p.ID, &p.Name, &p.Category, &p.Address, &p.VerifyStatus, &p.CreatedAt); err != nil {
+			if err := rows.Scan(&p.ID, &p.Name, &p.Category, &p.Address, &p.VerifyStatus, &p.ViewCount, &p.CreatedAt); err != nil {
 				return err
 			}
 			me.Points = append(me.Points, p)

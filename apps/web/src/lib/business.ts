@@ -11,6 +11,7 @@ export interface MyPoint {
   category: string;
   address: string | null;
   verifyStatus: string;
+  viewCount: number;
   createdAt: string;
 }
 

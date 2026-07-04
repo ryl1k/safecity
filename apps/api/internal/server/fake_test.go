@@ -35,6 +35,11 @@ type fakeStore struct {
 	pointID  string
 	pointErr error
 
+	// UpdatePoint / DeleteOwnPoint / IncrementView (delete reuses gotDeleteID/deleteErr below)
+	gotUpdateID string
+	updateErr   error
+	gotViewID   string
+
 	// SubscribeBusiness
 	gotSubPlan string
 	subErr     error
@@ -149,6 +154,18 @@ func (f *fakeStore) AddPoint(_ context.Context, userID string, in store.NewPoint
 	f.gotPoint = in
 	return f.pointID, f.pointErr
 }
+
+func (f *fakeStore) UpdatePoint(_ context.Context, userID, pointID string, in store.NewPoint) error {
+	f.gotUser, f.gotUpdateID, f.gotPoint = userID, pointID, in
+	return f.updateErr
+}
+
+func (f *fakeStore) DeleteOwnPoint(_ context.Context, userID, pointID string) error {
+	f.gotUser, f.gotDeleteID = userID, pointID
+	return f.deleteErr
+}
+
+func (f *fakeStore) IncrementView(_ context.Context, pointID string) { f.gotViewID = pointID }
 
 func (f *fakeStore) SubscribeBusiness(_ context.Context, userID, plan string) error {
 	f.gotUser, f.gotSubPlan = userID, plan

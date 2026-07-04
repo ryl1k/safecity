@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 
@@ -79,8 +80,8 @@ func (s *Server) handlePointsBBox(w http.ResponseWriter, r *http.Request) {
 // handlePointDetail: GET /points/{id} — public; 404 when not found.
 func (s *Server) handlePointDetail(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	if id == "" {
-		httpx.Error(w, http.StatusBadRequest, "invalid_query", "missing point id")
+	if !isUUID(id) {
+		httpx.Error(w, http.StatusNotFound, "not_found", "point not found")
 		return
 	}
 	p, err := s.store.PointDetail(r.Context(), id)
@@ -93,6 +94,8 @@ func (s *Server) handlePointDetail(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusNotFound, "not_found", "point not found")
 		return
 	}
+	// Best-effort view analytics — don't block or fail the read on it.
+	go s.store.IncrementView(context.Background(), id)
 	w.Header().Set("Cache-Control", readCacheControl)
 	httpx.JSON(w, http.StatusOK, p)
 }

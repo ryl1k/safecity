@@ -82,19 +82,27 @@ func TestPointsBBoxMissingParams(t *testing.T) {
 }
 
 func TestPointDetailOK(t *testing.T) {
-	fs := &fakeStore{detail: &store.PointDetail{ID: "abc", Name: "Opera"}}
-	rec := get(pointServer(fs), "/points/abc")
+	fs := &fakeStore{detail: &store.PointDetail{ID: sampleUUID, Name: "Opera"}}
+	rec := get(pointServer(fs), "/points/"+sampleUUID)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want 200; body=%s", rec.Code, rec.Body.String())
 	}
-	if fs.gotDetailID != "abc" {
-		t.Fatalf("store got id %q, want abc", fs.gotDetailID)
+	if fs.gotDetailID != sampleUUID {
+		t.Fatalf("store got id %q, want %s", fs.gotDetailID, sampleUUID)
+	}
+}
+
+func TestPointDetailBadID(t *testing.T) {
+	// A non-UUID id is rejected before hitting the store (also stops the
+	// `/points/undefined` 500 the web used to trigger).
+	if rec := get(pointServer(&fakeStore{}), "/points/undefined"); rec.Code != http.StatusNotFound {
+		t.Fatalf("status = %d, want 404", rec.Code)
 	}
 }
 
 func TestPointDetailNotFound(t *testing.T) {
 	fs := &fakeStore{detail: nil} // store returns (nil, nil) → 404
-	if rec := get(pointServer(fs), "/points/missing"); rec.Code != http.StatusNotFound {
+	if rec := get(pointServer(fs), "/points/"+sampleUUID); rec.Code != http.StatusNotFound {
 		t.Fatalf("status = %d, want 404", rec.Code)
 	}
 }

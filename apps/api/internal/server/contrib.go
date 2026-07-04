@@ -63,6 +63,62 @@ func (s *Server) handleAddPoint(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusCreated, map[string]string{"id": id})
 }
 
+// handleUpdatePoint: PATCH /points/{id} — the owner edits their own point.
+func (s *Server) handleUpdatePoint(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.principal(w, r)
+	if !ok {
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if !isUUID(id) {
+		httpx.Error(w, http.StatusNotFound, "not_found", "point not found")
+		return
+	}
+	var req createPointRequest
+	if !httpx.Decode(w, r, &req) {
+		return
+	}
+	err := s.store.UpdatePoint(r.Context(), p.UserID, id, store.NewPoint{
+		Name: req.Name, Category: req.Category, Lng: *req.Lng, Lat: *req.Lat,
+		Address: req.Address, Description: req.Description, Features: req.Features,
+	})
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			httpx.Error(w, http.StatusNotFound, "not_found", "point not found or not yours")
+			return
+		}
+		if errors.Is(err, store.ErrInvalid) {
+			httpx.ValidationError(w, []httpx.FieldError{{Field: "features", Message: "contains an unknown feature key"}})
+			return
+		}
+		s.storeError(w, "update point", "", "", err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// handleDeletePoint: DELETE /points/{id} — the owner removes their own point.
+func (s *Server) handleDeletePoint(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.principal(w, r)
+	if !ok {
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if !isUUID(id) {
+		httpx.Error(w, http.StatusNotFound, "not_found", "point not found")
+		return
+	}
+	if err := s.store.DeleteOwnPoint(r.Context(), p.UserID, id); err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			httpx.Error(w, http.StatusNotFound, "not_found", "point not found or not yours")
+			return
+		}
+		s.storeError(w, "delete point", "", "", err)
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
 // createReviewRequest is the body for POST /points/{id}/reviews.
 type createReviewRequest struct {
 	Profile string   `json:"profile" validate:"required,oneof=wheelchair blind"`
