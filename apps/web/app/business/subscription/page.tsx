@@ -11,38 +11,73 @@ const card = {
   borderRadius: '1em', padding: '1.3em',
 } as const;
 
-const PERKS = [
+// Free-tier features intentionally omit any point-count limit — the cap is never
+// advertised before it is hit.
+const FREE_FEATURES = [
+  'Додавання точок на мапу',
+  'Показ у пошуку та на мапі',
+  'Відгуки відвідувачів',
+  'Профіль точки з фото',
+];
+const BUSINESS_FEATURES = [
+  'Усе з базового плану',
   'Необмежена кількість точок',
   'Пріоритет у результатах пошуку',
-  'Позначка «Бізнес» на всіх ваших точках',
-  'Доступ до аналітики переглядів',
+  'Позначка «Бізнес» на всіх точках',
+  'Аналітика переглядів',
 ];
 
 function fmtDate(iso: string | null): string {
   return iso ? new Date(iso).toLocaleDateString('uk-UA') : '';
 }
 
-function PlanCard({ title, price, note, onPick, busy, highlight }: {
-  title: string; price: string; note: string; onPick: () => void; busy: boolean; highlight?: boolean;
+function Feature({ children }: { children: React.ReactNode }) {
+  return (
+    <li style={{ display: 'flex', gap: '0.5em', alignItems: 'flex-start', fontSize: '0.88em', lineHeight: 1.4 }}>
+      <span aria-hidden style={{ color: 'var(--sc-ok)', fontWeight: 800, flexShrink: 0 }}>✓</span>
+      <span>{children}</span>
+    </li>
+  );
+}
+
+function PlanCard({
+  title, price, period, note, features, current, highlight, action,
+}: {
+  title: string; price: string; period?: string; note?: string; features: string[];
+  current: boolean; highlight?: boolean; action: React.ReactNode;
 }) {
   return (
-    <div style={{ ...card, flex: '1 1 220px', borderColor: highlight ? 'var(--sc-primary)' : 'var(--sc-border)' }}>
-      <div style={{ fontWeight: 800, fontSize: '1.05em' }}>{title}</div>
-      <div style={{ fontSize: '1.9em', fontWeight: 800, margin: '0.2em 0' }}>{price}</div>
-      <div style={{ color: 'var(--sc-muted)', fontSize: '0.85em', marginBottom: '1em' }}>{note}</div>
-      <Button onClick={onPick} disabled={busy} variant={highlight ? 'primary' : 'secondary'} block>
-        {busy ? 'Обробка…' : 'Обрати'}
-      </Button>
+    <div
+      style={{
+        ...card, flex: '1 1 230px', display: 'flex', flexDirection: 'column', gap: '0.2em',
+        borderColor: current ? 'var(--sc-ok-line)' : highlight ? 'var(--sc-primary)' : 'var(--sc-border)',
+        borderWidth: current || highlight ? '2px' : undefined,
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5em' }}>
+        <span style={{ fontWeight: 800, fontSize: '1.05em' }}>{title}</span>
+        {current && <span style={{ fontSize: '0.72em', fontWeight: 800, color: 'var(--sc-ok)', background: 'var(--sc-ok-bg)', border: 'var(--sc-bw) solid var(--sc-ok-line)', borderRadius: '2em', padding: '0.15em 0.6em' }}>Поточний</span>}
+      </div>
+      <div style={{ margin: '0.15em 0' }}>
+        <span style={{ fontSize: '1.7em', fontWeight: 800 }}>{price}</span>
+        {period && <span style={{ color: 'var(--sc-muted)', fontWeight: 700 }}>{period}</span>}
+      </div>
+      <div style={{ color: 'var(--sc-muted)', fontSize: '0.82em', minHeight: '1.1em', marginBottom: '0.8em' }}>{note ?? ''}</div>
+      <ul style={{ listStyle: 'none', margin: '0 0 1.1em', padding: 0, display: 'flex', flexDirection: 'column', gap: '0.5em', flex: 1 }}>
+        {features.map((f) => <Feature key={f}>{f}</Feature>)}
+      </ul>
+      {action}
     </div>
   );
 }
 
 export default function BusinessSubscription() {
   const { me, reload } = useBusiness();
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<SubscriptionPlan | null>(null);
+  const currentPlan: 'free' | SubscriptionPlan = me.isBusiness ? (me.plan ?? 'monthly') : 'free';
 
   async function pick(plan: SubscriptionPlan) {
-    setBusy(true);
+    setBusy(plan);
     try {
       await subscribeBusiness(plan);
       await reload();
@@ -50,33 +85,60 @@ export default function BusinessSubscription() {
     } catch (err: unknown) {
       toast(err instanceof Error ? err.message : 'Не вдалося оформити підписку', 'error');
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   }
+
+  const bizButton = (plan: SubscriptionPlan) =>
+    currentPlan === plan ? (
+      <Button variant="secondary" block disabled>Активний план</Button>
+    ) : (
+      <Button onClick={() => pick(plan)} disabled={busy !== null} block variant={plan === 'yearly' ? 'primary' : 'secondary'}>
+        {busy === plan ? 'Обробка…' : me.isBusiness ? 'Перейти' : 'Обрати'}
+      </Button>
+    );
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2em' }}>
       <h1 style={{ margin: 0, fontSize: '1.6em', fontWeight: 800 }}>Підписка</h1>
 
-      {me.isBusiness && (
-        <section style={{ ...card, borderColor: 'var(--sc-ok-line)', background: 'var(--sc-ok-bg)' }}>
-          <div style={{ fontWeight: 800, color: 'var(--sc-ok)' }}>Активна · {me.plan === 'yearly' ? 'Річна' : 'Місячна'}</div>
-          <p style={{ margin: '0.3em 0 0', color: 'var(--sc-muted)', fontSize: '0.9em' }}>
-            {me.renewsAt ? `Наступне поновлення ${fmtDate(me.renewsAt)}.` : ''} Оберіть інший план нижче, щоб змінити його.
-          </p>
-        </section>
+      {me.isBusiness && me.renewsAt && (
+        <p style={{ margin: 0, color: 'var(--sc-muted)', fontSize: '0.9em' }}>
+          Бізнес-підписка активна · наступне поновлення {fmtDate(me.renewsAt)}.
+        </p>
       )}
 
-      <section style={card}>
-        <div style={{ fontWeight: 800, marginBottom: '0.6em' }}>Що входить у бізнес</div>
-        <ul style={{ margin: 0, paddingLeft: '1.2em', color: 'var(--sc-muted)', fontSize: '0.9em', lineHeight: 1.7 }}>
-          {PERKS.map((p) => <li key={p}>{p}</li>)}
-        </ul>
-      </section>
-
-      <div style={{ display: 'flex', gap: '0.9em', flexWrap: 'wrap' }}>
-        <PlanCard title="Місячна" price="₴199/міс" note="Оплата щомісяця" onPick={() => pick('monthly')} busy={busy} />
-        <PlanCard title="Річна" price="₴1990/рік" note="Два місяці у подарунок" onPick={() => pick('yearly')} busy={busy} highlight />
+      <div style={{ display: 'flex', gap: '0.9em', flexWrap: 'wrap', alignItems: 'stretch' }}>
+        <PlanCard
+          title="Базовий"
+          price="Безкоштовно"
+          features={FREE_FEATURES}
+          current={currentPlan === 'free'}
+          action={
+            currentPlan === 'free'
+              ? <Button variant="secondary" block disabled>Ваш план</Button>
+              : <span style={{ textAlign: 'center', color: 'var(--sc-muted)', fontSize: '0.82em', padding: '0.6em 0' }}>Входить у бізнес</span>
+          }
+        />
+        <PlanCard
+          title="Бізнес · Місячна"
+          price="₴199"
+          period="/міс"
+          note="Оплата щомісяця"
+          features={BUSINESS_FEATURES}
+          current={currentPlan === 'monthly'}
+          action={bizButton('monthly')}
+        />
+        <PlanCard
+          title="Бізнес · Річна"
+          price="₴1990"
+          period="/рік"
+          note="Два місяці у подарунок"
+          features={BUSINESS_FEATURES}
+          current={currentPlan === 'yearly'}
+          highlight
+          action={bizButton('yearly')}
+        />
       </div>
 
       <p style={{ margin: 0, fontSize: '0.78em', color: 'var(--sc-muted)' }}>
