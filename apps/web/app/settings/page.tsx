@@ -58,6 +58,16 @@ export default function SettingsPage() {
           )}
         </section>
 
+        {email && (
+          <section style={card}>
+            <h2 style={title}>Мій бізнес</h2>
+            <p style={{ margin: '0 0 0.8em', color: 'var(--sc-muted)', fontSize: '0.85em' }}>
+              Додайте свій заклад, підтвердіть його та піднімайте у пошуку підпискою.
+            </p>
+            <Link href="/business" style={{ textDecoration: 'none' }}><Button>Відкрити мій бізнес</Button></Link>
+          </section>
+        )}
+
         {isModerator && (
           <section style={card}>
             <h2 style={title}>Модерація</h2>

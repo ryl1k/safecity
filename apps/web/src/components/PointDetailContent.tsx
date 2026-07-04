@@ -113,6 +113,20 @@ export function PointDetailContent({ id, onRouteClick }: { id: string; onRouteCl
         {categoryLabel[point.category]}
         {point.address ? ` · ${point.address}` : ''}
       </p>
+      {(point.isBusiness || point.verifiedPaid) && (
+        <div style={{ display: 'flex', gap: '0.5em', flexWrap: 'wrap', marginTop: '0.5em' }}>
+          {point.isBusiness && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', background: 'var(--sc-surface-2)', color: 'var(--sc-muted)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '2em', padding: '0.25em 0.7em', fontWeight: 800, fontSize: '0.78em' }}>
+              Бізнес
+            </span>
+          )}
+          {point.verifiedPaid && (
+            <span style={{ display: 'inline-flex', alignItems: 'center', background: 'var(--sc-ok-bg)', color: 'var(--sc-ok)', border: 'var(--sc-bw) solid var(--sc-ok-line)', borderRadius: '2em', padding: '0.25em 0.7em', fontWeight: 800, fontSize: '0.78em' }}>
+              Верифіковано
+            </span>
+          )}
+        </div>
+      )}
       {/* Photos + description first — discovery before accessibility detail */}
       {point.photos && point.photos.length > 0 ? (
         <div style={{ marginTop: '1em' }}><PhotoGallery photos={point.photos} alt={point.name} /></div>

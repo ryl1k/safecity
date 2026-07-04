@@ -35,6 +35,9 @@ export interface PointSummary {
   verifyStatus: VerifyStatus;
   distanceM?: number;
   features: PointFeatureMap;
+  isBusiness?: boolean;
+  verifiedPaid?: boolean;
+  subscriptionActive?: boolean;
 }
 
 /** Per-profile ratings computed for a point. */

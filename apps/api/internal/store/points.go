@@ -10,44 +10,53 @@ import (
 // PointSummary is a map/list point with its feature values. Field names match the
 // web's @safecity/shared PointSummary so the rating engine consumes it unchanged.
 type PointSummary struct {
-	ID           string            `json:"id"`
-	Name         string            `json:"name"`
-	Category     string            `json:"category"`
-	Address      *string           `json:"address"`
-	Lng          float64           `json:"lng"`
-	Lat          float64           `json:"lat"`
-	VerifyStatus string            `json:"verifyStatus"`
-	DistanceM    *float64          `json:"distanceM,omitempty"`
-	Features     map[string]string `json:"features"`
+	ID                 string            `json:"id"`
+	Name               string            `json:"name"`
+	Category           string            `json:"category"`
+	Address            *string           `json:"address"`
+	Lng                float64           `json:"lng"`
+	Lat                float64           `json:"lat"`
+	VerifyStatus       string            `json:"verifyStatus"`
+	DistanceM          *float64          `json:"distanceM,omitempty"`
+	Features           map[string]string `json:"features"`
+	IsBusiness         bool              `json:"isBusiness"`
+	VerifiedPaid       bool              `json:"verifiedPaid"`
+	SubscriptionActive bool              `json:"subscriptionActive"`
 }
 
 // PointDetail adds description + photos for the detail view.
 type PointDetail struct {
-	ID           string            `json:"id"`
-	Name         string            `json:"name"`
-	Category     string            `json:"category"`
-	Address      *string           `json:"address"`
-	Description  *string           `json:"description"`
-	Photos       []string          `json:"photos"`
-	Lng          float64           `json:"lng"`
-	Lat          float64           `json:"lat"`
-	VerifyStatus string            `json:"verifyStatus"`
-	Features     map[string]string `json:"features"`
+	ID                 string            `json:"id"`
+	Name               string            `json:"name"`
+	Category           string            `json:"category"`
+	Address            *string           `json:"address"`
+	Description        *string           `json:"description"`
+	Photos             []string          `json:"photos"`
+	Lng                float64           `json:"lng"`
+	Lat                float64           `json:"lat"`
+	VerifyStatus       string            `json:"verifyStatus"`
+	Features           map[string]string `json:"features"`
+	IsBusiness         bool              `json:"isBusiness"`
+	VerifiedPaid       bool              `json:"verifiedPaid"`
+	SubscriptionActive bool              `json:"subscriptionActive"`
 }
 
 // Reads are public (guest-first; RLS read_all). They reuse the existing PostGIS
 // RPCs and cast uuid/enum columns to text so they scan into plain Go strings.
 
 const pointsNearSQL = `
-select id::text, name, category::text, address, lng, lat, verify_status::text, distance_m, features
+select id::text, name, category::text, address, lng, lat, verify_status::text, distance_m, features,
+       is_business, verified_paid, subscription_active
 from points_near($1, $2, $3)`
 
 const pointsInBBoxSQL = `
-select id::text, name, category::text, address, lng, lat, verify_status::text, features
+select id::text, name, category::text, address, lng, lat, verify_status::text, features,
+       is_business, verified_paid, subscription_active
 from points_in_bbox($1, $2, $3, $4)`
 
 const pointDetailSQL = `
-select id::text, name, category::text, address, description, photos, lng, lat, verify_status::text, features
+select id::text, name, category::text, address, description, photos, lng, lat, verify_status::text, features,
+       is_business, verified_paid, subscription_active
 from point_detail($1)`
 
 // PointsNear returns points within radiusM metres of (lng,lat), nearest first.
@@ -62,7 +71,8 @@ func (s *Store) PointsNear(ctx context.Context, lng, lat, radiusM float64) ([]Po
 	for rows.Next() {
 		var p PointSummary
 		if err := rows.Scan(&p.ID, &p.Name, &p.Category, &p.Address,
-			&p.Lng, &p.Lat, &p.VerifyStatus, &p.DistanceM, &p.Features); err != nil {
+			&p.Lng, &p.Lat, &p.VerifyStatus, &p.DistanceM, &p.Features,
+			&p.IsBusiness, &p.VerifiedPaid, &p.SubscriptionActive); err != nil {
 			return nil, err
 		}
 		ensureFeatures(&p.Features)
@@ -83,7 +93,8 @@ func (s *Store) PointsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat
 	for rows.Next() {
 		var p PointSummary
 		if err := rows.Scan(&p.ID, &p.Name, &p.Category, &p.Address,
-			&p.Lng, &p.Lat, &p.VerifyStatus, &p.Features); err != nil {
+			&p.Lng, &p.Lat, &p.VerifyStatus, &p.Features,
+			&p.IsBusiness, &p.VerifiedPaid, &p.SubscriptionActive); err != nil {
 			return nil, err
 		}
 		ensureFeatures(&p.Features)
@@ -97,7 +108,8 @@ func (s *Store) PointDetail(ctx context.Context, id string) (*PointDetail, error
 	var p PointDetail
 	err := s.db.Pool.QueryRow(ctx, pointDetailSQL, id).Scan(
 		&p.ID, &p.Name, &p.Category, &p.Address, &p.Description, &p.Photos,
-		&p.Lng, &p.Lat, &p.VerifyStatus, &p.Features)
+		&p.Lng, &p.Lat, &p.VerifyStatus, &p.Features,
+		&p.IsBusiness, &p.VerifiedPaid, &p.SubscriptionActive)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -119,11 +131,16 @@ type PointHit struct {
 	Address  *string `json:"address"`
 }
 
+// Boosts active-subscriber business points to the top of search results, keeping
+// the existing name/address filter. Scoped to text search only (not /near or
+// /bbox) — the user asked for search-result priority specifically; map-browsing
+// order is a separate, larger decision if ever wanted later.
 const searchPointsSQL = `
-select id::text, name, category::text, address
-from points
-where name ilike $1 or address ilike $1
-order by name
+select p.id::text, p.name, p.category::text, p.address
+from points p
+left join business_listings bl on bl.point_id = p.id
+where p.name ilike $1 or p.address ilike $1
+order by coalesce(bl.subscription_status = 'active', false) desc, p.name
 limit $2`
 
 // SearchPoints matches points by name or address substring (case-insensitive).
