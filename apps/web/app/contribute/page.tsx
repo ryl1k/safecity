@@ -37,6 +37,14 @@ export default function ContributePage() {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
+    // Pre-fill location + address when navigating from the map marker panel.
+    const params = new URLSearchParams(window.location.search);
+    const lng = parseFloat(params.get('lng') ?? '');
+    const lat = parseFloat(params.get('lat') ?? '');
+    const addr = params.get('address') ?? '';
+    if (!isNaN(lng) && !isNaN(lat)) setLoc([lng, lat]);
+    if (addr) setAddress(addr);
+
     (async () => {
       const { data } = await supabase.auth.getUser();
       if (!data.user) {
