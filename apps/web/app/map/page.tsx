@@ -57,10 +57,12 @@ export default function MapPage() {
   const [placeHits, setPlaceHits] = useState<GeoPlace[]>([]);
   const [searching, setSearching] = useState(false);
   const [activeIndex, setActiveIndex] = useState(-1);
-  // Desktop puts search in the navbar; mobile floats it on the map.
+  // Desktop puts search in the navbar; mobile/tablet floats it on the map.
+  // 1024px matches the header's actual no-wrap floor (logo+nav+actions alone
+  // need ~830px before search can fit at all) — below it the header would wrap.
   const [isDesktop, setIsDesktop] = useState(true);
   useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)');
+    const mq = window.matchMedia('(min-width: 1024px)');
     const sync = () => setIsDesktop(mq.matches);
     sync();
     mq.addEventListener('change', sync);

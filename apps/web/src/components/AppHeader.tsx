@@ -46,7 +46,7 @@ export function AppHeader({ active, search }: { active?: 'map' | 'places' | 'civ
 
         {/* Optional search slot (desktop map view puts its search here). */}
         {search ? (
-          <div style={{ flex: 1, minWidth: 220, maxWidth: 720, position: 'relative' }}>{search}</div>
+          <div style={{ flex: 1, minWidth: 180, maxWidth: 680, position: 'relative' }}>{search}</div>
         ) : null}
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.6em', flexWrap: 'wrap' }}>

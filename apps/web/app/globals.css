@@ -55,8 +55,10 @@
   .sc-marquee-track { animation: none; }
 }
 
-/* Hide non-essential labels on small screens (icon-only nav) */
-@media (max-width: 560px) {
+/* Hide non-essential labels on small/medium screens (icon-only nav). 900px
+   matches where the header's full-label nav + actions stop fitting one row
+   alongside search (see AppHeader.tsx / map isDesktop breakpoint). */
+@media (max-width: 900px) {
   .sc-hide-sm { display: none; }
   /* Header: drop the primary nav onto its own full-width row, centred. */
   .sc-header-nav { order: 2; flex-basis: 100%; justify-content: center; }
