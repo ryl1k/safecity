@@ -5,6 +5,7 @@ import './globals.css';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { ProfileProvider } from '@/profile/ProfileProvider';
 import { A11yDevAudit } from '@/components/A11yDevAudit';
+import { Toaster } from '@/components/Toaster';
 
 const onest = Onest({
   subsets: ['latin', 'cyrillic'],
@@ -43,6 +44,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider>
           <ProfileProvider>{children}</ProfileProvider>
         </ThemeProvider>
+        <Toaster />
         <A11yDevAudit />
       </body>
     </html>

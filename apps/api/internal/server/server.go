@@ -43,11 +43,9 @@ type DataStore interface {
 	// contribution writes
 	AddPoint(ctx context.Context, userID string, in store.NewPoint) (string, error)
 	UpsertReview(ctx context.Context, userID, pointID string, in store.NewReview) (store.Review, error)
-	// business listings (self-serve; payments mocked)
-	CreateBusinessPoint(ctx context.Context, userID string, in store.NewPoint) (string, error)
-	MyBusinessPoints(ctx context.Context, userID string) ([]store.BusinessPointRow, error)
-	MarkVerifiedPaid(ctx context.Context, userID, pointID string) error
-	SetSubscription(ctx context.Context, userID, pointID, plan string) error
+	// account-level business (self-serve; payments mocked)
+	SubscribeBusiness(ctx context.Context, userID, plan string) error
+	GetBusinessMe(ctx context.Context, userID string) (store.BusinessMe, error)
 	// civic writes
 	CreateProblem(ctx context.Context, userID string, in store.NewProblem) (store.Problem, error)
 	ConfirmProblem(ctx context.Context, userID, problemID string) (store.ConfirmResult, error)
@@ -250,10 +248,8 @@ func (s *Server) routes() {
 			r.Post("/problems/{id}/confirm", s.handleConfirmProblem)
 			r.Post("/petitions", s.handleCreatePetition)
 			r.Post("/petitions/{id}/sign", s.handleSignPetition)
-			r.Post("/business/points", s.handleCreateBusinessPoint)
-			r.Get("/business/points/me", s.handleMyBusinessPoints)
-			r.Post("/business/points/{id}/verify-payment", s.handleVerifyBusinessPayment)
-			r.Post("/business/points/{id}/subscribe", s.handleSubscribeBusinessPoint)
+			r.Post("/business/subscribe", s.handleSubscribeBusiness)
+			r.Get("/business/me", s.handleBusinessMe)
 		}
 	})
 }

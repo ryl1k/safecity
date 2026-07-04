@@ -2,142 +2,76 @@ package store
 
 import (
 	"context"
-	"errors"
 	"testing"
 	"time"
+
+	"github.com/safecity/api/internal/db"
 )
 
-// TestBusinessListingWritesIntegration exercises the business-listing write path
-// against the real DB end-to-end: create business point (+ its business_listings
-// row) → list via MyBusinessPoints → mark verified (mock payment) → subscribe
-// (mock). Cleans up via the pool (business_listings cascades on point delete).
-func TestBusinessListingWritesIntegration(t *testing.T) {
+// TestBusinessAccountIntegration exercises the account-level B2B write path:
+// subscribe → the account is business, with plan + a future renewal. Cleans up
+// the business_accounts row so the shared test user isn't left a business.
+func TestBusinessAccountIntegration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	database := dialTestDB(t, ctx)
 	st := New(database)
 	uid := firstUserID(t, ctx, database)
+	defer func() { _, _ = database.Pool.Exec(ctx, "delete from business_accounts where user_id = $1", uid) }()
 
-	const missingID = "00000000-0000-0000-0000-000000000000"
-	const otherUID = "00000000-0000-0000-0000-000000000001"
-
-	// ── Create business point ────────────────────────────────────────────────
-	pid, err := st.CreateBusinessPoint(ctx, uid, NewPoint{
-		Name:     "itest business point",
-		Category: "venue",
-		Lng:      24.0410,
-		Lat:      49.8510,
-		Features: map[string]string{},
-		Photos:   []string{},
-	})
+	// Not a business before subscribing.
+	before, err := st.GetBusinessMe(ctx, uid)
 	if err != nil {
-		t.Fatalf("CreateBusinessPoint: %v", err)
+		t.Fatalf("GetBusinessMe (before): %v", err)
 	}
-	defer func() { _, _ = database.Pool.Exec(ctx, "delete from points where id = $1", pid) }()
+	if before.IsBusiness {
+		t.Fatal("user should not be a business before subscribing (stale business_accounts row?)")
+	}
 
-	rows, err := st.MyBusinessPoints(ctx, uid)
+	if err := st.SubscribeBusiness(ctx, uid, "monthly"); err != nil {
+		t.Fatalf("SubscribeBusiness: %v", err)
+	}
+
+	after, err := st.GetBusinessMe(ctx, uid)
 	if err != nil {
-		t.Fatalf("MyBusinessPoints: %v", err)
+		t.Fatalf("GetBusinessMe (after): %v", err)
 	}
-	found := findBusinessRow(rows, pid)
-	if found == nil {
-		t.Fatalf("MyBusinessPoints did not include the new point %s", pid)
+	if !after.IsBusiness {
+		t.Fatal("user should be a business after subscribing")
 	}
-	if found.VerifiedPaid {
-		t.Fatal("new business point should not be verified-paid yet")
+	if after.Plan == nil || *after.Plan != "monthly" {
+		t.Fatalf("plan = %v, want monthly", after.Plan)
 	}
-	if found.SubscriptionStatus != "none" {
-		t.Fatalf("subscription status = %q, want none", found.SubscriptionStatus)
-	}
-
-	// ── Ownership + not-found guards ─────────────────────────────────────────
-	if err := st.MarkVerifiedPaid(ctx, otherUID, pid); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("MarkVerifiedPaid by non-owner: want ErrNotFound, got %v", err)
-	}
-	if err := st.MarkVerifiedPaid(ctx, uid, missingID); !errors.Is(err, ErrNotFound) {
-		t.Fatalf("MarkVerifiedPaid missing point: want ErrNotFound, got %v", err)
-	}
-
-	// ── Mock payment: verify, then subscribe ─────────────────────────────────
-	if err := st.MarkVerifiedPaid(ctx, uid, pid); err != nil {
-		t.Fatalf("MarkVerifiedPaid: %v", err)
-	}
-	if err := st.SetSubscription(ctx, uid, pid, "monthly"); err != nil {
-		t.Fatalf("SetSubscription: %v", err)
-	}
-
-	rows, err = st.MyBusinessPoints(ctx, uid)
-	if err != nil {
-		t.Fatalf("MyBusinessPoints (after): %v", err)
-	}
-	found = findBusinessRow(rows, pid)
-	if found == nil {
-		t.Fatal("business point disappeared after updates")
-	}
-	if !found.VerifiedPaid || found.VerifiedPaidAt == nil {
-		t.Fatalf("verified paid state = %+v", found)
-	}
-	if found.SubscriptionStatus != "active" || found.SubscriptionPlan == nil || *found.SubscriptionPlan != "monthly" {
-		t.Fatalf("subscription state = %+v", found)
-	}
-	if found.SubscriptionRenewsAt == nil {
-		t.Fatal("subscription renews_at not set")
+	if after.RenewsAt == nil || !after.RenewsAt.After(time.Now()) {
+		t.Fatalf("renews_at = %v, want a future time", after.RenewsAt)
 	}
 }
 
-func findBusinessRow(rows []BusinessPointRow, pointID string) *BusinessPointRow {
-	for i := range rows {
-		if rows[i].PointID == pointID {
-			return &rows[i]
-		}
-	}
-	return nil
-}
-
-// TestSearchPointsBusinessBoostIntegration locks in the search-priority boost:
-// an active-subscriber business point must sort before a plain crowdsourced
-// point even when name order alone would put it later (regression test for the
-// NULLS FIRST trap in `order by (bl.subscription_status = 'active') desc` —
-// without the coalesce, a non-business row's NULL sorts before TRUE on DESC).
+// TestSearchPointsBusinessBoostIntegration locks in the search-priority boost now
+// that "business" is account-level: a point owned by a business user must sort
+// before a point owned by a non-business user, even when name order alone would
+// reverse them. Uses direct inserts (privileged pool) for controlled ownership so
+// the per-user point cap doesn't interfere.
 func TestSearchPointsBusinessBoostIntegration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
 	database := dialTestDB(t, ctx)
 	st := New(database)
-	uid := firstUserID(t, ctx, database)
 
+	uids := twoUserIDs(t, ctx, database)
+	bizUID, plainUID := uids[0], uids[1]
 	const marker = "itestboost"
 
-	bizID, err := st.CreateBusinessPoint(ctx, uid, NewPoint{
-		Name:     marker + " zzz business",
-		Category: "venue",
-		Lng:      24.0420,
-		Lat:      49.8520,
-		Features: map[string]string{},
-		Photos:   []string{},
-	})
-	if err != nil {
-		t.Fatalf("CreateBusinessPoint: %v", err)
-	}
-	defer func() { _, _ = database.Pool.Exec(ctx, "delete from points where id = $1", bizID) }()
-	if err := st.SetSubscription(ctx, uid, bizID, "monthly"); err != nil {
-		t.Fatalf("SetSubscription: %v", err)
+	defer func() { _, _ = database.Pool.Exec(ctx, "delete from business_accounts where user_id = $1", bizUID) }()
+	if err := st.SubscribeBusiness(ctx, bizUID, "monthly"); err != nil {
+		t.Fatalf("SubscribeBusiness: %v", err)
 	}
 
-	plainID, err := st.AddPoint(ctx, uid, NewPoint{
-		Name:     marker + " aaa crowdsourced",
-		Category: "venue",
-		Lng:      24.0421,
-		Lat:      49.8521,
-		Features: map[string]string{},
-		Photos:   []string{},
-	})
-	if err != nil {
-		t.Fatalf("AddPoint: %v", err)
-	}
-	defer func() { _, _ = database.Pool.Exec(ctx, "delete from points where id = $1", plainID) }()
+	bizID := insertOwnedPoint(t, ctx, database, marker+" zzz business", 24.0420, 49.8520, bizUID)
+	plainID := insertOwnedPoint(t, ctx, database, marker+" aaa crowdsourced", 24.0421, 49.8521, plainUID)
+	defer func() { _, _ = database.Pool.Exec(ctx, "delete from points where id = any($1)", []string{bizID, plainID}) }()
 
 	hits, err := st.SearchPoints(ctx, marker, 10)
 	if err != nil {
@@ -147,11 +81,44 @@ func TestSearchPointsBusinessBoostIntegration(t *testing.T) {
 		t.Fatalf("expected 2 hits, got %d: %+v", len(hits), hits)
 	}
 	// Name order alone (aaa < zzz) would put the crowdsourced point first; the
-	// active subscription must override that.
+	// business owner must override that.
 	if hits[0].ID != bizID {
-		t.Fatalf("expected active-subscriber business point (%s) first, got %+v", bizID, hits)
+		t.Fatalf("expected business-owned point (%s) first, got %+v", bizID, hits)
 	}
 	if hits[1].ID != plainID {
-		t.Fatalf("expected crowdsourced point (%s) second, got %+v", plainID, hits)
+		t.Fatalf("expected non-business point (%s) second, got %+v", plainID, hits)
 	}
+}
+
+func twoUserIDs(t *testing.T, ctx context.Context, database *db.DB) []string {
+	t.Helper()
+	rows, err := database.Pool.Query(ctx, "select id::text from auth.users order by created_at limit 2")
+	if err != nil {
+		t.Fatalf("query users: %v", err)
+	}
+	defer rows.Close()
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			t.Fatalf("scan user: %v", err)
+		}
+		ids = append(ids, id)
+	}
+	if len(ids) < 2 {
+		t.Skip("need at least two auth.users for the boost test")
+	}
+	return ids
+}
+
+func insertOwnedPoint(t *testing.T, ctx context.Context, database *db.DB, name string, lng, lat float64, owner string) string {
+	t.Helper()
+	var id string
+	if err := database.Pool.QueryRow(ctx, `
+		insert into points (name, category, geom, source, verify_status, created_by)
+		values ($1, 'venue', ST_SetSRID(ST_MakePoint($2, $3), 4326)::geography, 'crowdsourced', 'unverified', $4)
+		returning id::text`, name, lng, lat, owner).Scan(&id); err != nil {
+		t.Fatalf("insert owned point: %v", err)
+	}
+	return id
 }

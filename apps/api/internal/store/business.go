@@ -2,118 +2,79 @@ package store
 
 import (
 	"context"
-	"encoding/json"
 	"time"
 
 	"github.com/jackc/pgx/v5"
 )
 
-// BusinessPointRow is a point joined with its business_listings state, for the
-// owner's dashboard (/business/points/me).
-type BusinessPointRow struct {
-	PointID              string     `json:"pointId"`
-	Name                 string     `json:"name"`
-	Category             string     `json:"category"`
-	Address              *string    `json:"address"`
-	VerifyStatus         string     `json:"verifyStatus"`
-	VerifiedPaid         bool       `json:"verifiedPaid"`
-	VerifiedPaidAt       *time.Time `json:"verifiedPaidAt"`
-	SubscriptionStatus   string     `json:"subscriptionStatus"`
-	SubscriptionPlan     *string    `json:"subscriptionPlan"`
-	SubscriptionRenewsAt *time.Time `json:"subscriptionRenewsAt"`
-	CreatedAt            time.Time  `json:"createdAt"`
+// MyPoint is one point the caller created, for their dashboard.
+type MyPoint struct {
+	ID           string    `json:"id"`
+	Name         string    `json:"name"`
+	Category     string    `json:"category"`
+	Address      *string   `json:"address"`
+	VerifyStatus string    `json:"verifyStatus"`
+	CreatedAt    time.Time `json:"createdAt"`
 }
 
-const insertBusinessListingSQL = `insert into business_listings (point_id, owner_id) values ($1::uuid, auth.uid())`
+// BusinessMe is the caller's account state + the points they created.
+type BusinessMe struct {
+	IsBusiness bool       `json:"isBusiness"`
+	Plan       *string    `json:"plan"`
+	RenewsAt   *time.Time `json:"renewsAt"`
+	Points     []MyPoint  `json:"points"`
+}
 
-// CreateBusinessPoint inserts a point (via the existing add_point RPC) and its
-// business_listings row in the same transaction, so a point is never left in a
-// half-business state if either insert fails. Businesses can only add new
-// points — there is no path here to attach a listing to an existing point.
-func (s *Store) CreateBusinessPoint(ctx context.Context, userID string, in NewPoint) (string, error) {
-	featuresJSON := []byte("{}")
-	if len(in.Features) > 0 {
-		b, err := json.Marshal(in.Features)
-		if err != nil {
-			return "", err
-		}
-		featuresJSON = b
-	}
+const subscribeBusinessSQL = `
+insert into business_accounts (user_id, active, plan, renews_at, updated_at)
+values (auth.uid(), true, $1,
+        now() + case when $1 = 'yearly' then interval '365 days' else interval '30 days' end, now())
+on conflict (user_id) do update
+  set active = true, plan = excluded.plan, renews_at = excluded.renews_at, updated_at = now()`
 
-	var id string
+// SubscribeBusiness activates (or renews) the caller's account-level business
+// subscription, unlocking unlimited points + verified/priority perks on all their
+// points. MOCK: no payment processor — a real one must move this behind a webhook.
+func (s *Store) SubscribeBusiness(ctx context.Context, userID, plan string) error {
 	err := s.db.WithUser(ctx, userID, func(tx pgx.Tx) error {
-		if err := tx.QueryRow(ctx, addPointSQL,
-			in.Name, in.Category, in.Lng, in.Lat,
-			nullable(in.Address), nullable(in.Description),
-			string(featuresJSON), in.Photos,
-		).Scan(&id); err != nil {
-			return err
-		}
-		_, err := tx.Exec(ctx, insertBusinessListingSQL, id)
-		return err
+		_, e := tx.Exec(ctx, subscribeBusinessSQL, plan)
+		return e
 	})
-	return id, classify(err)
+	return classify(err)
 }
 
-const myBusinessPointsSQL = `
-select p.id::text, p.name, p.category::text, p.address, p.verify_status::text,
-       bl.verified_paid, bl.verified_paid_at, bl.subscription_status, bl.subscription_plan,
-       bl.subscription_renews_at, bl.created_at
-from business_listings bl
-join points p on p.id = bl.point_id
-where bl.owner_id = auth.uid()
-order by bl.created_at desc`
+const businessAccountSQL = `
+select coalesce(active and (renews_at is null or renews_at > now()), false), plan, renews_at
+from business_accounts where user_id = auth.uid()`
 
-// MyBusinessPoints lists the caller's business points with their verify/subscription
-// state, newest first. business_listings' read policy is public (read_all), so the
-// owner filter here — not RLS — is what scopes this to the caller.
-func (s *Store) MyBusinessPoints(ctx context.Context, userID string) ([]BusinessPointRow, error) {
-	var out []BusinessPointRow
+const myPointsSQL = `
+select id::text, name, category::text, address, verify_status::text, created_at
+from points where created_by = auth.uid() order by created_at desc`
+
+// GetBusinessMe returns the caller's business status and the points they created.
+func (s *Store) GetBusinessMe(ctx context.Context, userID string) (BusinessMe, error) {
+	var me BusinessMe
+	me.Points = []MyPoint{}
 	err := s.db.WithUser(ctx, userID, func(tx pgx.Tx) error {
-		rows, err := tx.Query(ctx, myBusinessPointsSQL)
+		// Account row (may not exist → defaults to non-business).
+		if err := tx.QueryRow(ctx, businessAccountSQL).Scan(&me.IsBusiness, &me.Plan, &me.RenewsAt); err != nil {
+			if err != pgx.ErrNoRows {
+				return err
+			}
+		}
+		rows, err := tx.Query(ctx, myPointsSQL)
 		if err != nil {
 			return err
 		}
 		defer rows.Close()
-		out = []BusinessPointRow{}
 		for rows.Next() {
-			var r BusinessPointRow
-			if err := rows.Scan(&r.PointID, &r.Name, &r.Category, &r.Address, &r.VerifyStatus,
-				&r.VerifiedPaid, &r.VerifiedPaidAt, &r.SubscriptionStatus, &r.SubscriptionPlan,
-				&r.SubscriptionRenewsAt, &r.CreatedAt); err != nil {
+			var p MyPoint
+			if err := rows.Scan(&p.ID, &p.Name, &p.Category, &p.Address, &p.VerifyStatus, &p.CreatedAt); err != nil {
 				return err
 			}
-			out = append(out, r)
+			me.Points = append(me.Points, p)
 		}
 		return rows.Err()
 	})
-	return out, classify(err)
-}
-
-const markVerifiedPaidSQL = `
-update business_listings set verified_paid = true, verified_paid_at = now()
-where point_id = $1::uuid and owner_id = auth.uid()`
-
-// MarkVerifiedPaid flips a business listing to verified+paid. MOCK: no payment
-// processor is involved — see the owner_update policy comment in
-// 0017_business_listings.sql. ErrNotFound if the point isn't the caller's
-// business listing.
-func (s *Store) MarkVerifiedPaid(ctx context.Context, userID, pointID string) error {
-	return s.modExec(ctx, userID, markVerifiedPaidSQL, pointID)
-}
-
-const setSubscriptionSQL = `
-update business_listings
-set subscription_status = 'active',
-    subscription_plan = $2,
-    subscription_renews_at = now() + case when $2 = 'yearly' then interval '365 days' else interval '30 days' end
-where point_id = $1::uuid and owner_id = auth.uid()`
-
-// SetSubscription activates a subscription plan (monthly|yearly) for a business
-// listing, boosting its search-result priority while active. MOCK: no payment
-// processor is involved — see the owner_update policy comment in
-// 0017_business_listings.sql. ErrNotFound if the point isn't the caller's
-// business listing.
-func (s *Store) SetSubscription(ctx context.Context, userID, pointID, plan string) error {
-	return s.modExec(ctx, userID, setSubscriptionSQL, pointID, plan)
+	return me, classify(err)
 }

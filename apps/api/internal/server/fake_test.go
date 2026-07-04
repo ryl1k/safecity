@@ -35,21 +35,13 @@ type fakeStore struct {
 	pointID  string
 	pointErr error
 
-	// CreateBusinessPoint
-	gotBizPoint store.NewPoint
-	bizPointID  string
-	bizPointErr error
+	// SubscribeBusiness
+	gotSubPlan string
+	subErr     error
 
-	// MyBusinessPoints
-	bizPoints    []store.BusinessPointRow
-	bizPointsErr error
-
-	// MarkVerifiedPaid / SetSubscription
-	gotVerifyPaidID string
-	verifyPaidErr   error
-	gotSubID        string
-	gotSubPlan      string
-	subErr          error
+	// GetBusinessMe
+	bizMe    store.BusinessMe
+	bizMeErr error
 
 	// UpsertReview
 	gotReviewPoint string
@@ -158,25 +150,14 @@ func (f *fakeStore) AddPoint(_ context.Context, userID string, in store.NewPoint
 	return f.pointID, f.pointErr
 }
 
-func (f *fakeStore) CreateBusinessPoint(_ context.Context, userID string, in store.NewPoint) (string, error) {
-	f.gotUser = userID
-	f.gotBizPoint = in
-	return f.bizPointID, f.bizPointErr
-}
-
-func (f *fakeStore) MyBusinessPoints(_ context.Context, userID string) ([]store.BusinessPointRow, error) {
-	f.gotUser = userID
-	return f.bizPoints, f.bizPointsErr
-}
-
-func (f *fakeStore) MarkVerifiedPaid(_ context.Context, userID, pointID string) error {
-	f.gotUser, f.gotVerifyPaidID = userID, pointID
-	return f.verifyPaidErr
-}
-
-func (f *fakeStore) SetSubscription(_ context.Context, userID, pointID, plan string) error {
-	f.gotUser, f.gotSubID, f.gotSubPlan = userID, pointID, plan
+func (f *fakeStore) SubscribeBusiness(_ context.Context, userID, plan string) error {
+	f.gotUser, f.gotSubPlan = userID, plan
 	return f.subErr
+}
+
+func (f *fakeStore) GetBusinessMe(_ context.Context, userID string) (store.BusinessMe, error) {
+	f.gotUser = userID
+	return f.bizMe, f.bizMeErr
 }
 
 func (f *fakeStore) UpsertReview(_ context.Context, userID, pointID string, in store.NewReview) (store.Review, error) {

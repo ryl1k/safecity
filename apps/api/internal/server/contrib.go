@@ -44,6 +44,13 @@ func (s *Server) handleAddPoint(w http.ResponseWriter, r *http.Request) {
 		Photos:      req.Photos,
 	})
 	if err != nil {
+		// Non-business users are capped at 10 points; the 11th is rejected here.
+		// Surfaced with a distinct code so the web shows a toast (the limit is
+		// never advertised before it is hit).
+		if errors.Is(err, store.ErrPointLimit) {
+			httpx.Error(w, http.StatusConflict, "point_limit", "point limit reached")
+			return
+		}
 		// An unknown feature key fails the FK inside add_point — that's bad input,
 		// not a missing resource, so report it as a field error.
 		if errors.Is(err, store.ErrNotFound) {

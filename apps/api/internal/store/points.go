@@ -131,16 +131,15 @@ type PointHit struct {
 	Address  *string `json:"address"`
 }
 
-// Boosts active-subscriber business points to the top of search results, keeping
-// the existing name/address filter. Scoped to text search only (not /near or
-// /bbox) — the user asked for search-result priority specifically; map-browsing
+// Boosts points owned by an active business account to the top of search results,
+// keeping the existing name/address filter. Scoped to text search only (not /near
+// or /bbox) — the user asked for search-result priority specifically; map-browsing
 // order is a separate, larger decision if ever wanted later.
 const searchPointsSQL = `
 select p.id::text, p.name, p.category::text, p.address
 from points p
-left join business_listings bl on bl.point_id = p.id
 where p.name ilike $1 or p.address ilike $1
-order by coalesce(bl.subscription_status = 'active', false) desc, p.name
+order by is_business_user(p.created_by) desc, p.name
 limit $2`
 
 // SearchPoints matches points by name or address substring (case-insensitive).

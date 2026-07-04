@@ -7,10 +7,10 @@ import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { LocationPicker } from '@/components/LocationPicker';
 import { PhotoInput } from '@/components/PhotoInput';
-import { Button, Field, Segmented, Switch } from '@/components/ui';
+import { Button, Field, Segmented } from '@/components/ui';
 import { getCatalog } from '@/lib/catalog';
-import { api } from '@/lib/api';
-import { createBusinessPoint } from '@/lib/business';
+import { api, ApiError } from '@/lib/api';
+import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import { uploadPhotos } from '@/lib/storage';
 import { categoryLabel } from '@/lib/format';
@@ -34,7 +34,6 @@ export default function ContributePage() {
   const [loc, setLoc] = useState<[number, number] | null>(null);
   const [photos, setPhotos] = useState<File[]>([]);
   const [values, setValues] = useState<Record<string, FeatureValue>>({});
-  const [isBusiness, setIsBusiness] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
@@ -70,20 +69,6 @@ export default function ContributePage() {
       const cleaned: Record<string, FeatureValue> = {};
       for (const [k, v] of Object.entries(values)) if (v === 'yes' || v === 'no') cleaned[k] = v;
       const photoUrls = await uploadPhotos(photos, 'points');
-      if (isBusiness) {
-        await createBusinessPoint({
-          name,
-          category,
-          lat: p[1],
-          lng: p[0],
-          address,
-          description,
-          features: cleaned,
-          photos: photoUrls,
-        });
-        router.push('/business');
-        return;
-      }
       const res = await api.post<{ id: string }>('/points', {
         name,
         category,
@@ -95,8 +80,13 @@ export default function ContributePage() {
         photos: photoUrls,
       });
       router.push(`/point/${res.id}`);
-    } catch (err: any) {
-      setError(err?.message ?? 'Не вдалося додати місце');
+    } catch (err: unknown) {
+      // The 10-point cap is only ever surfaced here, at the moment it's hit.
+      if (err instanceof ApiError && err.code === 'point_limit') {
+        toast('Ви досягли ліміту в 10 точок. Оформіть бізнес-підписку для необмеженої кількості точок.', 'error');
+      } else {
+        setError(err instanceof Error ? err.message : 'Не вдалося додати місце');
+      }
     } finally {
       setBusy(false);
     }
@@ -111,11 +101,6 @@ export default function ContributePage() {
         <h1 style={{ margin: '0 0 1em', fontSize: '1.7em', fontWeight: 800 }}>Додати місце</h1>
 
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1em' }}>
-          <Switch
-            checked={isBusiness}
-            onChange={() => setIsBusiness((v) => !v)}
-            label="Реєструю як бізнес"
-          />
           <Field label="Назва" required value={name} onChange={(e) => setName(e.target.value)} placeholder="напр. Кав'ярня «Кава»" />
           <Field label="Адреса" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="вул. Прикладна, 1" />
 

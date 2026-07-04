@@ -60,11 +60,11 @@ export default function SettingsPage() {
 
         {email && (
           <section style={card}>
-            <h2 style={title}>Мій бізнес</h2>
+            <h2 style={title}>Мої точки</h2>
             <p style={{ margin: '0 0 0.8em', color: 'var(--sc-muted)', fontSize: '0.85em' }}>
-              Додайте свій заклад, підтвердіть його та піднімайте у пошуку підпискою.
+              Керуйте доданими точками та бізнес-акаунтом (необмежені точки, пріоритет у пошуку).
             </p>
-            <Link href="/business" style={{ textDecoration: 'none' }}><Button>Відкрити мій бізнес</Button></Link>
+            <Link href="/business" style={{ textDecoration: 'none' }}><Button>Мої точки</Button></Link>
           </section>
         )}
 
