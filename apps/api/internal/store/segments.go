@@ -20,6 +20,7 @@ type StreetSegment struct {
 	HasCurbCuts      *bool    `json:"hasCurbCuts"`
 	HasRamp          *bool    `json:"hasRamp"`
 	Lit              *bool    `json:"lit"`
+	Smoothness       *string  `json:"smoothness"`
 	VerifyStatus     string   `json:"verifyStatus"`
 	Rating           string   `json:"rating"` // "full" | "partial" | "none" | "unknown"
 	GeoJSON          string   `json:"geojson"` // ST_AsGeoJSON result (LineString geometry)
@@ -28,7 +29,7 @@ type StreetSegment struct {
 const segmentsInBBoxSQL = `
 select id::text, street_name, sidewalk_width_m, surface_type, incline_percent,
        has_tactile_paving, is_step_free, has_curb_cuts, has_ramp, lit,
-       verify_status, rating, geojson
+       smoothness, verify_status, rating, geojson
 from segments_in_bbox($1, $2, $3, $4)`
 
 // NewSegment is the validated input for submitting a street segment.
@@ -89,7 +90,7 @@ func (s *Store) SegmentsInBBox(ctx context.Context, minLng, minLat, maxLng, maxL
 		if err := rows.Scan(
 			&seg.ID, &seg.StreetName, &seg.SidewalkWidthM, &seg.SurfaceType,
 			&seg.InclinePercent, &seg.HasTactilePaving, &seg.IsStepFree, &seg.HasCurbCuts,
-			&seg.HasRamp, &seg.Lit, &seg.VerifyStatus, &seg.Rating, &seg.GeoJSON,
+			&seg.HasRamp, &seg.Lit, &seg.Smoothness, &seg.VerifyStatus, &seg.Rating, &seg.GeoJSON,
 		); err != nil {
 			return nil, err
 		}

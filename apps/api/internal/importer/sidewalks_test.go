@@ -31,8 +31,9 @@ func TestMapSidewalkWay(t *testing.T) {
 		ID:       100,
 		Geometry: geom([2]float64{49.84, 24.03}, [2]float64{49.841, 24.031}),
 		Tags: map[string]string{
-			"name": "Вулиця Франка", "surface": "asphalt", "lit": "yes",
-			"wheelchair": "yes", "incline": "5%", "kerb": "lowered",
+			"name": "Вулиця Франка", "surface": "asphalt", "smoothness": "good",
+			"width": "2.0 m", "lit": "yes", "wheelchair": "yes", "incline": "5%",
+			"kerb": "lowered", "tactile_paving": "yes",
 		},
 	})
 	if !ok {
@@ -43,6 +44,12 @@ func TestMapSidewalkWay(t *testing.T) {
 	}
 	if rec.SurfaceType == nil || *rec.SurfaceType != "asphalt" {
 		t.Fatalf("surface = %v", rec.SurfaceType)
+	}
+	if rec.Smoothness == nil || *rec.Smoothness != "good" {
+		t.Fatalf("smoothness = %v", rec.Smoothness)
+	}
+	if rec.SidewalkWidthM == nil || *rec.SidewalkWidthM != 2.0 {
+		t.Fatalf("width = %v", rec.SidewalkWidthM)
 	}
 	if rec.Lit == nil || !*rec.Lit {
 		t.Fatalf("lit = %v", rec.Lit)
@@ -56,8 +63,11 @@ func TestMapSidewalkWay(t *testing.T) {
 	if rec.HasCurbCuts == nil || !*rec.HasCurbCuts {
 		t.Fatalf("curbCuts = %v", rec.HasCurbCuts)
 	}
-	if rec.VerifyStatus != "verified" {
-		t.Fatalf("verifyStatus = %q", rec.VerifyStatus)
+	if rec.HasTactilePaving == nil || !*rec.HasTactilePaving {
+		t.Fatalf("tactilePaving = %v", rec.HasTactilePaving)
+	}
+	if rec.VerifyStatus != "unverified" {
+		t.Fatalf("verifyStatus = %q (OSM data must never be marked verified)", rec.VerifyStatus)
 	}
 	if len(rec.Coords) != 2 || rec.Coords[0] != [2]float64{24.03, 49.84} {
 		t.Fatalf("coords = %v", rec.Coords)
@@ -67,29 +77,52 @@ func TestMapSidewalkWay(t *testing.T) {
 func TestMapSidewalkWayWheelchairVariants(t *testing.T) {
 	base := geom([2]float64{49.8, 24.0}, [2]float64{49.81, 24.01})
 
-	limited, ok := mapSidewalkWay(SidewalkElement{ID: 1, Geometry: base, Tags: map[string]string{"name": "T", "wheelchair": "limited"}})
-	if !ok || limited.IsStepFree == nil || *limited.IsStepFree {
-		t.Fatalf("wheelchair=limited should map to IsStepFree=false, got %+v", limited)
-	}
-
+	// wheelchair=no is a ratable barrier signal → kept, IsStepFree=false.
 	no, ok := mapSidewalkWay(SidewalkElement{ID: 2, Geometry: base, Tags: map[string]string{"name": "T", "wheelchair": "no"}})
 	if !ok || no.IsStepFree == nil || *no.IsStepFree {
-		t.Fatalf("wheelchair=no should map to IsStepFree=false, got %+v", no)
+		t.Fatalf("wheelchair=no should be kept with IsStepFree=false, got ok=%v %+v", ok, no)
 	}
 
-	missing, ok := mapSidewalkWay(SidewalkElement{ID: 3, Geometry: base, Tags: map[string]string{"name": "T"}})
-	if !ok || missing.IsStepFree != nil {
-		t.Fatalf("missing wheelchair tag should leave IsStepFree nil, got %+v", missing)
+	// wheelchair=yes → kept, IsStepFree=true.
+	yes, ok := mapSidewalkWay(SidewalkElement{ID: 4, Geometry: base, Tags: map[string]string{"name": "T", "wheelchair": "yes"}})
+	if !ok || yes.IsStepFree == nil || !*yes.IsStepFree {
+		t.Fatalf("wheelchair=yes should be kept with IsStepFree=true, got ok=%v %+v", ok, yes)
+	}
+
+	// wheelchair=limited is too ambiguous to rate on its own → gated out.
+	if _, ok := mapSidewalkWay(SidewalkElement{ID: 1, Geometry: base, Tags: map[string]string{"name": "T", "wheelchair": "limited"}}); ok {
+		t.Fatal("wheelchair=limited with no other signal should be skipped")
 	}
 }
 
-func TestMapSidewalkWaySkipsNoName(t *testing.T) {
-	if _, ok := mapSidewalkWay(SidewalkElement{
-		ID:       1,
-		Geometry: geom([2]float64{1, 2}, [2]float64{3, 4}),
-		Tags:     map[string]string{"surface": "asphalt"},
-	}); ok {
-		t.Fatal("way without name should be skipped")
+func TestMapSidewalkWayGate(t *testing.T) {
+	base := geom([2]float64{49.8, 24.0}, [2]float64{49.81, 24.01})
+
+	// No rollability signal (name only) → skipped, even with geometry.
+	if _, ok := mapSidewalkWay(SidewalkElement{ID: 1, Geometry: base, Tags: map[string]string{"name": "проспект Шевченка"}}); ok {
+		t.Fatal("a named way with no surface/smoothness/wheelchair should be skipped")
+	}
+
+	// Width alone is only a modifier, never sufficient → skipped.
+	if _, ok := mapSidewalkWay(SidewalkElement{ID: 2, Geometry: base, Tags: map[string]string{"name": "T", "width": "2.0"}}); ok {
+		t.Fatal("width alone is not a ratable signal; should be skipped")
+	}
+
+	// Freeform/unknown surface is dropped and, with nothing else, gates out.
+	if _, ok := mapSidewalkWay(SidewalkElement{ID: 3, Geometry: base, Tags: map[string]string{"name": "T", "surface": "узбіччя_дороги"}}); ok {
+		t.Fatal("unrecognized freeform surface should not count as signal")
+	}
+
+	// A nameless way with a real surface is KEPT with a generic label.
+	rec, ok := mapSidewalkWay(SidewalkElement{ID: 4, Geometry: base, Tags: map[string]string{"footway": "sidewalk", "surface": "asphalt"}})
+	if !ok {
+		t.Fatal("nameless way with a real surface should be kept")
+	}
+	if rec.StreetName != "Тротуар" {
+		t.Fatalf("nameless footway=sidewalk should get generic name 'Тротуар', got %q", rec.StreetName)
+	}
+	if rec.SurfaceType == nil || *rec.SurfaceType != "asphalt" {
+		t.Fatalf("surface = %v", rec.SurfaceType)
 	}
 }
 
@@ -97,23 +130,59 @@ func TestMapSidewalkWaySkipsShortGeometry(t *testing.T) {
 	if _, ok := mapSidewalkWay(SidewalkElement{
 		ID:       1,
 		Geometry: geom([2]float64{1, 2}),
-		Tags:     map[string]string{"name": "T"},
+		Tags:     map[string]string{"name": "T", "surface": "asphalt"},
 	}); ok {
 		t.Fatal("way with fewer than 2 geometry points should be skipped")
 	}
 }
 
 func TestMapSidewalkWayMissingOptionalTags(t *testing.T) {
+	// Surface present (passes the gate) but every other optional tag missing —
+	// those pointers must stay nil rather than default to a value.
 	rec, ok := mapSidewalkWay(SidewalkElement{
 		ID:       5,
 		Geometry: geom([2]float64{49.8, 24.0}, [2]float64{49.81, 24.01}),
-		Tags:     map[string]string{"name": "T"},
+		Tags:     map[string]string{"name": "T", "surface": "asphalt"},
 	})
 	if !ok {
 		t.Fatal("expected ok")
 	}
-	if rec.SurfaceType != nil || rec.Lit != nil || rec.IsStepFree != nil || rec.InclinePercent != nil || rec.HasCurbCuts != nil {
+	if rec.Smoothness != nil || rec.SidewalkWidthM != nil || rec.Lit != nil ||
+		rec.IsStepFree != nil || rec.InclinePercent != nil || rec.HasCurbCuts != nil ||
+		rec.HasTactilePaving != nil {
 		t.Fatalf("missing optional tags should leave pointers nil, got %+v", rec)
+	}
+}
+
+func TestRecognizedSurface(t *testing.T) {
+	if recognizedSurface("asphalt") == nil || recognizedSurface("sett") == nil || recognizedSurface("gravel") == nil {
+		t.Fatal("known surfaces should be recognized")
+	}
+	if recognizedSurface("узбіччя_дороги") != nil || recognizedSurface("") != nil {
+		t.Fatal("freeform/empty surfaces should not be recognized")
+	}
+}
+
+func TestParseWidthMeters(t *testing.T) {
+	cases := []struct {
+		in     string
+		want   float64
+		wantOK bool
+	}{
+		{"1.5", 1.5, true},
+		{"1,5", 1.5, true},
+		{"2.0 m", 2.0, true},
+		{"0.9m", 0.9, true},
+		{"", 0, false},
+		{"3'6\"", 0, false},
+		{"1.0-2.0", 0, false},
+		{"wide", 0, false},
+	}
+	for _, c := range cases {
+		got, ok := parseWidthMeters(c.in)
+		if ok != c.wantOK || (ok && got != c.want) {
+			t.Errorf("parseWidthMeters(%q) = %v,%v; want %v,%v", c.in, got, ok, c.want, c.wantOK)
+		}
 	}
 }
 

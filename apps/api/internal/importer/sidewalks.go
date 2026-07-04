@@ -26,24 +26,88 @@ type SidewalkElement struct {
 
 // SegmentRecord is one street segment to upsert, keyed on OSM way id.
 type SegmentRecord struct {
-	StreetName     string
-	Coords         [][2]float64 // [[lng, lat], ...], at least 2 points
-	SurfaceType    *string
-	Lit            *bool
-	IsStepFree     *bool
-	InclinePercent *float64
-	HasCurbCuts    *bool
-	VerifyStatus   string
-	OSMWayID       int64
+	StreetName       string
+	Coords           [][2]float64 // [[lng, lat], ...], at least 2 points
+	SurfaceType      *string
+	Smoothness       *string
+	SidewalkWidthM   *float64
+	Lit              *bool
+	IsStepFree       *bool
+	InclinePercent   *float64
+	HasCurbCuts      *bool
+	HasTactilePaving *bool
+	VerifyStatus     string
+	OSMWayID         int64
 }
 
+// sidewalkQuery pulls pedestrian ways (footway/pedestrian/path) that carry at
+// least one rollability signal (surface, smoothness, or wheelchair). Requiring
+// a signal in Overpass itself keeps payloads small for dense cities and mirrors
+// the import gate — we never want to render a segment we can't rate. Road
+// centre-lines tagged `sidewalk=*` are deliberately excluded: their geometry is
+// the roadway and their `surface` describes the road, not the sidewalk.
 func sidewalkQuery(bbox string) string {
-	return fmt.Sprintf(`[out:json][timeout:90];
+	return fmt.Sprintf(`[out:json][timeout:120];
 (
-  way["highway"="footway"]["footway"="sidewalk"](%[1]s);
-  way["sidewalk"](%[1]s);
+  way["highway"~"^(footway|pedestrian|path)$"]["surface"](%[1]s);
+  way["highway"~"^(footway|pedestrian|path)$"]["smoothness"](%[1]s);
+  way["highway"~"^(footway|pedestrian|path)$"]["wheelchair"](%[1]s);
 );
 out geom;`, bbox)
+}
+
+// Surface & smoothness classes mirror segment_rating() in migration 0019. The
+// Go import gate and the SQL rating MUST agree on which values are recognized,
+// or a way could be imported yet rate 'unknown' — the exact signal-less junk we
+// are eliminating. TestSegmentRatingGateSync asserts every recognized surface
+// rates non-unknown against the live function.
+var (
+	surfaceGood       = strset("asphalt", "concrete", "paving_stones", "concrete:plates", "paved", "wood", "metal")
+	surfacePoor       = strset("sett", "concrete:lanes", "compacted", "fine_gravel")
+	surfaceImpassable = strset("cobblestone", "unhewn_cobblestone", "pebblestone", "gravel", "sand", "ground", "dirt", "earth", "grass", "mud", "unpaved", "rock")
+
+	smoothnessGood       = strset("excellent", "good")
+	smoothnessPoor       = strset("intermediate")
+	smoothnessImpassable = strset("bad", "very_bad", "horrible", "very_horrible", "impassable")
+)
+
+func strset(vals ...string) map[string]bool {
+	m := make(map[string]bool, len(vals))
+	for _, v := range vals {
+		m[v] = true
+	}
+	return m
+}
+
+// recognizedSurface returns a pointer to v when it is a surface we know how to
+// rate, else nil — freeform/unknown values (e.g. "узбіччя_дороги") are dropped
+// so they never masquerade as signal.
+func recognizedSurface(v string) *string {
+	if surfaceGood[v] || surfacePoor[v] || surfaceImpassable[v] {
+		s := v
+		return &s
+	}
+	return nil
+}
+
+func recognizedSmoothness(v string) *string {
+	if smoothnessGood[v] || smoothnessPoor[v] || smoothnessImpassable[v] {
+		s := v
+		return &s
+	}
+	return nil
+}
+
+// allRecognizedSurfaces lists every surface the importer will store — the
+// rating sync test asserts each rates non-unknown (gate/rating agreement).
+func allRecognizedSurfaces() []string {
+	var out []string
+	for _, m := range []map[string]bool{surfaceGood, surfacePoor, surfaceImpassable} {
+		for k := range m {
+			out = append(out, k)
+		}
+	}
+	return out
 }
 
 func strToBoolPtr(v string) *bool {
@@ -88,30 +152,130 @@ func parseInclinePercent(v string) (float64, bool) {
 	return f, true
 }
 
+// wheelchairToStepFree folds the explicit `wheelchair` tag into is_step_free:
+// yes/designated → true, no → false. "limited" and absent leave it nil so the
+// surface/smoothness verdict decides (segment_rating treats step_free=false as
+// a hard barrier, so mapping wheelchair=no here yields 'none').
+func wheelchairToStepFree(v string) *bool {
+	switch v {
+	case "yes", "designated":
+		b := true
+		return &b
+	case "no":
+		b := false
+		return &b
+	default:
+		return nil
+	}
+}
+
+func tactilePavingToBool(v string) *bool {
+	switch v {
+	case "yes", "contrasted":
+		b := true
+		return &b
+	case "no":
+		b := false
+		return &b
+	default:
+		return nil
+	}
+}
+
+// parseWidthMeters parses an OSM width value ("1.5", "1,5", "1.5 m", "2m") into
+// metres. ok is false for imperial units, ranges, or non-numeric junk.
+func parseWidthMeters(v string) (float64, bool) {
+	v = strings.ToLower(strings.TrimSpace(v))
+	if v == "" || strings.ContainsAny(v, "'\"") || strings.Contains(v, "ft") {
+		return 0, false // imperial — out of scope
+	}
+	for _, unit := range []string{"meters", "metres", "meter", "metre", "m"} {
+		if strings.HasSuffix(v, unit) {
+			v = strings.TrimSpace(strings.TrimSuffix(v, unit))
+			break
+		}
+	}
+	v = strings.ReplaceAll(v, ",", ".")
+	if strings.ContainsAny(v, "-;~ ") {
+		return 0, false // ranges / lists / stray tokens
+	}
+	f, err := strconv.ParseFloat(v, 64)
+	if err != nil || f <= 0 || f > 20 {
+		return 0, false
+	}
+	return f, true
+}
+
+func firstNonEmpty(vals ...string) string {
+	for _, v := range vals {
+		if strings.TrimSpace(v) != "" {
+			return v
+		}
+	}
+	return ""
+}
+
+// segmentName uses the OSM `name` when present, else a generic Ukrainian label
+// by way type. Sidewalks/footways are frequently nameless, and a nameless
+// segment with a real surface ("Тротуар — Асфальт") is far more useful than
+// dropping it: the accessibility signal, not the name, is the point.
+func segmentName(t map[string]string) string {
+	if n := strings.TrimSpace(t["name"]); n != "" {
+		return n
+	}
+	switch {
+	case t["highway"] == "pedestrian":
+		return "Пішохідна зона"
+	case t["footway"] == "sidewalk":
+		return "Тротуар"
+	default:
+		return "Пішохідна доріжка"
+	}
+}
+
 // mapSidewalkWay converts an Overpass way element to a SegmentRecord.
-// ok is false when the way has no name or fewer than 2 geometry points.
+//
+// The import gate keeps a way only when it carries a signal we can actually
+// rate — a recognized surface, a recognized smoothness, or an explicit
+// wheelchair yes/no/designated. A bare name (or width/incline alone, which are
+// only modifiers) is rejected: that is exactly the "Невідомо" junk we are
+// eliminating. ok is false for a gated-out or too-short (<2 points) way.
 func mapSidewalkWay(el SidewalkElement) (SegmentRecord, bool) {
 	t := el.Tags
 	if t == nil {
 		t = map[string]string{}
 	}
-	name := t["name"]
-	if name == "" || len(el.Geometry) < 2 {
+	if len(el.Geometry) < 2 {
 		return SegmentRecord{}, false
 	}
+
+	surface := recognizedSurface(t["surface"])
+	smoothness := recognizedSmoothness(t["smoothness"])
+	wc := t["wheelchair"]
+	if surface == nil && smoothness == nil && wc != "yes" && wc != "no" && wc != "designated" {
+		return SegmentRecord{}, false
+	}
+
 	coords := make([][2]float64, len(el.Geometry))
 	for i, pt := range el.Geometry {
 		coords[i] = [2]float64{pt.Lon, pt.Lat}
 	}
 	rec := SegmentRecord{
-		StreetName:   name,
-		Coords:       coords,
-		SurfaceType:  strptr(t["surface"]),
-		Lit:          strToBoolPtr(bin(t["lit"])),
-		IsStepFree:   strToBoolPtr(tri(t["wheelchair"])),
-		HasCurbCuts:  kerbToHasCurbCuts(t["kerb"]),
-		VerifyStatus: "verified",
-		OSMWayID:     el.ID,
+		StreetName:       segmentName(t),
+		Coords:           coords,
+		SurfaceType:      surface,
+		Smoothness:       smoothness,
+		Lit:              strToBoolPtr(bin(t["lit"])),
+		IsStepFree:       wheelchairToStepFree(wc),
+		HasCurbCuts:      kerbToHasCurbCuts(t["kerb"]),
+		HasTactilePaving: tactilePavingToBool(t["tactile_paving"]),
+		VerifyStatus:     "unverified", // imported from OSM, not human-verified
+		OSMWayID:         el.ID,
+	}
+	if w := firstNonEmpty(t["width"], t["sidewalk:width"], t["est_width"]); w != "" {
+		if m, ok := parseWidthMeters(w); ok {
+			rec.SidewalkWidthM = &m
+		}
 	}
 	if pct, ok := parseInclinePercent(t["incline"]); ok {
 		rec.InclinePercent = &pct
@@ -127,20 +291,23 @@ func segmentCoordsToWKT(coords [][2]float64) string {
 	return "LINESTRING(" + strings.Join(pts, ",") + ")"
 }
 
+// On refresh the importer OWNS every osm_way_id row, so it overwrites the
+// OSM-derived fields outright (a way that lost its `surface` tag upstream should
+// lose it here too) and re-asserts verify_status='unverified' — imported data
+// is never human-verified.
 const upsertSegmentSQL = `
 insert into street_segments
-  (street_name, geom, osm_way_id, surface_type, incline_percent,
-   is_step_free, has_curb_cuts, lit, verify_status)
+  (street_name, geom, osm_way_id, surface_type, smoothness, sidewalk_width_m,
+   incline_percent, is_step_free, has_curb_cuts, has_tactile_paving, lit, verify_status)
 values
-  ($1, ST_GeomFromText($2, 4326), $3, $4, $5, $6, $7, $8, $9)
+  ($1, ST_GeomFromText($2, 4326), $3, $4, $5, $6, $7, $8, $9, $10, $11, 'unverified')
 on conflict (osm_way_id) where osm_way_id is not null
 do update set street_name = excluded.street_name, geom = excluded.geom,
-              surface_type = coalesce(excluded.surface_type, street_segments.surface_type),
-              incline_percent = coalesce(excluded.incline_percent, street_segments.incline_percent),
-              is_step_free = coalesce(excluded.is_step_free, street_segments.is_step_free),
-              has_curb_cuts = coalesce(excluded.has_curb_cuts, street_segments.has_curb_cuts),
-              lit = coalesce(excluded.lit, street_segments.lit),
-              updated_at = now()
+              surface_type = excluded.surface_type, smoothness = excluded.smoothness,
+              sidewalk_width_m = excluded.sidewalk_width_m, incline_percent = excluded.incline_percent,
+              is_step_free = excluded.is_step_free, has_curb_cuts = excluded.has_curb_cuts,
+              has_tactile_paving = excluded.has_tactile_paving, lit = excluded.lit,
+              verify_status = 'unverified', updated_at = now()
 returning id::text`
 
 // upsertSegment inserts/updates a street segment keyed on osm_way_id and returns its id.
@@ -148,9 +315,35 @@ func upsertSegment(ctx context.Context, pool *pgxpool.Pool, rec SegmentRecord) (
 	var id string
 	err := pool.QueryRow(ctx, upsertSegmentSQL,
 		rec.StreetName, segmentCoordsToWKT(rec.Coords), rec.OSMWayID,
-		rec.SurfaceType, rec.InclinePercent, rec.IsStepFree, rec.HasCurbCuts, rec.Lit, rec.VerifyStatus,
+		rec.SurfaceType, rec.Smoothness, rec.SidewalkWidthM, rec.InclinePercent,
+		rec.IsStepFree, rec.HasCurbCuts, rec.HasTactilePaving, rec.Lit,
 	).Scan(&id)
 	return id, err
+}
+
+// PruneOSMSidewalks normalises the OSM layer after a seed run: it forces every
+// OSM row to verify_status='unverified' and deletes rows with no ratable signal
+// (rating 'unknown') — legacy junk from the pre-0019 importer that rated only by
+// is_step_free/width. It touches ONLY osm_way_id rows; user-drawn segments
+// (osm_way_id null) are never affected. Returns how many rows were flipped and
+// deleted so the caller can report the cleanup transparently.
+func PruneOSMSidewalks(ctx context.Context, pool *pgxpool.Pool) (flipped, deleted int64, err error) {
+	tag, err := pool.Exec(ctx,
+		`update street_segments set verify_status = 'unverified'
+		 where osm_way_id is not null and verify_status <> 'unverified'`)
+	if err != nil {
+		return 0, 0, fmt.Errorf("flip verify_status: %w", err)
+	}
+	flipped = tag.RowsAffected()
+
+	tag, err = pool.Exec(ctx,
+		`delete from street_segments
+		 where osm_way_id is not null
+		   and segment_rating(surface_type, smoothness, sidewalk_width_m, incline_percent, is_step_free) = 'unknown'`)
+	if err != nil {
+		return flipped, 0, fmt.Errorf("delete unknown-rated: %w", err)
+	}
+	return flipped, tag.RowsAffected(), nil
 }
 
 // ImportSidewalks queries Overpass for sidewalk/footway geometry in bbox and

@@ -11,9 +11,28 @@ const RATING_META: Record<string, { label: string; color: string; bg: string }> 
   unknown: UNKNOWN_RATING,
 };
 
+// Every surface the importer can store maps to a Ukrainian label — no raw OSM
+// value (like "sett") ever reaches the panel. Grouped by how they rate.
 const SURFACE_LABELS: Record<string, string> = {
-  asphalt: 'Асфальт', cobblestone: 'Бруківка', paving_stones: 'Тротуарна плитка',
-  gravel: 'Гравій', concrete: 'Бетон', unknown: 'Невідомо',
+  // good — can reach "full"
+  asphalt: 'Асфальт', concrete: 'Бетон', 'concrete:plates': 'Бетонні плити',
+  paving_stones: 'Тротуарна плитка', paved: 'Тверде покриття',
+  wood: 'Дерев’яний настил', metal: 'Металевий настил',
+  // poor — capped at "partial"
+  sett: 'Брукований камінь', 'concrete:lanes': 'Бетонні смуги',
+  compacted: 'Ущільнений ґрунт', fine_gravel: 'Дрібний гравій',
+  // impassable — forces "none"
+  cobblestone: 'Кругляк (бруківка)', unhewn_cobblestone: 'Необроблений камінь',
+  pebblestone: 'Галька', gravel: 'Гравій', sand: 'Пісок', ground: 'Ґрунт',
+  dirt: 'Земля', earth: 'Земля', grass: 'Трава', mud: 'Багно',
+  unpaved: 'Без твердого покриття', rock: 'Скельна порода',
+  unknown: 'Невідомо',
+};
+
+const SMOOTHNESS_LABELS: Record<string, string> = {
+  excellent: 'Відмінна', good: 'Добра', intermediate: 'Задовільна',
+  bad: 'Погана', very_bad: 'Дуже погана', horrible: 'Жахлива',
+  very_horrible: 'Вкрай жахлива', impassable: 'Непрохідна',
 };
 
 function Pill({ ok, label }: { ok: boolean | null; label: string }) {
@@ -71,8 +90,12 @@ export function StreetSegmentPanel({
         }}>
           {rating.label}
         </span>
-        {segment.verifyStatus === 'verified' && (
+        {segment.verifyStatus === 'verified' ? (
           <span style={{ fontSize: '0.78em', color: '#166534', fontWeight: 700 }}>✓ Верифіковано</span>
+        ) : (
+          <span style={{ fontSize: '0.78em', color: 'var(--sc-muted)', fontWeight: 600 }}>
+            Не верифіковано · дані OpenStreetMap
+          </span>
         )}
       </div>
 
@@ -85,6 +108,10 @@ export function StreetSegmentPanel({
         <AttrRow
           label="Покриття"
           value={segment.surfaceType ? (SURFACE_LABELS[segment.surfaceType] ?? segment.surfaceType) : null}
+        />
+        <AttrRow
+          label="Рівність покриття"
+          value={segment.smoothness ? (SMOOTHNESS_LABELS[segment.smoothness] ?? segment.smoothness) : null}
         />
         <AttrRow
           label="Нахил"

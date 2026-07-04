@@ -11,6 +11,7 @@ export interface StreetSegment {
   hasCurbCuts: boolean | null;
   hasRamp: boolean | null;
   lit: boolean | null;
+  smoothness: string | null;
   verifyStatus: string;
   rating: 'full' | 'partial' | 'none' | 'unknown';
   geojson: string; // GeoJSON LineString geometry from ST_AsGeoJSON

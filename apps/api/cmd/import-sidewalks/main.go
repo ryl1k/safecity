@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 
 	"github.com/safecity/api/internal/db"
@@ -55,6 +56,7 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Printf("Sidewalk import: %d segments upserted, %d skipped.\n", st.Upserts, st.Skipped)
+		prune(ctx, database.Pool)
 		return
 	}
 
@@ -76,8 +78,21 @@ func main() {
 		})
 	// Partial progress is real (idempotent upserts) — always report the totals.
 	fmt.Printf("Done: %d segments upserted, %d skipped.\n", st.Upserts, st.Skipped)
+	prune(ctx, database.Pool)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "warning: %v\n", err)
 		os.Exit(1)
 	}
+}
+
+// prune normalises the OSM sidewalk layer (unverify + drop unratable rows) and
+// reports the cleanup. Failures here are logged, not fatal — the seed itself
+// already succeeded.
+func prune(ctx context.Context, pool *pgxpool.Pool) {
+	flipped, deleted, err := importer.PruneOSMSidewalks(ctx, pool)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "prune warning: %v\n", err)
+		return
+	}
+	fmt.Printf("Prune: %d row(s) marked unverified, %d unratable row(s) deleted.\n", flipped, deleted)
 }
