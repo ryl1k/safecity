@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -175,13 +173,21 @@ const DefaultPerCity = 35
 // CityProgress reports one city's import outcome (err is non-nil on failure).
 type CityProgress func(city City, st Stats, err error)
 
+// cityDelay is the courtesy pause between cities — Overpass is a shared public
+// service; back-to-back heavy queries invite throttling.
+const cityDelay = 2 * time.Second
+
 // ImportSidewalksNational seeds street segments across the same 75
 // government-controlled cities used for the points showcase (Cities, mirrored
 // from apps/web/src/lib/cities.ts), capping each city at perCity segments
-// (<=0 uses DefaultPerCity). Politely rate-limited between cities — Overpass
-// is a shared public service. Stops and returns on the first city that fails;
-// progress (if non-nil) is called for every city, including the failing one,
-// before the error is returned.
+// (<=0 uses DefaultPerCity). progress (if non-nil) is called for every city,
+// including any that fail.
+//
+// A single city that still fails after postOverpass's retries is logged and
+// skipped, not fatal — one flaky city must not discard a long run's progress
+// (re-running is idempotent on osm_way_id, so it safely picks up stragglers).
+// The returned error is non-nil only when the context is cancelled mid-run, or
+// as an end-of-run summary naming the cities that could not be seeded.
 func ImportSidewalksNational(
 	ctx context.Context, pool *pgxpool.Pool, client *http.Client, endpoint string, perCity int, progress CityProgress,
 ) (Stats, error) {
@@ -193,24 +199,33 @@ func ImportSidewalksNational(
 	}
 
 	var total Stats
+	var failed []string
 	for i, city := range Cities {
 		st, err := importSidewalksBBox(ctx, pool, client, endpoint, CityBBox(city), perCity)
 		if progress != nil {
 			progress(city, st, err)
 		}
 		if err != nil {
-			return total, fmt.Errorf("city %s: %w", city.ID, err)
+			if ctx.Err() != nil {
+				return total, ctx.Err() // shutdown/timeout — stop the whole run
+			}
+			failed = append(failed, city.Name)
+		} else {
+			total.Upserts += st.Upserts
+			total.Skipped += st.Skipped
 		}
-		total.Upserts += st.Upserts
-		total.Skipped += st.Skipped
 
 		if i < len(Cities)-1 {
 			select {
 			case <-ctx.Done():
 				return total, ctx.Err()
-			case <-time.After(1500 * time.Millisecond):
+			case <-time.After(cityDelay):
 			}
 		}
+	}
+	if len(failed) > 0 {
+		return total, fmt.Errorf("%d/%d cities could not be seeded (re-run to retry): %s",
+			len(failed), len(Cities), strings.Join(failed, ", "))
 	}
 	return total, nil
 }
@@ -256,27 +271,14 @@ func importSidewalksBBox(
 }
 
 func fetchSidewalks(ctx context.Context, client *http.Client, endpoint, bbox string) ([]SidewalkElement, error) {
-	body := "data=" + url.QueryEscape(sidewalkQuery(bbox))
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(body))
+	data, err := postOverpass(ctx, client, endpoint, sidewalkQuery(bbox))
 	if err != nil {
 		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("User-Agent", userAgent)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("overpass request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
-		return nil, fmt.Errorf("overpass %d: %s", resp.StatusCode, snippet)
 	}
 	var payload struct {
 		Elements []SidewalkElement `json:"elements"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	if err := json.Unmarshal(data, &payload); err != nil {
 		return nil, fmt.Errorf("decode overpass: %w", err)
 	}
 	return payload.Elements, nil

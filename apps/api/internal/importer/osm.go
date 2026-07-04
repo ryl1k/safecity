@@ -4,10 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
-	"net/url"
-	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -229,27 +226,14 @@ func ImportOSM(ctx context.Context, pool *pgxpool.Pool, client *http.Client, end
 }
 
 func fetchOverpass(ctx context.Context, client *http.Client, endpoint, bbox string) ([]OSMElement, error) {
-	body := "data=" + url.QueryEscape(overpassQuery(bbox))
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, endpoint, strings.NewReader(body))
+	data, err := postOverpass(ctx, client, endpoint, overpassQuery(bbox))
 	if err != nil {
 		return nil, err
-	}
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("User-Agent", userAgent)
-
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("overpass request: %w", err)
-	}
-	defer func() { _ = resp.Body.Close() }()
-	if resp.StatusCode != http.StatusOK {
-		snippet, _ := io.ReadAll(io.LimitReader(resp.Body, 300))
-		return nil, fmt.Errorf("overpass %d: %s", resp.StatusCode, snippet)
 	}
 	var payload struct {
 		Elements []OSMElement `json:"elements"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+	if err := json.Unmarshal(data, &payload); err != nil {
 		return nil, fmt.Errorf("decode overpass: %w", err)
 	}
 	return payload.Elements, nil

@@ -69,14 +69,15 @@ func main() {
 	st, err := importer.ImportSidewalksNational(ctx, database.Pool, httpClient, endpoint, perCity,
 		func(city importer.City, st importer.Stats, cityErr error) {
 			if cityErr != nil {
-				fmt.Printf("  ✗ %-24s failed: %v\n", city.Name, cityErr)
+				fmt.Printf("  ✗ %-24s %v\n", city.Name, cityErr)
 				return
 			}
 			fmt.Printf("  ✓ %-24s %2d upserted, %2d skipped\n", city.Name, st.Upserts, st.Skipped)
 		})
+	// Partial progress is real (idempotent upserts) — always report the totals.
+	fmt.Printf("Done: %d segments upserted, %d skipped.\n", st.Upserts, st.Skipped)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "national sidewalk import failed: %v\n", err)
+		fmt.Fprintf(os.Stderr, "warning: %v\n", err)
 		os.Exit(1)
 	}
-	fmt.Printf("Done: %d segments upserted, %d skipped across %d cities.\n", st.Upserts, st.Skipped, len(importer.Cities))
 }
