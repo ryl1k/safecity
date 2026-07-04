@@ -159,7 +159,21 @@ func (s *Store) SearchPoints(ctx context.Context, query string, limit int) ([]Po
 		}
 		out = append(out, h)
 	}
-	return out, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	// Best-effort analytics: every returned point counts as one search appearance.
+	if len(out) > 0 {
+		ids := make([]string, len(out))
+		for i := range out {
+			ids[i] = out[i].ID
+		}
+		go func() {
+			_, _ = s.db.Pool.Exec(context.Background(),
+				`update points set search_appearances = search_appearances + 1 where id = any($1::uuid[])`, ids)
+		}()
+	}
+	return out, nil
 }
 
 func ensureFeatures(m *map[string]string) {

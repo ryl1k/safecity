@@ -9,13 +9,16 @@ import (
 
 // MyPoint is one point the caller created, for their dashboard.
 type MyPoint struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	Category     string    `json:"category"`
-	Address      *string   `json:"address"`
-	VerifyStatus string    `json:"verifyStatus"`
-	ViewCount    int       `json:"viewCount"`
-	CreatedAt    time.Time `json:"createdAt"`
+	ID                string    `json:"id"`
+	Name              string    `json:"name"`
+	Category          string    `json:"category"`
+	Address           *string   `json:"address"`
+	VerifyStatus      string    `json:"verifyStatus"`
+	ViewCount         int       `json:"viewCount"`
+	SearchAppearances int       `json:"searchAppearances"`
+	ReviewCount       int       `json:"reviewCount"`
+	AvgRating         *float64  `json:"avgRating"`
+	CreatedAt         time.Time `json:"createdAt"`
 }
 
 // BusinessMe is the caller's account state + the points they created.
@@ -49,8 +52,16 @@ select coalesce(active and (renews_at is null or renews_at > now()), false), pla
 from business_accounts where user_id = auth.uid()`
 
 const myPointsSQL = `
-select id::text, name, category::text, address, verify_status::text, view_count, created_at
-from points where created_by = auth.uid() order by created_at desc`
+select p.id::text, p.name, p.category::text, p.address, p.verify_status::text,
+       p.view_count, p.search_appearances,
+       coalesce(r.cnt, 0) as review_count, r.avg_stars, p.created_at
+from points p
+left join (
+  select point_id, count(*) as cnt, avg(stars)::float as avg_stars
+  from reviews group by point_id
+) r on r.point_id = p.id
+where p.created_by = auth.uid()
+order by p.created_at desc`
 
 // GetBusinessMe returns the caller's business status and the points they created.
 func (s *Store) GetBusinessMe(ctx context.Context, userID string) (BusinessMe, error) {
@@ -70,7 +81,8 @@ func (s *Store) GetBusinessMe(ctx context.Context, userID string) (BusinessMe, e
 		defer rows.Close()
 		for rows.Next() {
 			var p MyPoint
-			if err := rows.Scan(&p.ID, &p.Name, &p.Category, &p.Address, &p.VerifyStatus, &p.ViewCount, &p.CreatedAt); err != nil {
+			if err := rows.Scan(&p.ID, &p.Name, &p.Category, &p.Address, &p.VerifyStatus,
+				&p.ViewCount, &p.SearchAppearances, &p.ReviewCount, &p.AvgRating, &p.CreatedAt); err != nil {
 				return err
 			}
 			me.Points = append(me.Points, p)

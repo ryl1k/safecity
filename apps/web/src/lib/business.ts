@@ -12,6 +12,9 @@ export interface MyPoint {
   address: string | null;
   verifyStatus: string;
   viewCount: number;
+  searchAppearances: number;
+  reviewCount: number;
+  avgRating: number | null;
   createdAt: string;
 }
 
