@@ -14,6 +14,8 @@ export interface StreetSegment {
   smoothness: string | null;
   verifyStatus: string;
   rating: 'full' | 'partial' | 'none' | 'unknown';
+  // Per-field provenance: field name → source ('osm' | 'dem' | 'gov' | 'user').
+  fieldSources: Record<string, string>;
   geojson: string; // GeoJSON LineString geometry from ST_AsGeoJSON
 }
 

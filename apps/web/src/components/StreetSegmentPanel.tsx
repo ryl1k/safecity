@@ -35,6 +35,21 @@ const SMOOTHNESS_LABELS: Record<string, string> = {
   very_horrible: 'Вкрай жахлива', impassable: 'Непрохідна',
 };
 
+const SOURCE_LABELS: Record<string, string> = {
+  osm: 'OpenStreetMap',
+  gov: 'держмоніторинг безбар’єрності',
+  dem: 'рельєф (DEM)',
+  user: 'спільнота',
+};
+
+// Honest provenance line built from which sources actually filled this segment's
+// fields — OSM geometry/surface, gov «Мапа безбар'єрності» criteria, DEM incline.
+function sourceLabel(fieldSources: Record<string, string> | null | undefined): string {
+  const present = new Set(Object.values(fieldSources ?? {}));
+  const parts = ['osm', 'gov', 'dem', 'user'].filter((s) => present.has(s)).map((s) => SOURCE_LABELS[s]);
+  return parts.length ? `дані: ${parts.join(', ')}` : 'дані OpenStreetMap';
+}
+
 function Pill({ ok, label }: { ok: boolean | null; label: string }) {
   if (ok === null) return null;
   return (
@@ -94,7 +109,7 @@ export function StreetSegmentPanel({
           <span style={{ fontSize: '0.78em', color: '#166534', fontWeight: 700 }}>✓ Верифіковано</span>
         ) : (
           <span style={{ fontSize: '0.78em', color: 'var(--sc-muted)', fontWeight: 600 }}>
-            Не верифіковано · дані OpenStreetMap
+            Не верифіковано · {sourceLabel(segment.fieldSources)}
           </span>
         )}
       </div>

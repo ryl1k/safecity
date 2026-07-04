@@ -2,6 +2,7 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -10,26 +11,28 @@ import (
 
 // StreetSegment is one surveyed walking path with accessibility attributes.
 type StreetSegment struct {
-	ID               string   `json:"id"`
-	StreetName       string   `json:"streetName"`
-	SidewalkWidthM   *float64 `json:"sidewalkWidthM"`
-	SurfaceType      *string  `json:"surfaceType"`
-	InclinePercent   *float64 `json:"inclinePercent"`
-	HasTactilePaving *bool    `json:"hasTactilePaving"`
-	IsStepFree       *bool    `json:"isStepFree"`
-	HasCurbCuts      *bool    `json:"hasCurbCuts"`
-	HasRamp          *bool    `json:"hasRamp"`
-	Lit              *bool    `json:"lit"`
-	Smoothness       *string  `json:"smoothness"`
-	VerifyStatus     string   `json:"verifyStatus"`
-	Rating           string   `json:"rating"` // "full" | "partial" | "none" | "unknown"
-	GeoJSON          string   `json:"geojson"` // ST_AsGeoJSON result (LineString geometry)
+	ID               string            `json:"id"`
+	StreetName       string            `json:"streetName"`
+	SidewalkWidthM   *float64          `json:"sidewalkWidthM"`
+	SurfaceType      *string           `json:"surfaceType"`
+	InclinePercent   *float64          `json:"inclinePercent"`
+	HasTactilePaving *bool             `json:"hasTactilePaving"`
+	IsStepFree       *bool             `json:"isStepFree"`
+	HasCurbCuts      *bool             `json:"hasCurbCuts"`
+	HasRamp          *bool             `json:"hasRamp"`
+	Lit              *bool             `json:"lit"`
+	Smoothness       *string           `json:"smoothness"`
+	VerifyStatus     string            `json:"verifyStatus"`
+	Rating           string            `json:"rating"` // "full" | "partial" | "none" | "unknown"
+	// FieldSources maps each populated field to its provenance: osm|dem|gov|user.
+	FieldSources map[string]string `json:"fieldSources"`
+	GeoJSON      string            `json:"geojson"` // ST_AsGeoJSON result (LineString geometry)
 }
 
 const segmentsInBBoxSQL = `
 select id::text, street_name, sidewalk_width_m, surface_type, incline_percent,
        has_tactile_paving, is_step_free, has_curb_cuts, has_ramp, lit,
-       smoothness, verify_status, rating, geojson
+       smoothness, verify_status, rating, field_sources, geojson
 from segments_in_bbox($1, $2, $3, $4)`
 
 // NewSegment is the validated input for submitting a street segment.
@@ -87,12 +90,17 @@ func (s *Store) SegmentsInBBox(ctx context.Context, minLng, minLat, maxLng, maxL
 	out := []StreetSegment{}
 	for rows.Next() {
 		var seg StreetSegment
+		var fieldSources []byte
 		if err := rows.Scan(
 			&seg.ID, &seg.StreetName, &seg.SidewalkWidthM, &seg.SurfaceType,
 			&seg.InclinePercent, &seg.HasTactilePaving, &seg.IsStepFree, &seg.HasCurbCuts,
-			&seg.HasRamp, &seg.Lit, &seg.Smoothness, &seg.VerifyStatus, &seg.Rating, &seg.GeoJSON,
+			&seg.HasRamp, &seg.Lit, &seg.Smoothness, &seg.VerifyStatus, &seg.Rating,
+			&fieldSources, &seg.GeoJSON,
 		); err != nil {
 			return nil, err
+		}
+		if len(fieldSources) > 0 {
+			_ = json.Unmarshal(fieldSources, &seg.FieldSources)
 		}
 		out = append(out, seg)
 	}

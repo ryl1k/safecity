@@ -62,11 +62,15 @@ func main() {
 
 	perCity := importer.DefaultPerCity
 	if v := os.Getenv("PER_CITY"); v != "" {
-		if n, err := strconv.Atoi(v); err == nil && n > 0 {
-			perCity = n
+		if n, err := strconv.Atoi(v); err == nil && n >= 0 {
+			perCity = n // 0 = uncapped (keep every ratable segment per city)
 		}
 	}
-	fmt.Printf("Seeding sidewalks nationwide: %d cities, up to %d segments each …\n", len(importer.Cities), perCity)
+	capLabel := fmt.Sprintf("up to %d segments each", perCity)
+	if perCity == 0 {
+		capLabel = "uncapped (every ratable segment)"
+	}
+	fmt.Printf("Seeding sidewalks nationwide: %d cities, %s …\n", len(importer.Cities), capLabel)
 
 	st, err := importer.ImportSidewalksNational(ctx, database.Pool, httpClient, endpoint, perCity,
 		func(city importer.City, st importer.Stats, cityErr error) {

@@ -387,9 +387,10 @@ func ImportSidewalksNational(
 	if endpoint == "" {
 		endpoint = DefaultOverpassURL
 	}
-	if perCity <= 0 {
+	if perCity < 0 {
 		perCity = DefaultPerCity
 	}
+	// perCity == 0 means uncapped — keep every ratable segment per city.
 
 	var total Stats
 	var failed []string
