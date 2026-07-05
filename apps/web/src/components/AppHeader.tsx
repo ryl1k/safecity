@@ -24,8 +24,8 @@ export function AppHeader({ active, search }: { active?: 'map' | 'places' | 'civ
     >
       <div
         style={{
-          maxWidth: 1080, margin: '0 auto', padding: '0.55em 1.25em',
-          display: 'flex', alignItems: 'center', gap: '0.6em 1.2em', flexWrap: 'wrap',
+          maxWidth: 1280, margin: '0 auto', padding: '0.55em 1.25em',
+          display: 'flex', alignItems: 'center', gap: '0.5em 0.85em', flexWrap: 'wrap',
         }}
       >
         <Link
@@ -47,7 +47,7 @@ export function AppHeader({ active, search }: { active?: 'map' | 'places' | 'civ
 
         {/* Optional search slot (desktop map view puts its search here). */}
         {search ? (
-          <div style={{ flex: 1, minWidth: 180, maxWidth: 560, margin: '0 auto', position: 'relative' }}>{search}</div>
+          <div style={{ flex: 1, minWidth: 150, maxWidth: 460, margin: '0 auto', position: 'relative' }}>{search}</div>
         ) : null}
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.6em', flexWrap: 'wrap' }}>

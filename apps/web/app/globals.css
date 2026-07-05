@@ -55,10 +55,12 @@
   .sc-marquee-track { animation: none; }
 }
 
-/* Hide non-essential labels on small screens (icon-only nav) */
-@media (max-width: 560px) {
+/* Collapse nav/action labels to icons before the header would wrap to two rows. */
+@media (max-width: 1180px) {
   .sc-hide-sm { display: none; }
-  /* Header: drop the primary nav onto its own full-width row, centred. */
+}
+/* Very small: drop the primary nav onto its own full-width row, centred. */
+@media (max-width: 560px) {
   .sc-header-nav { order: 2; flex-basis: 100%; justify-content: center; }
 }
 
