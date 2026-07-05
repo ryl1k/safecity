@@ -44,6 +44,7 @@ export default function BusinessPoints() {
     <div className="sc-stagger" style={{ display: 'flex', flexDirection: 'column', gap: '1em' }}>
       <DashboardHeader
         title="Мої точки"
+        hideSelector
         actions={
           <Link href="/contribute" style={{ textDecoration: 'none' }}>
             <Button style={{ minHeight: '2.75em', fontSize: '0.95em', padding: '0 1.1em' }}>+ Додати точку</Button>
