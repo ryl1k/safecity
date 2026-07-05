@@ -3,6 +3,7 @@
 // perks) by subscribing — there is no on/off toggle.
 import type { Category, PointFeatureMap } from '@safecity/shared';
 import { api } from './api';
+import { supabase } from './supabase';
 
 export type SubscriptionPlan = 'monthly' | 'yearly';
 
@@ -29,17 +30,26 @@ export interface BusinessMe {
 }
 
 // Session-level memo so AppHeader (which mounts on every page) and the dashboard
-// layout share one fetch. Reset on sign-out, after mutations, or when a point is
-// added elsewhere — see invalidateBusinessMe.
+// layout share one fetch. Scoped to the user it was fetched for — see below.
 let meCache: Promise<BusinessMe> | null = null;
+let meCacheUser: string | null = null;
 
 /**
  * The caller's business status and the points they created. Cached for the
  * session; pass `fresh` after a mutation (subscribe, delete, verify request) to
  * bypass the cache.
+ *
+ * The cache is keyed by the current session's user id and re-validated on every
+ * read. Sign-out uses `router.refresh()` and login uses `router.push()` — neither
+ * reloads JS modules — so without this check a previous account's cached data
+ * would leak into a freshly signed-in account (they'd see the wrong points and
+ * subscription). Read-time validation is immune to auth-event ordering.
  */
 export async function businessMe(fresh = false): Promise<BusinessMe> {
-  if (fresh || !meCache) {
+  const { data } = await supabase.auth.getSession();
+  const uid = data.session?.user?.id ?? null;
+  if (fresh || !meCache || uid !== meCacheUser) {
+    meCacheUser = uid;
     meCache = api.get<BusinessMe>('/business/me', { auth: true }).catch((e) => {
       meCache = null; // don't cache a rejection
       throw e;
