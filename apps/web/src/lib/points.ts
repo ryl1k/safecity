@@ -27,6 +27,7 @@ export interface PointHit {
   name: string;
   category: PointSummary['category'];
   address: string | null;
+  features: PointSummary['features'];
 }
 
 /** Name/address search across all points (for the full-screen map search box). */

@@ -39,6 +39,12 @@ type PointDetail struct {
 	IsBusiness         bool              `json:"isBusiness"`
 	VerifiedPaid       bool              `json:"verifiedPaid"`
 	SubscriptionActive bool              `json:"subscriptionActive"`
+	// "Мапа безбар'єрності" monitoring fields (imported points; migration 0024).
+	GovRating       *float64 `json:"govRating"`
+	RatingAuthority *string  `json:"ratingAuthority"`
+	Kind            *string  `json:"kind"`
+	SourceURL       *string  `json:"sourceUrl"`
+	CheckedOn       *string  `json:"checkedOn"`
 }
 
 // Reads are public (guest-first; RLS read_all). They reuse the existing PostGIS
@@ -56,7 +62,8 @@ from points_in_bbox($1, $2, $3, $4)`
 
 const pointDetailSQL = `
 select id::text, name, category::text, address, description, photos, lng, lat, verify_status::text, features,
-       is_business, verified_paid, subscription_active
+       is_business, verified_paid, subscription_active,
+       gov_rating, rating_authority, kind, source_url, checked_on::text
 from point_detail($1)`
 
 // PointsNear returns points within radiusM metres of (lng,lat), nearest first.
@@ -109,7 +116,8 @@ func (s *Store) PointDetail(ctx context.Context, id string) (*PointDetail, error
 	err := s.db.Pool.QueryRow(ctx, pointDetailSQL, id).Scan(
 		&p.ID, &p.Name, &p.Category, &p.Address, &p.Description, &p.Photos,
 		&p.Lng, &p.Lat, &p.VerifyStatus, &p.Features,
-		&p.IsBusiness, &p.VerifiedPaid, &p.SubscriptionActive)
+		&p.IsBusiness, &p.VerifiedPaid, &p.SubscriptionActive,
+		&p.GovRating, &p.RatingAuthority, &p.Kind, &p.SourceURL, &p.CheckedOn)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
@@ -123,12 +131,14 @@ func (s *Store) PointDetail(ctx context.Context, id string) (*PointDetail, error
 	return &p, nil
 }
 
-// PointHit is a lightweight name/address search match.
+// PointHit is a lightweight name/address search match. Carries feature values so
+// the client can show the accessibility level next to each result.
 type PointHit struct {
-	ID       string  `json:"id"`
-	Name     string  `json:"name"`
-	Category string  `json:"category"`
-	Address  *string `json:"address"`
+	ID       string            `json:"id"`
+	Name     string            `json:"name"`
+	Category string            `json:"category"`
+	Address  *string           `json:"address"`
+	Features map[string]string `json:"features"`
 }
 
 // Boosts points owned by an active business account to the top of search results,
@@ -136,7 +146,9 @@ type PointHit struct {
 // or /bbox) — the user asked for search-result priority specifically; map-browsing
 // order is a separate, larger decision if ever wanted later.
 const searchPointsSQL = `
-select p.id::text, p.name, p.category::text, p.address
+select p.id::text, p.name, p.category::text, p.address,
+       coalesce((select jsonb_object_agg(fv.feature_key, fv.value::text)
+                 from point_feature_values fv where fv.point_id = p.id), '{}'::jsonb)
 from points p
 where p.name ilike $1 or p.address ilike $1
 order by is_business_user(p.created_by) desc, p.name
@@ -154,9 +166,10 @@ func (s *Store) SearchPoints(ctx context.Context, query string, limit int) ([]Po
 	out := []PointHit{}
 	for rows.Next() {
 		var h PointHit
-		if err := rows.Scan(&h.ID, &h.Name, &h.Category, &h.Address); err != nil {
+		if err := rows.Scan(&h.ID, &h.Name, &h.Category, &h.Address, &h.Features); err != nil {
 			return nil, err
 		}
+		ensureFeatures(&h.Features)
 		out = append(out, h)
 	}
 	if err := rows.Err(); err != nil {

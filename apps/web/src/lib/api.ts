@@ -52,7 +52,9 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${BASE}${path}`, { method, headers, body: payload, signal });
+  // no-store: this is a live data API — never serve a stale browser-cached response
+  // (a catalog/point change must show immediately, not after the HTTP cache expires).
+  const res = await fetch(`${BASE}${path}`, { method, headers, body: payload, signal, cache: 'no-store' });
   const text = await res.text();
   const json = text ? JSON.parse(text) : null;
   if (!res.ok) {

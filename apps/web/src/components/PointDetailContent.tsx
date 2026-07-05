@@ -3,9 +3,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import type { AccessibilityFeature, FeatureValue, Profile, PointSummary } from '@safecity/shared';
-import { computeRating } from '@safecity/shared';
-import { RatingBadge, ChecklistRow, ReviewItem, Button, LoadingState, ErrorState } from '@/components/ui';
+import type { AccessibilityFeature, AccessLevel, FeatureValue, Profile, PointSummary } from '@safecity/shared';
+import { ChecklistRow, ReviewItem, Button, LoadingState, ErrorState } from '@/components/ui';
 import { PhotoInput } from '@/components/PhotoInput';
 import { PhotoGallery } from '@/components/PhotoGallery';
 import { getCatalog } from '@/lib/catalog';
@@ -14,13 +13,13 @@ import { reviewsFor, addReview, type ReviewRow } from '@/lib/reviews';
 import { uploadPhotos } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { categoryLabel } from '@/lib/format';
+import { levelOf, levelLabel, levelColor } from '@/lib/filters';
 
 const profileLabel: Record<Profile, string> = { wheelchair: 'Крісло колісне', blind: 'Незрячі' };
 
 /** The point detail body (no page shell) — reused by /point/[id] and the map modal. */
 export function PointDetailContent({ id, onRouteClick }: { id: string; onRouteClick?: () => void }) {
-  // SafeCity is wheelchair/mobility-focused — only the wheelchair rating is shown.
-  const shownProfiles: Profile[] = ['wheelchair'];
+  // SafeCity is wheelchair/mobility-focused — only the wheelchair level is shown.
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'notfound'>('loading');
   const [point, setPoint] = useState<PointSummary | null>(null);
@@ -106,11 +105,13 @@ export function PointDetailContent({ id, onRouteClick }: { id: string; onRouteCl
   if (status === 'error') return <ErrorState onRetry={() => void load()} />;
   if (status === 'notfound' || !point) return <p style={{ color: 'var(--sc-muted)' }}>Місце не знайдено.</p>;
 
+  const level = levelOf(point, catalog);
+
   return (
     <>
       <h1 style={{ margin: '0 0 0.2em', fontSize: '1.9em', fontWeight: 800, lineHeight: 1.15 }}>{point.name}</h1>
       <p style={{ margin: 0, color: 'var(--sc-muted)' }}>
-        {categoryLabel[point.category]}
+        {point.kind || categoryLabel[point.category]}
         {point.address ? ` · ${point.address}` : ''}
       </p>
       {(point.isBusiness || point.verifiedPaid) && (
@@ -154,15 +155,22 @@ export function PointDetailContent({ id, onRouteClick }: { id: string; onRouteCl
         >
           <h2 style={{ ...cardTitle, margin: 0 }}>Доступність</h2>
           <span style={{ display: 'flex', gap: '0.5em', flexWrap: 'wrap' }}>
-            {shownProfiles.map((pr) => {
-              const r = computeRating(point.features, catalog, point.category, pr);
-              return r === 'unknown' ? null : <RatingBadge key={pr} rating={r} />;
-            })}
+            <LevelBadge level={level} />
           </span>
           <span aria-hidden style={{ marginLeft: 'auto', color: 'var(--sc-muted)', fontSize: '1.1em' }}>{accessOpen ? '▾' : '▸'}</span>
         </button>
         {accessOpen && (
           <div style={{ marginTop: '0.8em' }}>
+            {(point.sourceUrl || point.checkedOn) && (
+              <p style={{ margin: '0 0 0.9em', fontSize: '0.82em', color: 'var(--sc-muted)', lineHeight: 1.5 }}>
+                Рівень доступності за даними «Мапа безбар’єрності»
+                {point.checkedOn ? ` · перевірено ${new Date(point.checkedOn).toLocaleDateString('uk-UA')}` : ''}
+                {point.ratingAuthority && point.ratingAuthority !== 'невідомо' ? ` · ${point.ratingAuthority}` : ''}
+                {point.sourceUrl ? (
+                  <> · <a href={point.sourceUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--sc-primary)', fontWeight: 700 }}>джерело ↗</a></>
+                ) : null}
+              </p>
+            )}
             {shown.length === 0 ? (
               <p style={{ color: 'var(--sc-muted)', fontSize: '0.9em', margin: 0 }}>Поки що ніхто не вказав зручності тут — будьте першим.</p>
             ) : (
@@ -227,6 +235,23 @@ export function PointDetailContent({ id, onRouteClick }: { id: string; onRouteCl
         )}
       </section>
     </>
+  );
+}
+
+/** Accessibility level pill — the primary signal (no percentages). */
+function LevelBadge({ level }: { level: AccessLevel }) {
+  const color = levelColor[level];
+  return (
+    <span
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: '0.35em',
+        background: 'var(--sc-surface-2)', color,
+        border: `var(--sc-bw) solid ${color}`, borderRadius: '2em',
+        padding: '0.2em 0.7em', fontWeight: 800, fontSize: '0.82em',
+      }}
+    >
+      {levelLabel[level]}
+    </span>
   );
 }
 
