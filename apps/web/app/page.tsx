@@ -52,8 +52,8 @@ export default function HomePage() {
             повідомте й домагайтеся змін.
           </p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.8em', marginTop: '1.8em', justifyContent: 'center' }}>
-            <Link href="/onboarding" className="sc-foc" style={cta('primary')}>Почати</Link>
-            <Link href="/map" className="sc-foc" style={cta('secondary')}>Відкрити мапу</Link>
+            <Link href="/map" className="sc-foc" style={cta('primary')}>Відкрити мапу</Link>
+            <Link href="/places" className="sc-foc" style={cta('secondary')}>Переглянути місця</Link>
           </div>
         </section>
 
@@ -100,11 +100,11 @@ export default function HomePage() {
             <h2 style={{ margin: '0 0 0.3em', fontSize: '1.3em', fontWeight: 800 }}>Зробимо ваше місто доступним разом</h2>
             <p style={{ margin: '0 0 1.4em', color: 'var(--sc-muted)' }}>Зрозумілий, зручний і доступний для кожного.</p>
             <Link
-              href="/onboarding"
+              href="/map"
               className="sc-foc"
               style={{ display: 'grid', placeItems: 'center', width: 'min(100%, 52em)', minHeight: '3.4em', margin: '0 auto', padding: '0 1.5em', borderRadius: '0.8em', fontWeight: 800, fontSize: '1.05em', textDecoration: 'none', background: 'var(--sc-primary)', color: 'var(--sc-on-primary)' }}
             >
-              Налаштувати під себе
+              Відкрити мапу
             </Link>
           </section>
         </div>
