@@ -16,7 +16,9 @@ export function DashboardHeader({
   const { me, selectedPointId, setSelectedPointId } = useBusiness();
   const showSel = !hideSelector && me.points.length > 0;
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1em', flexWrap: 'wrap' }}>
+    // position/z-index so the selector's dropdown paints above the animated cards
+    // below it (each sc-stagger child is its own stacking context).
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1em', flexWrap: 'wrap', position: 'relative', zIndex: 20 }}>
       <div style={{ minWidth: 0 }}>
         <h1 style={{ margin: 0, fontSize: '1.6em', fontWeight: 800 }}>{title}</h1>
         {subtitle && <p style={{ margin: '0.3em 0 0', color: 'var(--sc-muted)', fontSize: '0.92em' }}>{subtitle}</p>}

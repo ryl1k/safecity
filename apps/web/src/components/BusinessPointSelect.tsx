@@ -31,6 +31,12 @@ export function BusinessPointSelect({ points, value, onChange }: { points: MyPoi
   const cat = categoryLabel[sel.category as keyof typeof categoryLabel] ?? sel.category;
   const lvl = catalog.length ? accessLevel(sel.features, catalog, sel.category) : null;
   const single = points.length <= 1;
+  const verify =
+    sel.verifyStatus === 'verified' || sel.verifyStatus === 'official'
+      ? { t: 'Перевірено', c: 'var(--sc-ok)' }
+      : sel.verificationRequestedAt
+      ? { t: 'Запит надіслано', c: levelColor.medium }
+      : { t: 'Не перевірено', c: 'var(--sc-muted)' };
 
   return (
     <div ref={boxRef} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '0.3em', minWidth: 0 }}>
@@ -53,15 +59,25 @@ export function BusinessPointSelect({ points, value, onChange }: { points: MyPoi
         {!single && <ChevronDown size={16} aria-hidden style={{ flexShrink: 0, color: 'var(--sc-muted)' }} />}
       </button>
 
-      <div style={{ display: 'flex', gap: '0.6em', alignItems: 'center', fontSize: '0.8em', color: 'var(--sc-muted)', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+      <div style={{ display: 'flex', gap: '0.45em', alignItems: 'center', fontSize: '0.8em', color: 'var(--sc-muted)', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
         <span>{cat}</span>
         {lvl && (
-          <span style={{ color: levelColor[lvl], fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.3em' }}>
-            <span aria-hidden style={{ width: '0.5em', height: '0.5em', borderRadius: '50%', background: levelColor[lvl] }} />
-            {levelLabel[lvl]}
-          </span>
+          <>
+            <span aria-hidden>·</span>
+            <span style={{ color: levelColor[lvl], fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.3em' }}>
+              <span aria-hidden style={{ width: '0.5em', height: '0.5em', borderRadius: '50%', background: levelColor[lvl] }} />
+              {levelLabel[lvl]}
+            </span>
+          </>
         )}
-        {sel.address && <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>· {sel.address}</span>}
+        <span aria-hidden>·</span>
+        <span style={{ color: verify.c, fontWeight: 700 }}>{verify.t}</span>
+        {sel.address && (
+          <>
+            <span aria-hidden>·</span>
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 160 }}>{sel.address}</span>
+          </>
+        )}
       </div>
 
       {open && !single && (

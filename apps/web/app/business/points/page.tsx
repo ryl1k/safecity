@@ -46,7 +46,7 @@ export default function BusinessPoints() {
         title="Мої точки"
         actions={
           <Link href="/contribute" style={{ textDecoration: 'none' }}>
-            <Button variant="secondary" style={{ minHeight: '2.3em', fontSize: '0.85em' }}>+ Додати точку</Button>
+            <Button style={{ minHeight: '2.75em', fontSize: '0.95em', padding: '0 1.1em' }}>+ Додати точку</Button>
           </Link>
         }
       />
@@ -85,10 +85,17 @@ export default function BusinessPoints() {
                 </div>
                 <div style={{ display: 'flex', gap: '0.4em', flexWrap: 'wrap' }}>
                   <Link href={`/point/${p.id}`} style={{ textDecoration: 'none' }}>
-                    <Button variant="ghost" style={{ minHeight: '2.1em', fontSize: '0.82em', padding: '0 0.7em' }}>Переглянути</Button>
+                    <Button variant="ghost" style={{ minHeight: '2.2em', fontSize: '0.82em', padding: '0 0.7em' }}>Переглянути</Button>
                   </Link>
-                  <Link href={`/point/${p.id}/edit`} style={{ textDecoration: 'none' }}>
-                    <Button variant="secondary" style={{ minHeight: '2.1em', fontSize: '0.82em', padding: '0 0.7em' }}>Редагувати</Button>
+                  <Link
+                    href={`/point/${p.id}/edit`}
+                    className="sc-foc"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', minHeight: '2.2em', padding: '0 0.9em', borderRadius: '0.5em',
+                      textDecoration: 'none', fontWeight: 700, fontSize: '0.82em', background: 'var(--sc-ok)', color: '#fff',
+                    }}
+                  >
+                    Редагувати
                   </Link>
                   <button
                     type="button"
@@ -97,9 +104,9 @@ export default function BusinessPoints() {
                     disabled={busyId === p.id}
                     aria-label={`Видалити ${p.name}`}
                     style={{
-                      minHeight: '2.1em', padding: '0 0.7em', borderRadius: '0.5em', cursor: 'pointer',
+                      minHeight: '2.2em', padding: '0 0.9em', borderRadius: '0.5em', cursor: 'pointer',
                       fontFamily: 'inherit', fontWeight: 700, fontSize: '0.82em',
-                      border: 'var(--sc-bw) solid var(--sc-bad)', background: 'transparent', color: 'var(--sc-bad)',
+                      border: 'none', background: 'var(--sc-bad)', color: '#fff',
                     }}
                   >
                     {busyId === p.id ? '…' : 'Видалити'}
