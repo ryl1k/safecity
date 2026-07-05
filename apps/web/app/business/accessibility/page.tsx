@@ -30,50 +30,32 @@ function verifyState(p: MyPoint): VerifyState {
   return 'none';
 }
 
-// At-a-glance verification status pill for the selected point (header, right).
-function VerifyBadge({ state }: { state: VerifyState }) {
-  const cfg =
-    state === 'verified'
-      ? { Icon: ShieldCheck, t: 'Перевірено', c: 'var(--sc-ok)', bg: 'var(--sc-ok-bg)', bd: 'var(--sc-ok-line)' }
-      : state === 'requested'
-      ? { Icon: Clock, t: 'Запит на розгляді', c: levelColor.medium, bg: 'transparent', bd: levelColor.medium }
-      : { Icon: ShieldQuestion, t: 'Не перевірено', c: 'var(--sc-muted)', bg: 'transparent', bd: 'var(--sc-border-strong)' };
-  const { Icon } = cfg;
-  return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45em', padding: '0.55em 0.95em', borderRadius: '2em', border: `var(--sc-bw) solid ${cfg.bd}`, background: cfg.bg, color: cfg.c, fontWeight: 800, fontSize: '0.85em', whiteSpace: 'nowrap' }}>
-      <Icon size={16} aria-hidden /> {cfg.t}
-    </span>
-  );
+// ── Verification (single card: prominent status + request action) ────────────
+function statusCfg(state: VerifyState) {
+  return state === 'verified'
+    ? { Icon: ShieldCheck, t: 'Перевірено', c: 'var(--sc-ok)', bg: 'var(--sc-ok-bg)', bd: 'var(--sc-ok-line)', desc: 'Модератор підтвердив дані цієї точки.' }
+    : state === 'requested'
+    ? { Icon: Clock, t: 'Запит на розгляді', c: levelColor.medium, bg: 'transparent', bd: levelColor.medium, desc: 'Модератор перевірить дані та підтвердить точку.' }
+    : { Icon: ShieldQuestion, t: 'Не перевірено', c: 'var(--sc-muted)', bg: 'transparent', bd: 'var(--sc-border-strong)', desc: 'Підтвердьте достовірність даних — верифіковані точки викликають більше довіри у відвідувачів.' };
 }
 
-// ── Verification (text on top, button below) ─────────────────────────────────
-function VerificationBar({ state, busy, onRequest }: { state: VerifyState; busy: boolean; onRequest: () => void }) {
+function VerificationCard({ state, busy, onRequest }: { state: VerifyState; busy: boolean; onRequest: () => void }) {
+  const cfg = statusCfg(state);
+  const { Icon } = cfg;
   return (
-    <section className="sc-rise" style={{ ...card, gap: '0.55em' }}>
+    <section className="sc-rise" style={{ ...card, gap: '0.7em' }}>
       <div style={sectionLabel}>Верифікація</div>
-      {state === 'verified' ? (
-        <>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4em', color: 'var(--sc-ok)', fontWeight: 800, background: 'var(--sc-ok-bg)', border: 'var(--sc-bw) solid var(--sc-ok-line)', borderRadius: '2em', padding: '0.35em 0.85em', fontSize: '0.88em', alignSelf: 'flex-start' }}>
-            <ShieldCheck size={16} aria-hidden /> Перевірено
-          </span>
-          <span style={{ color: 'var(--sc-muted)', fontSize: '0.88em' }}>Модератор підтвердив дані цієї точки.</span>
-        </>
-      ) : state === 'requested' ? (
-        <>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4em', color: levelColor.medium, fontWeight: 700, fontSize: '0.9em' }}>
-            <Clock size={16} aria-hidden /> Запит на розгляді
-          </span>
-          <span style={{ color: 'var(--sc-muted)', fontSize: '0.88em' }}>Модератор перевірить дані та підтвердить точку.</span>
-        </>
-      ) : (
-        <>
-          <span style={{ color: 'var(--sc-muted)', fontSize: '0.9em' }}>
-            Підтвердьте достовірність даних — верифіковані точки викликають більше довіри у відвідувачів.
-          </span>
-          <Button variant="secondary" onClick={onRequest} disabled={busy} style={{ minHeight: '2.5em', fontSize: '0.88em', alignSelf: 'flex-start' }}>
-            {busy ? 'Надсилання…' : 'Запросити верифікацію'}
-          </Button>
-        </>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.65em' }}>
+        <span aria-hidden style={{ display: 'grid', placeItems: 'center', width: '2.4em', height: '2.4em', borderRadius: '50%', flexShrink: 0, background: cfg.bg === 'transparent' ? 'var(--sc-surface-2)' : cfg.bg, border: `var(--sc-bw) solid ${cfg.bd}`, color: cfg.c }}>
+          <Icon size={22} />
+        </span>
+        <span style={{ fontWeight: 800, fontSize: '1.1em', color: cfg.c }}>{cfg.t}</span>
+      </div>
+      <span style={{ color: 'var(--sc-muted)', fontSize: '0.9em' }}>{cfg.desc}</span>
+      {state === 'none' && (
+        <Button variant="secondary" onClick={onRequest} disabled={busy} style={{ minHeight: '2.5em', fontSize: '0.88em', alignSelf: 'flex-start' }}>
+          {busy ? 'Надсилання…' : 'Запросити верифікацію'}
+        </Button>
       )}
     </section>
   );
@@ -254,11 +236,7 @@ export default function BusinessAccessibility() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2em' }}>
       <style>{`.sc-a11y-row2 { display: grid; grid-template-columns: 1.15fr 2fr; gap: 1em; align-items: stretch; } @media (max-width: 880px) { .sc-a11y-row2 { grid-template-columns: 1fr; } }`}</style>
 
-      <DashboardHeader
-        title="Доступність і верифікація"
-        subtitle="Ваша оцінка доступності, що покращити найперше, і як підтвердити дані модератором."
-        actions={point ? <VerifyBadge state={verifyState(point)} /> : undefined}
-      />
+      <DashboardHeader title="Доступність і верифікація" />
 
       {!point ? (
         <section style={card}><p style={{ margin: 0, color: 'var(--sc-muted)' }}>У вас ще немає точок.</p></section>
@@ -266,8 +244,8 @@ export default function BusinessAccessibility() {
         <section style={card}><p style={{ margin: 0, color: 'var(--sc-muted)' }}>Немає критеріїв доступності для цієї категорії.</p></section>
       ) : (
         <>
-          <div key={`vb-${point.id}`} style={{ maxWidth: 640 }}>
-            <VerificationBar state={verifyState(point)} busy={busyId === point.id} onRequest={() => askVerify(point.id)} />
+          <div key={`vb-${point.id}`} style={{ maxWidth: 620 }}>
+            <VerificationCard state={verifyState(point)} busy={busyId === point.id} onRequest={() => askVerify(point.id)} />
           </div>
           <div key={`cards-${point.id}`} style={{ display: 'flex', flexDirection: 'column', gap: '1em' }}>
             <div className="sc-a11y-row2">
