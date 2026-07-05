@@ -169,6 +169,59 @@ function Metric({ icon: Icon, value, title, fill }: { icon: LucideIcon; value: s
   );
 }
 
+// Donut split into high/medium/low arcs, sized by count (pathLength=100 → work in %).
+function LevelDonut({ counts, center, sub, size = 112, stroke = 15 }: { counts: Record<AccessLevel, number>; center: React.ReactNode; sub?: string; size?: number; stroke?: number }) {
+  const r = (size - stroke) / 2;
+  const total = LEVELS.reduce((s, l) => s + (counts[l] ?? 0), 0);
+  let acc = 0;
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label="Розподіл точок за рівнями доступності">
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--sc-surface-2)" strokeWidth={stroke} />
+        {total > 0 && LEVELS.map((l) => {
+          const n = counts[l] ?? 0;
+          if (n === 0) return null;
+          const pct = (n / total) * 100;
+          const el = (
+            <circle
+              key={l} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={levelColor[l]} strokeWidth={stroke}
+              pathLength={100} strokeDasharray={`${pct} ${100 - pct}`} strokeDashoffset={-acc}
+              transform={`rotate(-90 ${size / 2} ${size / 2})`}
+            />
+          );
+          acc += pct;
+          return el;
+        })}
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', lineHeight: 1.1 }}>
+        <span style={{ fontSize: '1.6em', fontWeight: 800 }}>{center}</span>
+        {sub && <span style={{ fontSize: '0.6em', color: 'var(--sc-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{sub}</span>}
+      </div>
+    </div>
+  );
+}
+
+// Single-value ring (one arc), colored by level — like the accessibility gauge.
+function LevelRing({ score, color, center, sub, size = 112, stroke = 15 }: { score: number; color: string; center: React.ReactNode; sub?: string; size?: number; stroke?: number }) {
+  const r = (size - stroke) / 2;
+  const frac = Math.max(0, Math.min(1, score / 100)) * 100;
+  return (
+    <div style={{ position: 'relative', width: size, height: size, flexShrink: 0 }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`${Math.round(score)}%`}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--sc-surface-2)" strokeWidth={stroke} />
+        <circle
+          cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round"
+          pathLength={100} strokeDasharray={`${frac} ${100 - frac}`} transform={`rotate(-90 ${size / 2} ${size / 2})`}
+        />
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', textAlign: 'center', lineHeight: 1.1 }}>
+        <span style={{ fontSize: '1.5em', fontWeight: 800, color }}>{center}</span>
+        {sub && <span style={{ fontSize: '0.58em', color: 'var(--sc-muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{sub}</span>}
+      </div>
+    </div>
+  );
+}
+
 export default function BusinessAnalytics() {
   const { me } = useBusiness();
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
@@ -314,15 +367,18 @@ export default function BusinessAnalytics() {
       {/* Accessibility level breakdown across the caller's points */}
       {catalog.length > 0 && pts.length > 0 && (
         <section style={{ ...card }}>
-          <div style={{ fontWeight: 800, marginBottom: '0.7em' }}>Рівень доступності ваших точок</div>
-          <div style={{ display: 'flex', gap: '0.6em', flexWrap: 'wrap' }}>
-            {LEVELS.map((l) => (
-              <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '0.5em', padding: '0.5em 0.9em', borderRadius: '0.7em', border: `var(--sc-bw) solid ${levelColor[l]}` }}>
-                <span aria-hidden style={{ width: '0.7em', height: '0.7em', borderRadius: '50%', background: levelColor[l] }} />
-                <span style={{ fontWeight: 700, color: levelColor[l] }}>{levelLabel[l]}</span>
-                <span style={{ fontWeight: 800, fontSize: '1.1em' }}>{levelCounts[l] ?? 0}</span>
-              </div>
-            ))}
+          <div style={{ fontWeight: 800, marginBottom: '0.9em' }}>Рівень доступності ваших точок</div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1.4em', flexWrap: 'wrap' }}>
+            <LevelDonut counts={levelCounts} center={pts.length} sub={pts.length === 1 ? 'точка' : 'точок'} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5em', flex: '1 1 200px', minWidth: 0 }}>
+              {LEVELS.map((l) => (
+                <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '0.5em', padding: '0.5em 0.9em', borderRadius: '0.7em', border: `var(--sc-bw) solid ${levelColor[l]}` }}>
+                  <span aria-hidden style={{ width: '0.7em', height: '0.7em', borderRadius: '50%', background: levelColor[l] }} />
+                  <span style={{ fontWeight: 700, color: levelColor[l] }}>{levelLabel[l]}</span>
+                  <span style={{ fontWeight: 800, fontSize: '1.1em', marginLeft: 'auto' }}>{levelCounts[l] ?? 0}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </section>
       )}
@@ -364,23 +420,32 @@ export default function BusinessAnalytics() {
               const pct = Math.round((worse / total) * 100);
               const dist = LEVELS.map((l) => ({ l, n: nearby.others.filter((x) => x === l).length }));
               const unknownN = nearby.others.filter((x) => x === 'unknown').length;
+              // Average accessibility of the rated places nearby, using each level's
+              // band midpoint (high 75–100, medium 51–74, low 0–50) → a single %.
+              const bandMid: Record<AccessLevel, number> = { high: 88, medium: 62, low: 25, unknown: 0 };
+              const rated = nearby.others.filter((l) => l !== 'unknown');
+              const avgScore = rated.length ? rated.reduce((s, l) => s + bandMid[l], 0) / rated.length : 0;
+              const avgLevel: AccessLevel = avgScore >= 75 ? 'high' : avgScore >= 51 ? 'medium' : 'low';
               return (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8em' }}>
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6em', flexWrap: 'wrap' }}>
-                    <span style={{ fontWeight: 800, color: levelColor[nearby.own] }}>Ваша точка: {levelLabel[nearby.own]}</span>
-                    <span style={{ color: 'var(--sc-muted)', fontSize: '0.9em' }}>
-                      доступніша за <strong style={{ color: 'var(--sc-text)' }}>{worse}</strong> із {total} закладів поблизу ({pct}%)
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', gap: '0.6em', flexWrap: 'wrap' }}>
-                    {dist.map(({ l, n }) => (
-                      <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '0.45em', padding: '0.4em 0.8em', borderRadius: '0.7em', border: `var(--sc-bw) solid ${levelColor[l]}` }}>
-                        <span aria-hidden style={{ width: '0.6em', height: '0.6em', borderRadius: '50%', background: levelColor[l] }} />
-                        <span style={{ fontWeight: 700, color: levelColor[l], fontSize: '0.85em' }}>{levelLabel[l]}</span>
-                        <span style={{ fontWeight: 800 }}>{n}</span>
-                      </div>
-                    ))}
-                    {unknownN > 0 && <span style={{ color: 'var(--sc-muted)', fontSize: '0.8em', alignSelf: 'center' }}>+{unknownN} без даних</span>}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1.4em', flexWrap: 'wrap' }}>
+                  <LevelRing score={avgScore} color={levelColor[avgLevel]} center={`${Math.round(avgScore)}%`} sub="сер. поблизу" />
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8em', flex: '1 1 260px', minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6em', flexWrap: 'wrap' }}>
+                      <span style={{ fontWeight: 800, color: levelColor[nearby.own] }}>Ваша точка: {levelLabel[nearby.own]}</span>
+                      <span style={{ color: 'var(--sc-muted)', fontSize: '0.9em' }}>
+                        доступніша за <strong style={{ color: 'var(--sc-text)' }}>{worse}</strong> із {total} закладів поблизу ({pct}%)
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '0.6em', flexWrap: 'wrap' }}>
+                      {dist.map(({ l, n }) => (
+                        <div key={l} style={{ display: 'flex', alignItems: 'center', gap: '0.45em', padding: '0.4em 0.8em', borderRadius: '0.7em', border: `var(--sc-bw) solid ${levelColor[l]}` }}>
+                          <span aria-hidden style={{ width: '0.6em', height: '0.6em', borderRadius: '50%', background: levelColor[l] }} />
+                          <span style={{ fontWeight: 700, color: levelColor[l], fontSize: '0.85em' }}>{levelLabel[l]}</span>
+                          <span style={{ fontWeight: 800 }}>{n}</span>
+                        </div>
+                      ))}
+                      {unknownN > 0 && <span style={{ color: 'var(--sc-muted)', fontSize: '0.8em', alignSelf: 'center' }}>+{unknownN} без даних</span>}
+                    </div>
                   </div>
                 </div>
               );
