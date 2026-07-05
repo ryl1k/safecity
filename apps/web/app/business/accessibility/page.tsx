@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ShieldCheck, Clock, CircleHelp, Wrench, PartyPopper, Check, X, HelpCircle } from 'lucide-react';
+import { ShieldCheck, ShieldQuestion, Clock, CircleHelp, Wrench, PartyPopper, Check, X, HelpCircle } from 'lucide-react';
 import type { AccessibilityFeature, AccessLevel, CriterionState, FeatureValue, LevelBreakdown } from '@safecity/shared';
 import { accessLevelBreakdown } from '@safecity/shared';
 import { Button } from '@/components/ui';
@@ -28,6 +28,22 @@ function verifyState(p: MyPoint): VerifyState {
   if (p.verifyStatus === 'verified' || p.verifyStatus === 'official') return 'verified';
   if (p.verificationRequestedAt) return 'requested';
   return 'none';
+}
+
+// At-a-glance verification status pill for the selected point (header, right).
+function VerifyBadge({ state }: { state: VerifyState }) {
+  const cfg =
+    state === 'verified'
+      ? { Icon: ShieldCheck, t: 'Перевірено', c: 'var(--sc-ok)', bg: 'var(--sc-ok-bg)', bd: 'var(--sc-ok-line)' }
+      : state === 'requested'
+      ? { Icon: Clock, t: 'Запит на розгляді', c: levelColor.medium, bg: 'transparent', bd: levelColor.medium }
+      : { Icon: ShieldQuestion, t: 'Не перевірено', c: 'var(--sc-muted)', bg: 'transparent', bd: 'var(--sc-border-strong)' };
+  const { Icon } = cfg;
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45em', padding: '0.55em 0.95em', borderRadius: '2em', border: `var(--sc-bw) solid ${cfg.bd}`, background: cfg.bg, color: cfg.c, fontWeight: 800, fontSize: '0.85em', whiteSpace: 'nowrap' }}>
+      <Icon size={16} aria-hidden /> {cfg.t}
+    </span>
+  );
 }
 
 // ── Verification (text on top, button below) ─────────────────────────────────
@@ -241,6 +257,7 @@ export default function BusinessAccessibility() {
       <DashboardHeader
         title="Доступність і верифікація"
         subtitle="Ваша оцінка доступності, що покращити найперше, і як підтвердити дані модератором."
+        actions={point ? <VerifyBadge state={verifyState(point)} /> : undefined}
       />
 
       {!point ? (
