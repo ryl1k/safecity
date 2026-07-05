@@ -32,22 +32,33 @@ function VisualPanel({ Icon, children }: { Icon: LucideIcon; children: React.Rea
     <div style={{
       position: 'relative', minHeight: 300, borderRadius: '1.6em', overflow: 'hidden',
       border: 'var(--sc-bw) solid var(--sc-border)', display: 'grid', placeItems: 'center', padding: '2.2em',
-      background: 'linear-gradient(140deg, var(--sc-primary-tint), var(--sc-surface) 72%)',
+      background: 'var(--sc-surface)', boxShadow: '0 18px 45px -22px rgba(0,0,0,0.35)',
     }}>
-      <Icon aria-hidden size={230} className="sc-drift" style={{ position: 'absolute', right: '-2.4rem', bottom: '-2.4rem', color: 'var(--sc-primary)', opacity: 0.08, pointerEvents: 'none' }} />
+      <Icon aria-hidden size={230} className="sc-drift" style={{ position: 'absolute', right: '-2.4rem', bottom: '-2.4rem', color: 'var(--sc-primary)', opacity: 0.07, pointerEvents: 'none' }} />
       <div style={{ position: 'relative', width: '100%', maxWidth: 340 }}>{children}</div>
     </div>
   );
 }
 
 function Capability({
-  n, Icon, title, body, bullets, cta, flip, visual,
+  n, Icon, title, body, bullets, cta, flip, tint, visual,
 }: {
   n: string; Icon: LucideIcon; title: string; body: string; bullets: string[];
-  cta?: { href: string; label: string }; flip?: boolean; visual: React.ReactNode;
+  cta?: { href: string; label: string }; flip?: boolean; tint?: boolean; visual: React.ReactNode;
 }) {
   return (
-    <section className="sc-snap-section" style={{ minHeight: '88vh', display: 'flex', alignItems: 'center', padding: '3.5em 0' }}>
+    <section
+      className="sc-snap-section"
+      style={{
+        minHeight: '88vh', display: 'flex', alignItems: 'center', padding: '3.5em 0',
+        // full-bleed band; alternating tint clearly separates neighbouring sections
+        // (color-mix keeps it theme-aware — a teal band in light, a dark teal band in dark)
+        background: tint
+          ? 'linear-gradient(160deg, color-mix(in srgb, var(--sc-primary) 15%, var(--sc-surface)), color-mix(in srgb, var(--sc-primary) 5%, var(--sc-surface)))'
+          : 'var(--sc-bg)',
+        borderTop: 'var(--sc-bw) solid var(--sc-border)',
+      }}
+    >
       <div className={`sc-cap-grid${flip ? ' sc-cap-flip' : ''}`} style={{ maxWidth: 1080, margin: '0 auto', padding: '0 1.25em' }}>
         <Reveal className="sc-cap-text">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1em', alignItems: 'flex-start' }}>
@@ -225,7 +236,7 @@ export default function HomePage() {
         </section>
 
         <Capability
-          n="1" Icon={SlidersHorizontal} title="Створено для мобільності"
+          n="1" Icon={SlidersHorizontal} title="Створено для мобільності" tint
           body="SafeCity зроблено насамперед для людей на кріслі колісному та з обмеженою мобільністю. Кожне місце ми оцінюємо за реальними бар’єрами — вхід, двері, пандус, туалет — і показуємо зрозумілий рівень доступності, тож ви знаєте, чи підходить вам місце, ще до виходу з дому."
           bullets={['Оцінка доступності для крісла колісного', 'Зрозумілі рівні: високий, середній, низький', 'Комфортна тема та розмір шрифту під ваші потреби']}
           visual={<MobilityVisual />}
@@ -238,7 +249,7 @@ export default function HomePage() {
           visual={<PlacesVisual />}
         />
         <Capability
-          n="3" Icon={Navigation} title="Прокладайте безпечний маршрут"
+          n="3" Icon={Navigation} title="Прокладайте безпечний маршрут" tint
           body="Маршрути без сходів і з пологими ділянками, що оминають підтверджені бар’єри. Додавайте проміжні зупинки, а дорогою застосунок підкаже доступні місця поруч зі шляхом."
           bullets={['Маршрути без сходів і високих бордюрів', 'Оминання підтверджених бар’єрів', 'Доступні місця вздовж шляху']}
           cta={{ href: '/map', label: 'Відкрити мапу' }}
@@ -252,7 +263,7 @@ export default function HomePage() {
           visual={<ChangeVisual />}
         />
         <Capability
-          n="5" Icon={Store} title="Зробіть ваш бізнес доступним"
+          n="5" Icon={Store} title="Зробіть ваш бізнес доступним" tint
           body="Позначте свій заклад на мапі — і покажіть клієнтам, що до вас легко потрапити. Доступні місця отримують значок довіри, помітніші в пошуку та привертають відвідувачів, які інакше пройшли б повз."
           bullets={['Значок «Перевірено» для довіри', 'Більше клієнтів, які шукають доступність', 'Керуйте своїми точками з панелі бізнесу']}
           cta={{ href: '/contribute', label: 'Додати свій заклад' }}
