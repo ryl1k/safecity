@@ -49,6 +49,8 @@ type DataStore interface {
 	// account-level business (self-serve; payments mocked)
 	SubscribeBusiness(ctx context.Context, userID, plan string) error
 	GetBusinessMe(ctx context.Context, userID string) (store.BusinessMe, error)
+	GetBusinessAnalytics(ctx context.Context, userID string) (store.BusinessAnalytics, error)
+	RequestPointVerification(ctx context.Context, userID, pointID string) error
 	// civic writes
 	CreateProblem(ctx context.Context, userID string, in store.NewProblem) (store.Problem, error)
 	ConfirmProblem(ctx context.Context, userID, problemID string) (store.ConfirmResult, error)
@@ -255,6 +257,8 @@ func (s *Server) routes() {
 			r.Post("/petitions/{id}/sign", s.handleSignPetition)
 			r.Post("/business/subscribe", s.handleSubscribeBusiness)
 			r.Get("/business/me", s.handleBusinessMe)
+			r.Get("/business/analytics", s.handleBusinessAnalytics)
+			r.Post("/business/points/{id}/request-verification", s.handleRequestPointVerification)
 		}
 	})
 }

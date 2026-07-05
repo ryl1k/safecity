@@ -20,7 +20,15 @@ function styleFor(dark: boolean) {
   };
 }
 
-/** Click (or drag the pin) to choose a point's location. */
+/**
+ * Click (or drag the pin) to choose a point's location.
+ *
+ * `onChange` fires ONLY on a genuine user action (map click, pin drag, or
+ * "my location") — never on mount or when `value` is set from the outside.
+ * That lets callers reverse-geocode a *user-picked* spot without clobbering an
+ * already-loaded address, and lets an address autocomplete drive `value` (which
+ * moves the pin here) without bouncing back into a reverse-geocode loop.
+ */
 export function LocationPicker({
   value,
   onChange,
@@ -34,6 +42,15 @@ export function LocationPicker({
   const mlRef = useRef<any>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  // Always-current mirror of `value`, readable from inside the once-only effect.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  // Coords we last emitted/placed from inside — lets the value-sync effect
+  // ignore its own echo and react only to *external* changes.
+  const lastRef = useRef<[number, number] | null>(value);
+  // Set once the map is ready; used by useMyLocation + the value-sync effect.
+  const ensureMarkerRef = useRef<((lng: number, lat: number) => void) | null>(null);
+  const userPickRef = useRef<((lng: number, lat: number) => void) | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -43,34 +60,61 @@ export function LocationPicker({
       if (cancelled || !containerRef.current || mapRef.current) return;
       const dark = typeof document !== 'undefined' && document.documentElement.getAttribute('data-theme') === 'dark';
       const c = loadCity();
-      const map = new maplibregl.Map({ container: containerRef.current, style: styleFor(dark) as any, center: value ?? [c.lng, c.lat], zoom: 14 });
+      const start = valueRef.current ?? [c.lng, c.lat];
+      const map = new maplibregl.Map({ container: containerRef.current, style: styleFor(dark) as any, center: start as [number, number], zoom: 14 });
       mapRef.current = map;
       map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
-      const place = (lng: number, lat: number) => {
+      // Create or move the marker WITHOUT notifying — for programmatic placement.
+      const ensureMarker = (lng: number, lat: number) => {
         if (!markerRef.current) {
           markerRef.current = new maplibregl.Marker({ color: '#0d5b66', draggable: true }).setLngLat([lng, lat]).addTo(map);
           markerRef.current.on('dragend', () => {
             const ll = markerRef.current.getLngLat();
-            onChangeRef.current(ll.lng, ll.lat);
+            userPick(ll.lng, ll.lat);
           });
         } else {
           markerRef.current.setLngLat([lng, lat]);
         }
+      };
+      // A genuine user action — moves the marker AND notifies the caller.
+      const userPick = (lng: number, lat: number) => {
+        ensureMarker(lng, lat);
+        lastRef.current = [lng, lat];
         onChangeRef.current(lng, lat);
       };
+      ensureMarkerRef.current = ensureMarker;
+      userPickRef.current = userPick;
 
-      if (value) place(value[0], value[1]);
-      map.on('click', (e: any) => place(e.lngLat.lng, e.lngLat.lat));
+      // Initial placement is silent (no onChange) so a loaded address survives.
+      if (valueRef.current) {
+        ensureMarker(valueRef.current[0], valueRef.current[1]);
+        lastRef.current = valueRef.current;
+      }
+      map.on('click', (e: any) => userPick(e.lngLat.lng, e.lngLat.lat));
     })();
     return () => {
       cancelled = true;
       mapRef.current?.remove();
       mapRef.current = null;
       markerRef.current = null;
+      ensureMarkerRef.current = null;
+      userPickRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // React to *external* value changes (e.g. an address-autocomplete pick):
+  // move the pin and recenter, but skip our own echoed emissions.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !value || !ensureMarkerRef.current) return;
+    const le = lastRef.current;
+    if (le && Math.abs(le[0] - value[0]) < 1e-9 && Math.abs(le[1] - value[1]) < 1e-9) return;
+    ensureMarkerRef.current(value[0], value[1]);
+    lastRef.current = value;
+    map.flyTo({ center: value, zoom: Math.max(map.getZoom(), 15) });
+  }, [value]);
 
   function useMyLocation() {
     if (typeof navigator === 'undefined' || !navigator.geolocation) return;
@@ -78,19 +122,9 @@ export function LocationPicker({
       const lng = pos.coords.longitude;
       const lat = pos.coords.latitude;
       const map = mapRef.current;
-      const ml = mlRef.current;
-      if (!map || !ml) return;
+      if (!map || !userPickRef.current) return;
       map.flyTo({ center: [lng, lat], zoom: 15 });
-      if (markerRef.current) {
-        markerRef.current.setLngLat([lng, lat]);
-      } else {
-        markerRef.current = new ml.Marker({ color: '#0d5b66', draggable: true }).setLngLat([lng, lat]).addTo(map);
-        markerRef.current.on('dragend', () => {
-          const ll = markerRef.current.getLngLat();
-          onChangeRef.current(ll.lng, ll.lat);
-        });
-      }
-      onChangeRef.current(lng, lat);
+      userPickRef.current(lng, lat);
     });
   }
 

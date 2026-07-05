@@ -3,6 +3,8 @@ package server
 import (
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	"github.com/safecity/api/internal/httpx"
 )
 
@@ -50,4 +52,41 @@ func (s *Server) handleBusinessMe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	httpx.JSON(w, http.StatusOK, me)
+}
+
+// handleRequestPointVerification: POST /business/points/{id}/request-verification —
+// the point's owner asks a moderator to verify it. The moderator then approves via
+// POST /admin/points/{id}/verify. 404 if the point isn't the caller's.
+func (s *Server) handleRequestPointVerification(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.principal(w, r)
+	if !ok {
+		return
+	}
+	id := chi.URLParam(r, "id")
+	if !isUUID(id) {
+		httpx.Error(w, http.StatusBadRequest, "invalid_query", "point id must be a uuid")
+		return
+	}
+	if err := s.store.RequestPointVerification(r.Context(), p.UserID, id); err != nil {
+		s.storeError(w, "request point verification", "", "point not found", err)
+		return
+	}
+	s.log.Info("point verification requested", "point_id", id, "user", p.UserID)
+	httpx.JSON(w, http.StatusOK, map[string]bool{"ok": true})
+}
+
+// handleBusinessAnalytics: GET /business/analytics — reviews-over-time (real) and
+// forward-only view/search snapshots for the caller's points.
+func (s *Server) handleBusinessAnalytics(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.principal(w, r)
+	if !ok {
+		return
+	}
+	a, err := s.store.GetBusinessAnalytics(r.Context(), p.UserID)
+	if err != nil {
+		s.log.Error("business analytics", "err", err)
+		httpx.Error(w, http.StatusInternalServerError, "internal", "could not load analytics")
+		return
+	}
+	httpx.JSON(w, http.StatusOK, a)
 }

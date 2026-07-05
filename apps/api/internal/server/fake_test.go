@@ -48,6 +48,14 @@ type fakeStore struct {
 	bizMe    store.BusinessMe
 	bizMeErr error
 
+	// GetBusinessAnalytics
+	bizAnalytics    store.BusinessAnalytics
+	bizAnalyticsErr error
+
+	// RequestPointVerification
+	gotVerifyReqID string
+	verifyReqErr   error
+
 	// UpsertReview
 	gotReviewPoint string
 	gotReview      store.NewReview
@@ -175,6 +183,17 @@ func (f *fakeStore) SubscribeBusiness(_ context.Context, userID, plan string) er
 func (f *fakeStore) GetBusinessMe(_ context.Context, userID string) (store.BusinessMe, error) {
 	f.gotUser = userID
 	return f.bizMe, f.bizMeErr
+}
+
+func (f *fakeStore) GetBusinessAnalytics(_ context.Context, userID string) (store.BusinessAnalytics, error) {
+	f.gotUser = userID
+	return f.bizAnalytics, f.bizAnalyticsErr
+}
+
+func (f *fakeStore) RequestPointVerification(_ context.Context, userID, pointID string) error {
+	f.gotUser = userID
+	f.gotVerifyReqID = pointID
+	return f.verifyReqErr
 }
 
 func (f *fakeStore) UpsertReview(_ context.Context, userID, pointID string, in store.NewReview) (store.Review, error) {

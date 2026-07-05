@@ -1,15 +1,18 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AccessibilityFeature, Category, FeatureValue } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { LocationPicker } from '@/components/LocationPicker';
+import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { PhotoInput } from '@/components/PhotoInput';
 import { Button, Field, Segmented } from '@/components/ui';
 import { getCatalog } from '@/lib/catalog';
 import { api, ApiError } from '@/lib/api';
+import { invalidateBusinessMe } from '@/lib/business';
+import { reverseGeocode } from '@/lib/geocode';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import { uploadPhotos } from '@/lib/storage';
@@ -36,6 +39,17 @@ export default function ContributePage() {
   const [values, setValues] = useState<Record<string, FeatureValue>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const revAbort = useRef<AbortController | null>(null);
+
+  // User picked a spot on the map → drop the pin and reverse-geocode into the
+  // address field (best-effort; a manually-typed address just gets overwritten).
+  function pickLocation(lng: number, lat: number) {
+    setLoc([lng, lat]);
+    revAbort.current?.abort();
+    const ctrl = new AbortController();
+    revAbort.current = ctrl;
+    reverseGeocode(lng, lat, ctrl.signal).then((addr) => { if (addr) setAddress(addr); }).catch(() => {});
+  }
 
   useEffect(() => {
     // Pre-fill location + address when navigating from the map marker panel.
@@ -58,7 +72,15 @@ export default function ContributePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const features = useMemo(() => catalog.filter((f) => f.categories.includes(category)), [catalog, category]);
+  // Wheelchair-only (SafeCity is mobility-focused — blind-profile criteria aren't
+  // shown or scored anywhere, so collecting them here is just clutter). Stars first.
+  const features = useMemo(
+    () =>
+      catalog
+        .filter((f) => f.profile === 'wheelchair' && f.categories.includes(category))
+        .sort((a, b) => Number(b.critical) - Number(a.critical)),
+    [catalog, category],
+  );
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -79,6 +101,7 @@ export default function ContributePage() {
         features: cleaned,
         photos: photoUrls,
       });
+      invalidateBusinessMe(); // header's "Мої точки" gate must see the new point
       router.push(`/point/${res.id}`);
     } catch (err: unknown) {
       // The 10-point cap is only ever surfaced here, at the moment it's hit.
@@ -102,7 +125,12 @@ export default function ContributePage() {
 
         <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1em' }}>
           <Field label="Назва" required value={name} onChange={(e) => setName(e.target.value)} placeholder="напр. Кав'ярня «Кава»" />
-          <Field label="Адреса" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="вул. Прикладна, 1" />
+          <AddressAutocomplete
+            value={address}
+            onChange={setAddress}
+            onPick={(lng, lat) => setLoc([lng, lat])}
+            placeholder="вул. Прикладна, 1"
+          />
 
           <div>
             <label htmlFor="desc" style={{ display: 'block', fontWeight: 600, fontSize: '0.9em', marginBottom: '0.4em' }}>Опис</label>
@@ -142,7 +170,7 @@ export default function ContributePage() {
 
           <div>
             <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Місцезнаходження</div>
-            <LocationPicker value={loc} onChange={(lng, lat) => setLoc([lng, lat])} />
+            <LocationPicker value={loc} onChange={pickLocation} />
           </div>
 
           <div>

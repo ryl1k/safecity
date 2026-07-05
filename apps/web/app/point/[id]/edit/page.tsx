@@ -1,14 +1,17 @@
 'use client';
 
-import { use, useEffect, useMemo, useState } from 'react';
+import { use, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import type { AccessibilityFeature, Category, FeatureValue } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { LocationPicker } from '@/components/LocationPicker';
+import { AddressAutocomplete } from '@/components/AddressAutocomplete';
 import { Button, Field, Segmented } from '@/components/ui';
 import { getCatalog } from '@/lib/catalog';
 import { ApiError } from '@/lib/api';
+import { invalidateBusinessMe } from '@/lib/business';
+import { reverseGeocode } from '@/lib/geocode';
 import { toast } from '@/lib/toast';
 import { supabase } from '@/lib/supabase';
 import { categoryLabel } from '@/lib/format';
@@ -34,6 +37,18 @@ export default function EditPointPage({ params }: { params: Promise<{ id: string
   const [values, setValues] = useState<Record<string, FeatureValue>>({});
   const [busy, setBusy] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const revAbort = useRef<AbortController | null>(null);
+
+  // User picked a spot on the map → drop the pin and reverse-geocode into the
+  // address field. Only fires on a real user pick, so the loaded address stays
+  // put on mount.
+  function pickLocation(lng: number, lat: number) {
+    setLoc([lng, lat]);
+    revAbort.current?.abort();
+    const ctrl = new AbortController();
+    revAbort.current = ctrl;
+    reverseGeocode(lng, lat, ctrl.signal).then((addr) => { if (addr) setAddress(addr); }).catch(() => {});
+  }
 
   useEffect(() => {
     (async () => {
@@ -59,7 +74,15 @@ export default function EditPointPage({ params }: { params: Promise<{ id: string
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const features = useMemo(() => catalog.filter((f) => f.categories.includes(category)), [catalog, category]);
+  // Wheelchair-only, stars first — matches the add-point form (blind-profile
+  // criteria aren't shown or scored anywhere in this mobility-focused app).
+  const features = useMemo(
+    () =>
+      catalog
+        .filter((f) => f.profile === 'wheelchair' && f.categories.includes(category))
+        .sort((a, b) => Number(b.critical) - Number(a.critical)),
+    [catalog, category],
+  );
 
   async function save(e: React.FormEvent) {
     e.preventDefault();
@@ -87,6 +110,7 @@ export default function EditPointPage({ params }: { params: Promise<{ id: string
     setDeleting(true);
     try {
       await deletePoint(id);
+      invalidateBusinessMe(); // may have been their last point → header gate updates
       toast('Точку видалено.', 'success');
       router.push('/business');
     } catch (err: unknown) {
@@ -108,7 +132,12 @@ export default function EditPointPage({ params }: { params: Promise<{ id: string
         ) : (
           <form onSubmit={save} style={{ display: 'flex', flexDirection: 'column', gap: '1.1em' }}>
             <Field label="Назва" required value={name} onChange={(e) => setName(e.target.value)} placeholder="напр. Кав'ярня «Кава»" />
-            <Field label="Адреса" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="вул. Прикладна, 1" />
+            <AddressAutocomplete
+              value={address}
+              onChange={setAddress}
+              onPick={(lng, lat) => setLoc([lng, lat])}
+              placeholder="вул. Прикладна, 1"
+            />
 
             <div>
               <label htmlFor="desc" style={{ display: 'block', fontWeight: 600, fontSize: '0.9em', marginBottom: '0.4em' }}>Опис</label>
@@ -147,7 +176,7 @@ export default function EditPointPage({ params }: { params: Promise<{ id: string
 
             <div>
               <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Місцезнаходження</div>
-              <LocationPicker value={loc} onChange={(lng, lat) => setLoc([lng, lat])} />
+              <LocationPicker value={loc} onChange={pickLocation} />
             </div>
 
             <fieldset style={{ border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', padding: '1em' }}>

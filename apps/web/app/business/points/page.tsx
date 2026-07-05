@@ -1,10 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Eye } from 'lucide-react';
+import type { AccessibilityFeature } from '@safecity/shared';
+import { accessLevel } from '@safecity/shared';
 import { Button } from '@/components/ui';
 import { categoryLabel } from '@/lib/format';
+import { levelLabel, levelColor } from '@/lib/filters';
+import { getCatalog } from '@/lib/catalog';
 import { toast } from '@/lib/toast';
 import { deletePoint } from '@/lib/points';
 import { useBusiness } from '@/lib/businessContext';
@@ -18,6 +22,8 @@ const verifyLabel: Record<string, { label: string; ok: boolean }> = {
 export default function BusinessPoints() {
   const { me, reload } = useBusiness();
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
+  useEffect(() => { void getCatalog().then(setCatalog).catch(() => {}); }, []);
 
   async function onDelete(id: string) {
     if (!confirm('Видалити цю точку? Дію не можна скасувати.')) return;
@@ -48,6 +54,7 @@ export default function BusinessPoints() {
         ) : (
           me.points.map((p, i) => {
             const v = verifyLabel[p.verifyStatus] ?? { label: p.verifyStatus, ok: false };
+            const lvl = catalog.length ? accessLevel(p.features, catalog, p.category) : null;
             return (
               <div
                 key={p.id}
@@ -64,6 +71,12 @@ export default function BusinessPoints() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.9em', fontSize: '0.85em' }}>
+                  {lvl && (
+                    <span title="Рівень доступності" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35em', fontWeight: 700, color: levelColor[lvl] }}>
+                      <span aria-hidden style={{ width: '0.55em', height: '0.55em', borderRadius: '50%', background: levelColor[lvl] }} />
+                      {levelLabel[lvl]}
+                    </span>
+                  )}
                   <span title="Перегляди" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3em', color: 'var(--sc-muted)', fontWeight: 700 }}><Eye size={15} aria-hidden /> {p.viewCount}</span>
                   <span style={{ color: v.ok ? 'var(--sc-ok)' : 'var(--sc-muted)', fontWeight: 700 }}>{v.label}</span>
                 </div>

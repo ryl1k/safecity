@@ -51,7 +51,8 @@ export default function BusinessOverview() {
         <section style={card}>
           <div style={{ fontWeight: 800, marginBottom: '0.3em' }}>Станьте бізнесом</div>
           <p style={{ margin: '0 0 1em', color: 'var(--sc-muted)', fontSize: '0.9em' }}>
-            Необмежена кількість точок, пріоритет у результатах пошуку та позначка бізнесу.
+            Необмежена кількість точок, пріоритет у пошуку, аналітика та графіки відгуків,
+            поради з доступності, порівняння із закладами поблизу та верифікація.
           </p>
           <Link href="/business/subscription" style={{ textDecoration: 'none' }}>
             <Button>Оформити підписку</Button>
