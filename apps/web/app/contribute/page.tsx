@@ -121,9 +121,9 @@ export default function ContributePage() {
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="map" />
       <main id="main-content" tabIndex={-1} style={{ flex: 1, width: '100%', maxWidth: 'min(100%, 620px)', margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
-        <h1 style={{ margin: '0 0 1em', fontSize: '1.7em', fontWeight: 800 }}>Додати місце</h1>
+        <h1 className="sc-animate-in" style={{ margin: '0 0 1em', fontSize: '1.7em', fontWeight: 800 }}>Додати місце</h1>
 
-        <form onSubmit={submit} style={{ display: 'flex', flexDirection: 'column', gap: '1.1em' }}>
+        <form onSubmit={submit} className="sc-stagger" style={{ display: 'flex', flexDirection: 'column', gap: '1.1em' }}>
           <Field label="Назва" required value={name} onChange={(e) => setName(e.target.value)} placeholder="напр. Кав'ярня «Кава»" />
           <AddressAutocomplete
             value={address}

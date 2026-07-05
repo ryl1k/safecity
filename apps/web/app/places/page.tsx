@@ -99,6 +99,7 @@ export default function PlacesPage() {
       <main
         id="main-content"
         tabIndex={-1}
+        className="sc-stagger"
         style={{ flex: 1, width: '100%', maxWidth: 'min(100%, 860px)', margin: '0 auto', padding: '1.4em 1.25em 4em', display: 'flex', flexDirection: 'column', gap: '1em' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>
