@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 /** Fades + slides its children in when scrolled into view (once). Honors reduced motion. */
-export function Reveal({ children, delay = 0 }: { children: React.ReactNode; delay?: number }) {
+export function Reveal({ children, delay = 0, className, style }: { children: React.ReactNode; delay?: number; className?: string; style?: React.CSSProperties }) {
   const ref = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(false);
 
@@ -33,10 +33,12 @@ export function Reveal({ children, delay = 0 }: { children: React.ReactNode; del
   return (
     <div
       ref={ref}
+      className={className}
       style={{
         opacity: shown ? 1 : 0,
         transform: shown ? 'none' : 'translateY(24px)',
         transition: `opacity .55s ease ${delay}ms, transform .55s ease ${delay}ms`,
+        ...style,
       }}
     >
       {children}

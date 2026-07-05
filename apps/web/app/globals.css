@@ -79,6 +79,32 @@
   .sc-rise, .sc-gauge-arc, .sc-bar-fill, .sc-draw, .sc-stagger > * { animation: none !important; }
 }
 
+/* Landing "how it works" scroll-snap. `proximity` (not mandatory) so the hero,
+   reviews and CTA above/below stay freely scrollable — only the tall capability
+   sections gently lock as you reach them. Scoped to the landing route via
+   .sc-snap-page on <html> (toggled by <ScrollSnap/>), so it never leaks elsewhere.
+   scroll-padding-top clears the sticky header so snapped titles aren't hidden. */
+html.sc-snap-page { scroll-snap-type: y proximity; scroll-padding-top: 4.6em; }
+.sc-snap-section { scroll-snap-align: start; scroll-snap-stop: normal; }
+@media (prefers-reduced-motion: reduce) {
+  html.sc-snap-page { scroll-snap-type: none; }
+}
+
+/* Capability section: text + visual two-up, alternating sides; stacks on narrow
+   (text always first in DOM, so mobile reads text → visual regardless of flip). */
+.sc-cap-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 2.6em; align-items: center; width: 100%; }
+.sc-cap-flip .sc-cap-text { order: 2; }
+.sc-cap-flip .sc-cap-visual { order: 1; }
+@media (max-width: 900px) {
+  .sc-cap-grid { grid-template-columns: 1fr; gap: 1.7em; }
+  .sc-cap-flip .sc-cap-text, .sc-cap-flip .sc-cap-visual { order: 0; }
+}
+
+/* Slow drift for the big watermark icon behind each capability visual. */
+@keyframes sc-drift { from { transform: translateY(0.4em); } to { transform: translateY(-0.4em); } }
+.sc-drift { animation: sc-drift 5s ease-in-out infinite alternate; }
+@media (prefers-reduced-motion: reduce) { .sc-drift { animation: none; } }
+
 /* Collapse nav/action labels to icons before the header would wrap to two rows. */
 @media (max-width: 1180px) {
   .sc-hide-sm { display: none; }
