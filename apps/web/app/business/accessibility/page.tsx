@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ShieldCheck, ShieldQuestion, Clock, CircleHelp, Wrench, PartyPopper, Check, X, HelpCircle } from 'lucide-react';
+import Link from 'next/link';
+import { ShieldCheck, ShieldQuestion, Clock, CircleHelp, Wrench, PartyPopper, Check, X, HelpCircle, SquarePen } from 'lucide-react';
 import type { AccessibilityFeature, AccessLevel, CriterionState, FeatureValue, LevelBreakdown } from '@safecity/shared';
 import { accessLevelBreakdown } from '@safecity/shared';
 import { Button } from '@/components/ui';
@@ -57,6 +58,39 @@ function VerificationCard({ state, busy, onRequest }: { state: VerifyState; busy
           {busy ? 'Надсилання…' : 'Запросити верифікацію'}
         </Button>
       )}
+    </section>
+  );
+}
+
+// ── Data completeness (how much is assessed) + shortcut to edit the point ─────
+// "unknown" criteria are not-yet-assessed; confirming them makes the score (and
+// any verification) rest on real data instead of gaps.
+function DataCompletenessCard({ bd, pointId, delay }: { bd: LevelBreakdown; pointId: string; delay: number }) {
+  const total = bd.criteria.length;
+  const unknown = bd.criteria.filter((c) => c.value === 'unknown').length;
+  const assessed = total - unknown;
+  const pct = total > 0 ? Math.round((assessed / total) * 100) : 100;
+  const done = unknown === 0;
+  return (
+    <section className="sc-rise" style={{ ...card, gap: '0.7em', animationDelay: `${delay}ms` }}>
+      <div style={sectionLabel}>Заповненість даних</div>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: '0.5em' }}>
+        <span style={{ fontSize: '0.9em', color: 'var(--sc-muted)' }}>
+          <strong style={{ color: 'var(--sc-text)', fontSize: '1.15em' }}>{assessed}</strong> / {total} критеріїв оцінено
+        </span>
+        <span style={{ fontWeight: 800, color: done ? 'var(--sc-ok)' : 'var(--sc-text)' }}>{pct}%</span>
+      </div>
+      <div style={{ height: '0.55em', borderRadius: '1em', background: 'var(--sc-surface-2)', overflow: 'hidden' }}>
+        <div className="sc-bar-fill" style={{ width: `${pct}%`, height: '100%', background: done ? 'var(--sc-ok)' : 'var(--sc-primary)', borderRadius: '1em' }} />
+      </div>
+      <span style={{ color: 'var(--sc-muted)', fontSize: '0.88em' }}>
+        {done
+          ? 'Усі критерії оцінено — дані готові до верифікації.'
+          : <>Ще <strong style={{ color: 'var(--sc-text)' }}>{unknown}</strong> без оцінки — підтвердьте, щоб оцінка спиралась на реальні дані.</>}
+      </span>
+      <Link href={`/point/${pointId}/edit`} className="sc-foc" style={{ display: 'inline-flex', alignItems: 'center', gap: '0.45em', alignSelf: 'flex-start', minHeight: '2.5em', padding: '0 1em', borderRadius: '0.5em', textDecoration: 'none', fontWeight: 700, fontSize: '0.88em', background: 'var(--sc-ok)', color: '#fff' }}>
+        <SquarePen size={16} aria-hidden /> Оновити дані
+      </Link>
     </section>
   );
 }
@@ -234,7 +268,7 @@ export default function BusinessAccessibility() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2em' }}>
-      <style>{`.sc-a11y-row2 { display: grid; grid-template-columns: 1.15fr 2fr; gap: 1em; align-items: stretch; } @media (max-width: 880px) { .sc-a11y-row2 { grid-template-columns: 1fr; } }`}</style>
+      <style>{`.sc-a11y-row2 { display: grid; grid-template-columns: 1.15fr 2fr; gap: 1em; align-items: stretch; } .sc-verify-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1em; align-items: stretch; } @media (max-width: 880px) { .sc-a11y-row2, .sc-verify-row { grid-template-columns: 1fr; } }`}</style>
 
       <DashboardHeader title="Доступність і верифікація" />
 
@@ -244,8 +278,9 @@ export default function BusinessAccessibility() {
         <section style={card}><p style={{ margin: 0, color: 'var(--sc-muted)' }}>Немає критеріїв доступності для цієї категорії.</p></section>
       ) : (
         <>
-          <div key={`vb-${point.id}`} style={{ maxWidth: 620 }}>
+          <div key={`vb-${point.id}`} className="sc-verify-row">
             <VerificationCard state={verifyState(point)} busy={busyId === point.id} onRequest={() => askVerify(point.id)} />
+            <DataCompletenessCard bd={bd} pointId={point.id} delay={60} />
           </div>
           <div key={`cards-${point.id}`} style={{ display: 'flex', flexDirection: 'column', gap: '1em' }}>
             <div className="sc-a11y-row2">
