@@ -11,12 +11,12 @@ import { ScrollSnap } from '@/components/ScrollSnap';
 
 // ── Capability section (one per "how it works" step) ──────────────────────────
 const medallion = {
-  position: 'relative', width: '3.4em', height: '3.4em', flexShrink: 0, borderRadius: '1em',
+  position: 'relative', width: '4.6em', height: '4.6em', flexShrink: 0, borderRadius: '1.25em',
   background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', display: 'grid', placeItems: 'center',
 } as const;
 const badgeNum = {
-  position: 'absolute', top: '-0.5em', left: '-0.5em', width: '1.8em', height: '1.8em', borderRadius: '50%',
-  background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '0.8em',
+  position: 'absolute', top: '-0.55em', left: '-0.55em', width: '2em', height: '2em', borderRadius: '50%',
+  background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '0.82em',
 } as const;
 const capCta = {
   display: 'inline-flex', alignItems: 'center', gap: '0.5em', minHeight: '3em', padding: '0 1.4em',
@@ -51,22 +51,22 @@ function Capability({
       className="sc-snap-section"
       style={{
         minHeight: '88vh', display: 'flex', alignItems: 'center', padding: '3.5em 0',
-        // full-bleed band; alternating tint clearly separates neighbouring sections
-        // (color-mix keeps it theme-aware — a teal band in light, a dark teal band in dark)
+        // full-bleed tint band that fades to the base bg at the top/bottom edges, so
+        // neighbouring sections blend into each other (no hard seam). color-mix keeps
+        // it theme-aware — a teal band in light, a dark teal band in dark.
         background: tint
-          ? 'linear-gradient(160deg, color-mix(in srgb, var(--sc-primary) 15%, var(--sc-surface)), color-mix(in srgb, var(--sc-primary) 5%, var(--sc-surface)))'
+          ? 'linear-gradient(180deg, var(--sc-bg) 0%, color-mix(in srgb, var(--sc-primary) 14%, var(--sc-surface)) 26%, color-mix(in srgb, var(--sc-primary) 14%, var(--sc-surface)) 74%, var(--sc-bg) 100%)'
           : 'var(--sc-bg)',
-        borderTop: 'var(--sc-bw) solid var(--sc-border)',
       }}
     >
       <div className={`sc-cap-grid${flip ? ' sc-cap-flip' : ''}`} style={{ maxWidth: 1080, margin: '0 auto', padding: '0 1.25em' }}>
         <Reveal className="sc-cap-text">
           <div style={{ display: 'flex', flexDirection: 'column', gap: '1em', alignItems: 'flex-start' }}>
             <span aria-hidden style={medallion}>
-              <Icon size={26} />
+              <Icon size={38} />
               <span style={badgeNum}>{n}</span>
             </span>
-            <h2 style={{ margin: 0, fontSize: 'clamp(1.6rem, 3.4vw, 2.4rem)', lineHeight: 1.12, letterSpacing: '-0.02em', fontWeight: 800 }}>{title}</h2>
+            <h2 style={{ margin: 0, fontSize: 'clamp(1.6rem, 3.4vw, 2.4rem)', lineHeight: 1.12, letterSpacing: '-0.02em', fontWeight: 800, hyphens: 'none' }}>{title}</h2>
             <p style={{ margin: 0, fontSize: '1.08em', lineHeight: 1.6, color: 'var(--sc-muted)', maxWidth: '46ch' }}>{body}</p>
             <ul style={{ margin: '0.2em 0 0', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.55em' }}>
               {bullets.map((b) => (
