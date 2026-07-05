@@ -62,10 +62,13 @@ function countIntoBins(times: number[], starts: number[]): number[] {
   return counts;
 }
 
-// Simple CSS bar chart. Values align 1:1 with labels.
 // Responsive multi-series area/line graph. Strokes stay crisp (non-scaling) while
-// the x-axis stretches to fill the container; labels render as HTML below.
-function LineChart({ labels, series, height = 150 }: { labels: string[]; series: { name: string; color: string; values: number[] }[]; height?: number }) {
+// the x-axis stretches to fill the container; a left Y axis with gridlines gives
+// the peaks a scale, and hovering reveals the exact value(s) at each point.
+// (Dots/guide/tooltip render as HTML so they don't distort under the non-uniform
+// x-stretch of the SVG.)
+function LineChart({ labels, series, height = 150 }: { labels: string[]; series: { name: string; label?: string; color: string; values: number[] }[]; height?: number }) {
+  const [hover, setHover] = useState<number | null>(null);
   const n = labels.length;
   const W = 1000;
   const padTop = 10;
@@ -73,27 +76,77 @@ function LineChart({ labels, series, height = 150 }: { labels: string[]; series:
   const innerH = height - padTop - padBottom;
   const max = Math.max(1, ...series.flatMap((s) => s.values));
   const x = (i: number) => (n <= 1 ? W / 2 : (i / (n - 1)) * W);
+  const xPct = (i: number) => (n <= 1 ? 50 : (i / (n - 1)) * 100);
   const y = (v: number) => padTop + innerH - (v / max) * innerH;
   const base = padTop + innerH;
+  const ticks = Array.from(new Set([0, Math.round(max / 2), max]));
   return (
-    <div style={{ marginTop: '0.4em' }}>
-      <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none" role="img" aria-label="Графік за часом" style={{ display: 'block' }}>
-        <line x1={0} y1={base} x2={W} y2={base} stroke="var(--sc-border)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
-        {series.map((s) => {
-          const line = s.values.map((v, i) => `${x(i)},${y(v)}`).join(' ');
-          const area = `M0,${base} ` + s.values.map((v, i) => `L${x(i)},${y(v)}`).join(' ') + ` L${W},${base} Z`;
-          return (
-            <g key={s.name}>
-              <path d={area} fill={s.color} opacity={0.12} />
-              <polyline className="sc-draw" points={line} fill="none" stroke={s.color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" pathLength={1} strokeDasharray={1} strokeDashoffset={1} />
-            </g>
-          );
-        })}
-      </svg>
-      <div style={{ display: 'flex', marginTop: '0.3em' }}>
-        {labels.map((l, i) => (
-          <span key={i} style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: '0.62em', color: 'var(--sc-muted)', whiteSpace: 'nowrap', overflow: 'hidden' }}>{l}</span>
+    <div style={{ marginTop: '0.4em', display: 'flex', gap: '0.4em' }}>
+      {/* Y axis ticks */}
+      <div aria-hidden style={{ position: 'relative', width: '2.2em', height, flexShrink: 0 }}>
+        {ticks.map((t) => (
+          <span key={t} style={{ position: 'absolute', right: 0, top: y(t), transform: 'translateY(-50%)', fontSize: '0.62em', color: 'var(--sc-muted)', lineHeight: 1 }}>{t}</span>
         ))}
+      </div>
+      {/* chart + x labels */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div
+          style={{ position: 'relative', height }}
+          onMouseLeave={() => setHover(null)}
+          onMouseMove={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            if (rect.width === 0 || n === 0) return;
+            const rel = (e.clientX - rect.left) / rect.width;
+            setHover(Math.max(0, Math.min(n - 1, Math.round(rel * (n - 1)))));
+          }}
+        >
+          <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none" role="img" aria-label="Графік за часом" style={{ display: 'block' }}>
+            {ticks.map((t) => (
+              <line key={t} x1={0} y1={y(t)} x2={W} y2={y(t)} stroke="var(--sc-border)" strokeWidth={1} strokeDasharray={t === 0 ? undefined : '3 4'} opacity={t === 0 ? 1 : 0.6} vectorEffect="non-scaling-stroke" />
+            ))}
+            {series.map((s) => {
+              const line = s.values.map((v, i) => `${x(i)},${y(v)}`).join(' ');
+              const area = `M0,${base} ` + s.values.map((v, i) => `L${x(i)},${y(v)}`).join(' ') + ` L${W},${base} Z`;
+              return (
+                <g key={s.name}>
+                  <path d={area} fill={s.color} opacity={0.12} />
+                  <polyline className="sc-draw" points={line} fill="none" stroke={s.color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" pathLength={1} strokeDasharray={1} strokeDashoffset={1} />
+                </g>
+              );
+            })}
+          </svg>
+          {hover !== null && (
+            <>
+              <div aria-hidden style={{ position: 'absolute', left: `${xPct(hover)}%`, top: padTop, bottom: padBottom, width: 1, background: 'var(--sc-border-strong)', transform: 'translateX(-0.5px)', pointerEvents: 'none' }} />
+              {series.map((s) => (
+                <div key={s.name} aria-hidden style={{ position: 'absolute', left: `${xPct(hover)}%`, top: y(s.values[hover]!), width: 8, height: 8, borderRadius: '50%', background: s.color, border: '2px solid var(--sc-surface)', transform: 'translate(-50%, -50%)', pointerEvents: 'none' }} />
+              ))}
+              <div
+                role="status"
+                style={{
+                  position: 'absolute', left: `${xPct(hover)}%`, top: 0,
+                  transform: `translateX(${xPct(hover) < 15 ? '0' : xPct(hover) > 85 ? '-100%' : '-50%'})`,
+                  background: 'var(--sc-text)', color: 'var(--sc-surface)', borderRadius: '0.5em', padding: '0.35em 0.6em',
+                  fontSize: '0.7em', fontWeight: 700, whiteSpace: 'nowrap', pointerEvents: 'none', zIndex: 2, boxShadow: '0 2px 10px rgba(0,0,0,0.22)',
+                }}
+              >
+                <div style={{ opacity: 0.7, fontWeight: 600, marginBottom: series.length > 1 ? '0.25em' : 0 }}>{labels[hover]}</div>
+                {series.map((s) => (
+                  <div key={s.name} style={{ display: 'flex', alignItems: 'center', gap: '0.35em' }}>
+                    <span aria-hidden style={{ width: 7, height: 7, borderRadius: '50%', background: s.color, flexShrink: 0 }} />
+                    {series.length > 1 && <span style={{ opacity: 0.8 }}>{s.label ?? s.name}:</span>}
+                    <span>{s.values[hover]}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+        <div style={{ display: 'flex', marginTop: '0.3em' }}>
+          {labels.map((l, i) => (
+            <span key={i} style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: '0.62em', color: hover === i ? 'var(--sc-text)' : 'var(--sc-muted)', fontWeight: hover === i ? 700 : 400, whiteSpace: 'nowrap', overflow: 'hidden' }}>{l}</span>
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -227,7 +280,7 @@ export default function BusinessAnalytics() {
         {reviewsInRange === 0 ? (
           <p style={{ margin: '0.4em 0 0', color: 'var(--sc-muted)', fontSize: '0.88em' }}>За обраний період відгуків немає.</p>
         ) : (
-          <LineChart labels={reviewBins.map((b) => b.label)} series={[{ name: 'reviews', color: 'var(--sc-primary)', values: reviewBins.map((b) => b.value) }]} />
+          <LineChart labels={reviewBins.map((b) => b.label)} series={[{ name: 'reviews', label: 'Відгуки', color: 'var(--sc-primary)', values: reviewBins.map((b) => b.value) }]} />
         )}
       </section>
 
@@ -247,8 +300,8 @@ export default function BusinessAnalytics() {
             <LineChart
               labels={metricBins.map((b) => b.label)}
               series={[
-                { name: 'views', color: 'var(--sc-primary)', values: metricBins.map((b) => b.views) },
-                { name: 'search', color: 'var(--sc-accent)', values: metricBins.map((b) => b.search) },
+                { name: 'views', label: 'Перегляди', color: 'var(--sc-primary)', values: metricBins.map((b) => b.views) },
+                { name: 'search', label: 'Пошук', color: 'var(--sc-accent)', values: metricBins.map((b) => b.search) },
               ]}
             />
             <p style={{ margin: '0.5em 0 0', fontSize: '0.72em', color: 'var(--sc-muted)' }}>
