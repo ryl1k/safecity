@@ -113,32 +113,36 @@ export function accessLevel(
   return 'low';
 }
 
-/** One accessibility criterion that is not yet confirmed present, with the score
- * gain from setting it to "yes". `value` is 'no' (a real barrier — a physical
- * change) or 'unknown' (not yet assessed — an easy confirm). */
-export interface CriterionGap {
+/** One accessibility criterion's contribution to the score. All figures are in
+ * score points (out of 100). `value` is 'yes' (confirmed present), 'no' (a real
+ * barrier — a physical change) or 'unknown' (not assessed — an easy confirm). */
+export interface CriterionState {
   key: string;
-  weight: number; // raw weight (score points, since each category's set sums to 100)
-  value: FeatureValue; // 'no' | 'unknown' (never 'yes' — those aren't gaps)
-  gain: number; // score points (0..100) added by setting this criterion to "yes"
+  weight: number; // this criterion's share of the 100-point score
+  value: FeatureValue;
+  earned: number; // points currently earned: yes → weight, no → 0, unknown → weight/2
+  gain: number; // points added by setting it to "yes" (0 when already yes)
+  critical: boolean; // a "star" criterion (entrance / doors / ramp)
 }
 
 /** Actionable breakdown of a point's accessibility level: the current score, how
- * far it is from Medium/High, and which criteria to improve (highest-impact first).
- * Returns null when no weighted criteria apply to the category. */
+ * far it is from Medium/High, and the per-criterion composition. Returns null when
+ * no weighted criteria apply to the category. */
 export interface LevelBreakdown {
   level: AccessLevel;
   score: number; // 0..100 (rounded)
   toMedium: number; // score points needed to reach Medium (51); 0 if already there
   toHigh: number; // score points needed to reach High (75); 0 if already there
-  gaps: CriterionGap[]; // criteria not yet "yes", highest gain first
+  criteria: CriterionState[]; // all applicable criteria, highest weight first
+  gaps: CriterionState[]; // criteria not yet "yes", highest gain first
 }
 
 /**
- * Decompose the accessibility level into an actionable plan — powers the B2B
- * "what's missing to reach High, and what's easiest" view. Uses the SAME weights
- * as accessLevel(), so guidance never contradicts the badge. `unknown` gaps are
- * the easy wins (confirm/document, no construction); `no` gaps need a real change.
+ * Decompose the accessibility level — powers the B2B score gauge, the
+ * "what's missing to reach High" plan, and the per-criterion breakdown. Uses the
+ * SAME weights as accessLevel(), so guidance never contradicts the badge.
+ * `unknown` gaps are easy wins (confirm/document, no construction); `no` gaps need
+ * a real change. All figures are normalized to score points out of 100.
  */
 export function accessLevelBreakdown(
   features: PointFeatureMap,
@@ -151,29 +155,27 @@ export function accessLevelBreakdown(
   );
   if (applicable.length === 0) return null;
 
-  let earned = 0;
   let total = 0;
-  const gaps: CriterionGap[] = [];
-  for (const f of applicable) {
-    const w = WHEELCHAIR_WEIGHTS[f.key] ?? 0;
-    total += w;
-    const raw = features[f.key];
-    const v: FeatureValue = raw === 'yes' || raw === 'no' ? raw : 'unknown';
-    const contrib = v === 'yes' ? w : v === 'no' ? 0 : 0.5 * w;
-    earned += contrib;
-    if (v !== 'yes') gaps.push({ key: f.key, weight: w, value: v, gain: w - contrib });
-  }
-  const score = (earned / total) * 100;
-  // Normalize weight units → score points (total is 100 for full catalogs, less
-  // if some criteria are absent from this category).
-  for (const g of gaps) g.gain = (g.gain / total) * 100;
-  gaps.sort((a, b) => b.gain - a.gain);
+  for (const f of applicable) total += WHEELCHAIR_WEIGHTS[f.key] ?? 0;
+
+  const criteria: CriterionState[] = applicable.map((f) => {
+    const raw = WHEELCHAIR_WEIGHTS[f.key] ?? 0;
+    const weight = (raw / total) * 100; // normalize → score points
+    const v: FeatureValue = features[f.key] === 'yes' || features[f.key] === 'no' ? (features[f.key] as FeatureValue) : 'unknown';
+    const earned = v === 'yes' ? weight : v === 'no' ? 0 : weight / 2;
+    return { key: f.key, weight, value: v, earned, gain: weight - earned, critical: Boolean(f.critical) };
+  });
+
+  const score = criteria.reduce((s, c) => s + c.earned, 0);
+  const byWeight = [...criteria].sort((a, b) => b.weight - a.weight);
+  const gaps = criteria.filter((c) => c.value !== 'yes').sort((a, b) => b.gain - a.gain);
 
   return {
     level: accessLevel(features, catalog, category, profile),
     score: Math.round(score),
     toMedium: Math.max(0, Math.round(51 - score)),
     toHigh: Math.max(0, Math.round(75 - score)),
+    criteria: byWeight,
     gaps,
   };
 }
