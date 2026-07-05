@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, MapPin, ShieldCheck, BarChart3, CreditCard, Lock, type LucideIcon } from 'lucide-react';
+import { LayoutDashboard, MapPin, ShieldCheck, BarChart3, MessageSquareWarning, CreditCard, Lock, type LucideIcon } from 'lucide-react';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { BusinessPaywall } from '@/components/BusinessPaywall';
@@ -20,6 +20,7 @@ const NAV: { href: string; label: string; icon: LucideIcon; exact?: boolean; pre
   { href: '/business/points', label: 'Мої точки', icon: MapPin },
   { href: '/business/accessibility', label: 'Доступність', icon: ShieldCheck, premium: true },
   { href: '/business/analytics', label: 'Аналітика', icon: BarChart3, premium: true },
+  { href: '/business/reports', label: 'Звернення', icon: MessageSquareWarning },
   { href: '/business/subscription', label: 'Підписка', icon: CreditCard },
 ];
 

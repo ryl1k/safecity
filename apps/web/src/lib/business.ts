@@ -99,3 +99,26 @@ export interface BusinessAnalyticsData {
 export async function businessAnalytics(): Promise<BusinessAnalyticsData> {
   return api.get<BusinessAnalyticsData>('/business/analytics', { auth: true });
 }
+
+/** One visitor-submitted problem report on a point the caller owns. */
+export interface BusinessReport {
+  id: string;
+  title: string;
+  description: string | null;
+  status: string; // reported | confirmed | escalated | resolved
+  severity: number; // 1..3
+  confirmations: number;
+  photos: string[];
+  pointId: string;
+  pointName: string;
+  createdAt: string;
+}
+
+/**
+ * Problem reports visitors filed on the caller's own points — an inbox of issues
+ * to fix (open first, then most severe). Reports on seeded points are handled by
+ * moderators, not surfaced here.
+ */
+export async function businessReports(): Promise<BusinessReport[]> {
+  return api.get<BusinessReport[]>('/business/reports', { auth: true });
+}

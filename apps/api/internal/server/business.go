@@ -54,6 +54,22 @@ func (s *Server) handleBusinessMe(w http.ResponseWriter, r *http.Request) {
 	httpx.JSON(w, http.StatusOK, me)
 }
 
+// handleBusinessReports: GET /business/reports — visitor-submitted problem reports
+// on the caller's own points (an inbox of issues to fix).
+func (s *Server) handleBusinessReports(w http.ResponseWriter, r *http.Request) {
+	p, ok := s.principal(w, r)
+	if !ok {
+		return
+	}
+	reports, err := s.store.GetBusinessReports(r.Context(), p.UserID)
+	if err != nil {
+		s.log.Error("business reports", "err", err)
+		httpx.Error(w, http.StatusInternalServerError, "internal", "could not load reports")
+		return
+	}
+	httpx.JSON(w, http.StatusOK, reports)
+}
+
 // handleRequestPointVerification: POST /business/points/{id}/request-verification —
 // the point's owner asks a moderator to verify it. The moderator then approves via
 // POST /admin/points/{id}/verify. 404 if the point isn't the caller's.

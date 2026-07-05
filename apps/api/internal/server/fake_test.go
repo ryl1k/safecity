@@ -52,6 +52,10 @@ type fakeStore struct {
 	bizAnalytics    store.BusinessAnalytics
 	bizAnalyticsErr error
 
+	// GetBusinessReports
+	bizReports    []store.BusinessReport
+	bizReportsErr error
+
 	// RequestPointVerification
 	gotVerifyReqID string
 	verifyReqErr   error
@@ -188,6 +192,11 @@ func (f *fakeStore) GetBusinessMe(_ context.Context, userID string) (store.Busin
 func (f *fakeStore) GetBusinessAnalytics(_ context.Context, userID string) (store.BusinessAnalytics, error) {
 	f.gotUser = userID
 	return f.bizAnalytics, f.bizAnalyticsErr
+}
+
+func (f *fakeStore) GetBusinessReports(_ context.Context, userID string) ([]store.BusinessReport, error) {
+	f.gotUser = userID
+	return f.bizReports, f.bizReportsErr
 }
 
 func (f *fakeStore) RequestPointVerification(_ context.Context, userID, pointID string) error {

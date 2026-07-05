@@ -50,6 +50,7 @@ type DataStore interface {
 	SubscribeBusiness(ctx context.Context, userID, plan string) error
 	GetBusinessMe(ctx context.Context, userID string) (store.BusinessMe, error)
 	GetBusinessAnalytics(ctx context.Context, userID string) (store.BusinessAnalytics, error)
+	GetBusinessReports(ctx context.Context, userID string) ([]store.BusinessReport, error)
 	RequestPointVerification(ctx context.Context, userID, pointID string) error
 	// civic writes
 	CreateProblem(ctx context.Context, userID string, in store.NewProblem) (store.Problem, error)
@@ -258,6 +259,7 @@ func (s *Server) routes() {
 			r.Post("/business/subscribe", s.handleSubscribeBusiness)
 			r.Get("/business/me", s.handleBusinessMe)
 			r.Get("/business/analytics", s.handleBusinessAnalytics)
+			r.Get("/business/reports", s.handleBusinessReports)
 			r.Post("/business/points/{id}/request-verification", s.handleRequestPointVerification)
 		}
 	})

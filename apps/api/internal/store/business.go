@@ -100,6 +100,57 @@ func (s *Store) GetBusinessMe(ctx context.Context, userID string) (BusinessMe, e
 	return me, classify(err)
 }
 
+// BusinessReport is one problem a visitor reported on a point the caller owns.
+// Reports on seeded points (points.created_by IS NULL) never surface here — those
+// are handled by the moderator surface (GET /admin/problems).
+type BusinessReport struct {
+	ID            string    `json:"id"`
+	Title         string    `json:"title"`
+	Description   *string   `json:"description"`
+	Status        string    `json:"status"`
+	Severity      int       `json:"severity"`
+	Confirmations int       `json:"confirmations"`
+	Photos        []string  `json:"photos"`
+	PointID       string    `json:"pointId"`
+	PointName     string    `json:"pointName"`
+	CreatedAt     time.Time `json:"createdAt"`
+}
+
+const businessReportsSQL = `
+select p.id::text, p.title, p.description, p.status::text, p.severity,
+       p.confirmations, coalesce(p.photos, '{}'), pt.id::text, pt.name, p.created_at
+from problems p
+join points pt on pt.id = p.point_id
+where pt.created_by = auth.uid()
+order by (p.status = 'resolved'), p.severity desc, p.created_at desc
+limit 500`
+
+// GetBusinessReports returns the visitor-submitted problem reports on the points
+// the caller created — an inbox of issues to fix, open first, then most severe.
+func (s *Store) GetBusinessReports(ctx context.Context, userID string) ([]BusinessReport, error) {
+	out := []BusinessReport{}
+	err := s.db.WithUser(ctx, userID, func(tx pgx.Tx) error {
+		rows, e := tx.Query(ctx, businessReportsSQL)
+		if e != nil {
+			return e
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var r BusinessReport
+			if e := rows.Scan(&r.ID, &r.Title, &r.Description, &r.Status, &r.Severity,
+				&r.Confirmations, &r.Photos, &r.PointID, &r.PointName, &r.CreatedAt); e != nil {
+				return e
+			}
+			if r.Photos == nil {
+				r.Photos = []string{}
+			}
+			out = append(out, r)
+		}
+		return rows.Err()
+	})
+	return out, classify(err)
+}
+
 // RequestPointVerification flags one of the caller's points for moderator review.
 // PT404 (not owned) → ErrNotFound; already-verified points are a no-op.
 func (s *Store) RequestPointVerification(ctx context.Context, userID, pointID string) error {
