@@ -62,19 +62,38 @@ function countIntoBins(times: number[], starts: number[]): number[] {
 }
 
 // Simple CSS bar chart. Values align 1:1 with labels.
-function Bars({ bins, color, unit }: { bins: { label: string; value: number }[]; color: string; unit?: string }) {
-  const max = Math.max(1, ...bins.map((b) => b.value));
+// Responsive multi-series area/line graph. Strokes stay crisp (non-scaling) while
+// the x-axis stretches to fill the container; labels render as HTML below.
+function LineChart({ labels, series, height = 150 }: { labels: string[]; series: { name: string; color: string; values: number[] }[]; height?: number }) {
+  const n = labels.length;
+  const W = 1000;
+  const padTop = 10;
+  const padBottom = 8;
+  const innerH = height - padTop - padBottom;
+  const max = Math.max(1, ...series.flatMap((s) => s.values));
+  const x = (i: number) => (n <= 1 ? W / 2 : (i / (n - 1)) * W);
+  const y = (v: number) => padTop + innerH - (v / max) * innerH;
+  const base = padTop + innerH;
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', height: 120, marginTop: '0.3em' }}>
-      {bins.map((b, i) => (
-        <div key={i} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.25em', height: '100%', justifyContent: 'flex-end' }}>
-          <div
-            title={`${b.label}: ${b.value}${unit ? ' ' + unit : ''}`}
-            style={{ width: '100%', maxWidth: 26, height: `${(b.value / max) * 100}%`, minHeight: b.value > 0 ? 3 : 0, background: color, borderRadius: '3px 3px 0 0' }}
-          />
-          <span style={{ fontSize: '0.6em', color: 'var(--sc-muted)', whiteSpace: 'nowrap', overflow: 'hidden', maxWidth: 30 }}>{b.label}</span>
-        </div>
-      ))}
+    <div style={{ marginTop: '0.4em' }}>
+      <svg viewBox={`0 0 ${W} ${height}`} width="100%" height={height} preserveAspectRatio="none" role="img" aria-label="Графік за часом" style={{ display: 'block' }}>
+        <line x1={0} y1={base} x2={W} y2={base} stroke="var(--sc-border)" strokeWidth={1} vectorEffect="non-scaling-stroke" />
+        {series.map((s) => {
+          const line = s.values.map((v, i) => `${x(i)},${y(v)}`).join(' ');
+          const area = `M0,${base} ` + s.values.map((v, i) => `L${x(i)},${y(v)}`).join(' ') + ` L${W},${base} Z`;
+          return (
+            <g key={s.name}>
+              <path d={area} fill={s.color} opacity={0.12} />
+              <polyline className="sc-draw" points={line} fill="none" stroke={s.color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" pathLength={1} strokeDasharray={1} strokeDashoffset={1} />
+            </g>
+          );
+        })}
+      </svg>
+      <div style={{ display: 'flex', marginTop: '0.3em' }}>
+        {labels.map((l, i) => (
+          <span key={i} style={{ flex: 1, minWidth: 0, textAlign: 'center', fontSize: '0.62em', color: 'var(--sc-muted)', whiteSpace: 'nowrap', overflow: 'hidden' }}>{l}</span>
+        ))}
+      </div>
     </div>
   );
 }
@@ -165,7 +184,7 @@ export default function BusinessAnalytics() {
   const hasMetricDeltas = metricBins.some((b) => b.views > 0 || b.search > 0);
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2em' }}>
+    <div className="sc-stagger" style={{ display: 'flex', flexDirection: 'column', gap: '1.2em' }}>
       <h1 style={{ margin: 0, fontSize: '1.6em', fontWeight: 800 }}>Аналітика</h1>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.9em' }}>
@@ -207,7 +226,7 @@ export default function BusinessAnalytics() {
         {reviewsInRange === 0 ? (
           <p style={{ margin: '0.4em 0 0', color: 'var(--sc-muted)', fontSize: '0.88em' }}>За обраний період відгуків немає.</p>
         ) : (
-          <Bars bins={reviewBins} color="var(--sc-primary)" unit="відг." />
+          <LineChart labels={reviewBins.map((b) => b.label)} series={[{ name: 'reviews', color: 'var(--sc-primary)', values: reviewBins.map((b) => b.value) }]} />
         )}
       </section>
 
@@ -224,8 +243,13 @@ export default function BusinessAnalytics() {
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35em' }}><span aria-hidden style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--sc-primary)' }} /> Перегляди</span>
               <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35em' }}><span aria-hidden style={{ width: 10, height: 10, borderRadius: 2, background: 'var(--sc-accent)' }} /> Пошук</span>
             </div>
-            <Bars bins={metricBins.map((b) => ({ label: b.label, value: b.views }))} color="var(--sc-primary)" unit="переглядів" />
-            <Bars bins={metricBins.map((b) => ({ label: b.label, value: b.search }))} color="var(--sc-accent)" unit="у пошуку" />
+            <LineChart
+              labels={metricBins.map((b) => b.label)}
+              series={[
+                { name: 'views', color: 'var(--sc-primary)', values: metricBins.map((b) => b.views) },
+                { name: 'search', color: 'var(--sc-accent)', values: metricBins.map((b) => b.search) },
+              ]}
+            />
             <p style={{ margin: '0.5em 0 0', fontSize: '0.72em', color: 'var(--sc-muted)' }}>
               Історія переглядів/пошуку ведеться лише з {metricsSince} — раніші дані не зберігалися.
             </p>

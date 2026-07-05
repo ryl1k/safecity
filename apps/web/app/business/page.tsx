@@ -29,7 +29,7 @@ export default function BusinessOverview() {
   const mostViewed = [...me.points].sort((a, b) => b.viewCount - a.viewCount)[0];
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2em' }}>
+    <div className="sc-stagger" style={{ display: 'flex', flexDirection: 'column', gap: '1.2em' }}>
       <h1 style={{ margin: 0, fontSize: '1.6em', fontWeight: 800 }}>Огляд</h1>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '0.9em' }}>

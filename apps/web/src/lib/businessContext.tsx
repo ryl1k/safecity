@@ -8,6 +8,9 @@ export type BusinessGate = 'loading' | 'guest' | 'ok' | 'error';
 export interface BusinessCtx {
   me: BusinessMe;
   reload: () => Promise<void>;
+  // Point focused by the global top-right selector; shared across dashboard pages.
+  selectedPointId: string | null;
+  setSelectedPointId: (id: string) => void;
 }
 
 // Provided by app/business/layout.tsx once data is loaded, so every sub-page

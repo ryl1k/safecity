@@ -7,6 +7,7 @@ import { LayoutDashboard, MapPin, ShieldCheck, BarChart3, CreditCard, Lock, type
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { BusinessPaywall } from '@/components/BusinessPaywall';
+import { BusinessPointSelect } from '@/components/BusinessPointSelect';
 import { Button, LoadingState, ErrorState } from '@/components/ui';
 import { supabase } from '@/lib/supabase';
 import { businessMe, type BusinessMe } from '@/lib/business';
@@ -26,7 +27,16 @@ const NAV: { href: string; label: string; icon: LucideIcon; exact?: boolean; pre
 export default function BusinessLayout({ children }: { children: React.ReactNode }) {
   const [gate, setGate] = useState<BusinessGate>('loading');
   const [me, setMe] = useState<BusinessMe | null>(null);
+  const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
   const pathname = usePathname();
+
+  // Keep the shared selection valid: default to the first point, and reset if the
+  // current one disappears (deleted, or a different account signed in).
+  useEffect(() => {
+    if (!me) return;
+    const ids = me.points.map((p) => p.id);
+    setSelectedPointId((cur) => (cur && ids.includes(cur) ? cur : ids[0] ?? null));
+  }, [me]);
 
   const load = useCallback(async (fresh: boolean) => {
     try {
@@ -53,6 +63,9 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
 
   const activeNav = NAV.find((n) => (n.exact ? pathname === n.href : pathname.startsWith(n.href)));
   const locked = Boolean(activeNav?.premium) && me != null && !me.isBusiness;
+  // The point selector is only meaningful on point-focused pages — hide it on the
+  // account-level Overview and Subscription.
+  const showSelector = pathname !== '/business' && !pathname.startsWith('/business/subscription');
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
@@ -96,7 +109,12 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
             </section>
           )}
           {gate === 'ok' && me && (
-            <BusinessContext.Provider value={{ me, reload }}>
+            <BusinessContext.Provider value={{ me, reload, selectedPointId, setSelectedPointId }}>
+              {me.points.length > 0 && !locked && showSelector && (
+                <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '0.9em' }}>
+                  <BusinessPointSelect points={me.points} value={selectedPointId} onChange={setSelectedPointId} />
+                </div>
+              )}
               {locked ? <BusinessPaywall /> : children}
             </BusinessContext.Provider>
           )}

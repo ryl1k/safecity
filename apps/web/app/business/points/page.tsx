@@ -40,7 +40,7 @@ export default function BusinessPoints() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '1em' }}>
+    <div className="sc-stagger" style={{ display: 'flex', flexDirection: 'column', gap: '1em' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6em' }}>
         <h1 style={{ margin: 0, fontSize: '1.6em', fontWeight: 800 }}>Мої точки</h1>
         <Link href="/contribute" style={{ textDecoration: 'none' }}>

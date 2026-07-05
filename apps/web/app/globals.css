@@ -55,6 +55,30 @@
   .sc-marquee-track { animation: none; }
 }
 
+/* Dashboard card spawn — staggered fade-rise + gauge/bar reveals. Dashboard cards
+   carry no position:fixed descendants, so `both` (retain final state) is safe.
+   Stagger via inline animation-delay. */
+@keyframes sc-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes sc-arc { from { stroke-dashoffset: 260; } to { stroke-dashoffset: 0; } }
+@keyframes sc-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes sc-draw { to { stroke-dashoffset: 0; } }
+.sc-rise { animation: sc-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.sc-gauge-arc { animation: sc-arc 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.sc-bar-fill { transform-origin: left center; animation: sc-grow 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.sc-draw { animation: sc-draw 1s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* Drop-in stagger: animate a container's direct children in sequence. */
+.sc-stagger > * { animation: sc-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.sc-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.sc-stagger > *:nth-child(2) { animation-delay: 70ms; }
+.sc-stagger > *:nth-child(3) { animation-delay: 140ms; }
+.sc-stagger > *:nth-child(4) { animation-delay: 210ms; }
+.sc-stagger > *:nth-child(5) { animation-delay: 280ms; }
+.sc-stagger > *:nth-child(6) { animation-delay: 350ms; }
+.sc-stagger > *:nth-child(n + 7) { animation-delay: 420ms; }
+@media (prefers-reduced-motion: reduce) {
+  .sc-rise, .sc-gauge-arc, .sc-bar-fill, .sc-draw, .sc-stagger > * { animation: none !important; }
+}
+
 /* Collapse nav/action labels to icons before the header would wrap to two rows. */
 @media (max-width: 1180px) {
   .sc-hide-sm { display: none; }

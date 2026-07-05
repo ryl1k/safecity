@@ -35,6 +35,15 @@ function fmtDate(iso: string | null): string {
   return iso ? new Date(iso).toLocaleDateString('uk-UA') : '';
 }
 
+function StatusStat({ label, children, delay }: { label: string; children: React.ReactNode; delay: number }) {
+  return (
+    <div className="sc-rise" style={{ background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', padding: '1em 1.2em', display: 'flex', flexDirection: 'column', gap: '0.2em', animationDelay: `${delay}ms` }}>
+      <div style={{ fontSize: '0.78em', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.04em', color: 'var(--sc-muted)' }}>{label}</div>
+      <div style={{ fontSize: '1.3em', fontWeight: 800 }}>{children}</div>
+    </div>
+  );
+}
+
 function Feature({ children }: { children: React.ReactNode }) {
   return (
     <li style={{ display: 'flex', gap: '0.5em', alignItems: 'flex-start', fontSize: '0.88em', lineHeight: 1.4 }}>
@@ -45,17 +54,19 @@ function Feature({ children }: { children: React.ReactNode }) {
 }
 
 function PlanCard({
-  title, price, period, note, features, current, highlight, action,
+  title, price, period, note, features, current, highlight, action, delay = 0,
 }: {
   title: string; price: string; period?: string; note?: string; features: string[];
-  current: boolean; highlight?: boolean; action: React.ReactNode;
+  current: boolean; highlight?: boolean; action: React.ReactNode; delay?: number;
 }) {
   return (
     <div
+      className="sc-rise"
       style={{
         ...card, flex: '1 1 240px', maxWidth: 380, display: 'flex', flexDirection: 'column', gap: '0.2em',
         borderColor: current ? 'var(--sc-ok-line)' : highlight ? 'var(--sc-primary)' : 'var(--sc-border)',
         borderWidth: current || highlight ? '2px' : undefined,
+        animationDelay: `${delay}ms`,
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '0.5em' }}>
@@ -107,15 +118,15 @@ export default function BusinessSubscription() {
       <h1 style={{ margin: 0, fontSize: '1.6em', fontWeight: 800 }}>Підписка</h1>
 
       {me.isBusiness && (
-        <section style={{ display: 'flex', alignItems: 'center', gap: '1.1em', flexWrap: 'wrap', background: 'var(--sc-ok-bg)', border: 'var(--sc-bw) solid var(--sc-ok-line)', borderRadius: '1em', padding: '0.9em 1.2em' }}>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5em', fontWeight: 800, color: 'var(--sc-ok)' }}>
-            <span aria-hidden style={{ width: '0.7em', height: '0.7em', borderRadius: '50%', background: 'var(--sc-ok)' }} /> Активна
-          </span>
-          <span style={{ color: 'var(--sc-muted)', fontSize: '0.9em' }}>План: <strong style={{ color: 'var(--sc-text)' }}>{me.plan === 'yearly' ? 'Річна' : 'Місячна'}</strong></span>
-          {me.renewsAt && (
-            <span style={{ color: 'var(--sc-muted)', fontSize: '0.9em' }}>Діє до: <strong style={{ color: 'var(--sc-text)' }}>{fmtDate(me.renewsAt)}</strong></span>
-          )}
-        </section>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.9em' }}>
+          <StatusStat label="Статус" delay={0}>
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4em', color: 'var(--sc-ok)' }}>
+              <span aria-hidden style={{ width: '0.55em', height: '0.55em', borderRadius: '50%', background: 'var(--sc-ok)' }} /> Активна
+            </span>
+          </StatusStat>
+          <StatusStat label="План" delay={70}>{me.plan === 'yearly' ? 'Річна' : 'Місячна'}</StatusStat>
+          <StatusStat label="Діє до" delay={140}>{me.renewsAt ? fmtDate(me.renewsAt) : '—'}</StatusStat>
+        </div>
       )}
 
       <div style={{ display: 'flex', gap: '0.9em', flexWrap: 'wrap', alignItems: 'stretch' }}>
@@ -124,6 +135,7 @@ export default function BusinessSubscription() {
           price="Безкоштовно"
           features={FREE_FEATURES}
           current={currentPlan === 'free'}
+          delay={180}
           action={
             currentPlan === 'free'
               ? <Button variant="secondary" block disabled>Ваш план</Button>
@@ -137,6 +149,7 @@ export default function BusinessSubscription() {
           note="Оплата щомісяця"
           features={BUSINESS_FEATURES}
           current={currentPlan === 'monthly'}
+          delay={250}
           action={bizButton('monthly')}
         />
         <PlanCard
@@ -147,6 +160,7 @@ export default function BusinessSubscription() {
           features={BUSINESS_FEATURES}
           current={currentPlan === 'yearly'}
           highlight
+          delay={320}
           action={bizButton('yearly')}
         />
       </div>
