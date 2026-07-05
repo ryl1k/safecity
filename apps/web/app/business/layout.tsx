@@ -57,7 +57,7 @@ export default function BusinessLayout({ children }: { children: React.ReactNode
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="business" />
-      <div className="sc-biz-grid" style={{ flex: 1, width: '100%', maxWidth: 1120, margin: '0 auto', padding: '1.4em 1.25em 3em' }}>
+      <div className="sc-biz-grid" style={{ flex: 1, width: '100%', maxWidth: 1280, margin: '0 auto', padding: '1.4em 1.25em 3em' }}>
         <aside className="sc-biz-side">
           <nav aria-label="Панель бізнесу" style={{ display: 'flex', flexDirection: 'column', gap: '0.25em' }}>
             {NAV.map((n) => {

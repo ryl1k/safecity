@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import { ShieldCheck, Clock, CircleHelp, Wrench, PartyPopper, Check, X, HelpCircle, ChevronDown } from 'lucide-react';
 import type { AccessibilityFeature, AccessLevel, CriterionState, FeatureValue, LevelBreakdown } from '@safecity/shared';
 import { accessLevelBreakdown } from '@safecity/shared';
@@ -64,31 +63,31 @@ function PointSelect({ points, value, onChange }: { points: MyPoint[]; value: st
   );
 }
 
-// ── Verification (wide horizontal bar in the header) ────────────────────────
+// ── Verification (header card — text on top, button below) ──────────────────
 function VerificationBar({ state, busy, onRequest }: { state: VerifyState; busy: boolean; onRequest: () => void }) {
   return (
-    <section className="sc-rise" style={{ ...card, flexDirection: 'row', alignItems: 'center', gap: '1.1em', flexWrap: 'wrap', padding: '1em 1.3em' }}>
-      <div style={{ ...sectionLabel, flexShrink: 0 }}>Верифікація</div>
+    <section className="sc-rise" style={{ ...card, gap: '0.55em', height: '100%', justifyContent: 'center' }}>
+      <div style={sectionLabel}>Верифікація</div>
       {state === 'verified' ? (
         <>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4em', color: 'var(--sc-ok)', fontWeight: 800, background: 'var(--sc-ok-bg)', border: 'var(--sc-bw) solid var(--sc-ok-line)', borderRadius: '2em', padding: '0.35em 0.85em', fontSize: '0.88em', flexShrink: 0 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4em', color: 'var(--sc-ok)', fontWeight: 800, background: 'var(--sc-ok-bg)', border: 'var(--sc-bw) solid var(--sc-ok-line)', borderRadius: '2em', padding: '0.35em 0.85em', fontSize: '0.88em', alignSelf: 'flex-start' }}>
             <ShieldCheck size={16} aria-hidden /> Перевірено
           </span>
-          <span style={{ flex: '1 1 160px', minWidth: 0, color: 'var(--sc-muted)', fontSize: '0.88em' }}>Модератор підтвердив дані цієї точки.</span>
+          <span style={{ color: 'var(--sc-muted)', fontSize: '0.88em' }}>Модератор підтвердив дані цієї точки.</span>
         </>
       ) : state === 'requested' ? (
         <>
-          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4em', color: levelColor.medium, fontWeight: 700, fontSize: '0.9em', flexShrink: 0 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4em', color: levelColor.medium, fontWeight: 700, fontSize: '0.9em' }}>
             <Clock size={16} aria-hidden /> Запит на розгляді
           </span>
-          <span style={{ flex: '1 1 160px', minWidth: 0, color: 'var(--sc-muted)', fontSize: '0.88em' }}>Модератор перевірить дані та підтвердить точку.</span>
+          <span style={{ color: 'var(--sc-muted)', fontSize: '0.88em' }}>Модератор перевірить дані та підтвердить точку.</span>
         </>
       ) : (
         <>
-          <span style={{ flex: '1 1 220px', minWidth: 0, color: 'var(--sc-muted)', fontSize: '0.9em' }}>
+          <span style={{ color: 'var(--sc-muted)', fontSize: '0.9em' }}>
             Підтвердьте достовірність даних — верифіковані точки викликають більше довіри у відвідувачів.
           </span>
-          <Button variant="secondary" onClick={onRequest} disabled={busy} style={{ minHeight: '2.5em', fontSize: '0.88em', flexShrink: 0 }}>
+          <Button variant="secondary" onClick={onRequest} disabled={busy} style={{ minHeight: '2.5em', fontSize: '0.88em', alignSelf: 'flex-start' }}>
             {busy ? 'Надсилання…' : 'Запросити верифікацію'}
           </Button>
         </>
@@ -151,18 +150,17 @@ function ScoreCard({ bd, delay }: { bd: LevelBreakdown; delay: number }) {
 }
 
 // ── What to improve ─────────────────────────────────────────────────────────
-function GapRow({ label, gain, kind }: { label: string; gain: number; kind: 'easy' | 'hard' }) {
-  const Icon = kind === 'easy' ? CircleHelp : Wrench;
+// One icon per group heading only (rows stay icon-free, indented under it).
+function GapRow({ label, gain }: { label: string; gain: number }) {
   return (
-    <li style={{ display: 'flex', alignItems: 'center', gap: '0.55em', fontSize: '0.9em', padding: '0.34em 0' }}>
-      <Icon size={16} aria-hidden style={{ flexShrink: 0, color: kind === 'easy' ? 'var(--sc-primary)' : 'var(--sc-muted)' }} />
+    <li style={{ display: 'flex', alignItems: 'center', gap: '0.55em', fontSize: '0.9em', padding: '0.34em 0', paddingLeft: '1.6em' }}>
       <span style={{ flex: 1, minWidth: 0 }}>{label}</span>
       <span style={{ flexShrink: 0, fontWeight: 800, color: 'var(--sc-ok)' }}>+{Math.round(gain)}</span>
     </li>
   );
 }
 
-function ImprovementCard({ bd, labelOf, editHref, delay }: { bd: LevelBreakdown; labelOf: (k: string) => string; editHref: string; delay: number }) {
+function ImprovementCard({ bd, labelOf, delay }: { bd: LevelBreakdown; labelOf: (k: string) => string; delay: number }) {
   const easy = bd.gaps.filter((g) => g.value === 'unknown');
   const hard = bd.gaps.filter((g) => g.value === 'no');
   return (
@@ -178,7 +176,7 @@ function ImprovementCard({ bd, labelOf, editHref, delay }: { bd: LevelBreakdown;
                 <CircleHelp size={15} aria-hidden /> Найлегше — просто підтвердити
               </div>
               <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                {easy.map((g) => <GapRow key={g.key} label={labelOf(g.key)} gain={g.gain} kind="easy" />)}
+                {easy.map((g) => <GapRow key={g.key} label={labelOf(g.key)} gain={g.gain} />)}
               </ul>
             </div>
           )}
@@ -188,14 +186,14 @@ function ImprovementCard({ bd, labelOf, editHref, delay }: { bd: LevelBreakdown;
                 <Wrench size={15} aria-hidden /> Найбільший вплив — потребує змін
               </div>
               <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-                {hard.map((g) => <GapRow key={g.key} label={labelOf(g.key)} gain={g.gain} kind="hard" />)}
+                {hard.map((g) => <GapRow key={g.key} label={labelOf(g.key)} gain={g.gain} />)}
               </ul>
             </div>
           )}
         </div>
       )}
       <p style={{ margin: '0.2em 0 0', fontSize: '0.76em', color: 'var(--sc-muted)' }}>
-        Числа — приріст до оцінки. <Link href={editHref} style={{ color: 'var(--sc-primary)', fontWeight: 700, textDecoration: 'none' }}>Оновити критерії →</Link>
+        Числа — приріст до оцінки доступності. Критерії оновлюються після верифікації точки модератором.
       </p>
     </section>
   );
@@ -312,7 +310,7 @@ export default function BusinessAccessibility() {
             <div key={`cards-${point.id}`} style={{ display: 'flex', flexDirection: 'column', gap: '1em' }}>
               <div className="sc-a11y-row2">
                 <ScoreCard bd={bd} delay={60} />
-                <ImprovementCard bd={bd} labelOf={labelOf} editHref={`/point/${point.id}/edit`} delay={120} />
+                <ImprovementCard bd={bd} labelOf={labelOf} delay={120} />
               </div>
               <CompositionCard bd={bd} labelOf={labelOf} delay={180} />
             </div>

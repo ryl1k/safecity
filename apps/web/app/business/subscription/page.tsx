@@ -106,10 +106,16 @@ export default function BusinessSubscription() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2em' }}>
       <h1 style={{ margin: 0, fontSize: '1.6em', fontWeight: 800 }}>Підписка</h1>
 
-      {me.isBusiness && me.renewsAt && (
-        <p style={{ margin: 0, color: 'var(--sc-muted)', fontSize: '0.9em' }}>
-          Бізнес-підписка активна · наступне поновлення {fmtDate(me.renewsAt)}.
-        </p>
+      {me.isBusiness && (
+        <section style={{ display: 'flex', alignItems: 'center', gap: '1.1em', flexWrap: 'wrap', background: 'var(--sc-ok-bg)', border: 'var(--sc-bw) solid var(--sc-ok-line)', borderRadius: '1em', padding: '0.9em 1.2em' }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5em', fontWeight: 800, color: 'var(--sc-ok)' }}>
+            <span aria-hidden style={{ width: '0.7em', height: '0.7em', borderRadius: '50%', background: 'var(--sc-ok)' }} /> Активна
+          </span>
+          <span style={{ color: 'var(--sc-muted)', fontSize: '0.9em' }}>План: <strong style={{ color: 'var(--sc-text)' }}>{me.plan === 'yearly' ? 'Річна' : 'Місячна'}</strong></span>
+          {me.renewsAt && (
+            <span style={{ color: 'var(--sc-muted)', fontSize: '0.9em' }}>Діє до: <strong style={{ color: 'var(--sc-text)' }}>{fmtDate(me.renewsAt)}</strong></span>
+          )}
+        </section>
       )}
 
       <div style={{ display: 'flex', gap: '0.9em', flexWrap: 'wrap', alignItems: 'stretch' }}>
@@ -144,10 +150,6 @@ export default function BusinessSubscription() {
           action={bizButton('yearly')}
         />
       </div>
-
-      <p style={{ margin: 0, fontSize: '0.78em', color: 'var(--sc-muted)' }}>
-        Оплата зараз мокована — активація миттєва, без реального процесингу.
-      </p>
     </div>
   );
 }
