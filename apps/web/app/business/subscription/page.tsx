@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui';
+import { DashboardHeader } from '@/components/DashboardHeader';
 import { toast } from '@/lib/toast';
 import { subscribeBusiness, type SubscriptionPlan } from '@/lib/business';
 import { useBusiness } from '@/lib/businessContext';
@@ -115,7 +116,7 @@ export default function BusinessSubscription() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2em' }}>
-      <h1 style={{ margin: 0, fontSize: '1.6em', fontWeight: 800 }}>Підписка</h1>
+      <DashboardHeader title="Підписка" hideSelector />
 
       {me.isBusiness && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '0.9em' }}>

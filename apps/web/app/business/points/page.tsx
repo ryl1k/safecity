@@ -6,6 +6,7 @@ import { Eye } from 'lucide-react';
 import type { AccessibilityFeature } from '@safecity/shared';
 import { accessLevel } from '@safecity/shared';
 import { Button } from '@/components/ui';
+import { DashboardHeader } from '@/components/DashboardHeader';
 import { categoryLabel } from '@/lib/format';
 import { levelLabel, levelColor } from '@/lib/filters';
 import { getCatalog } from '@/lib/catalog';
@@ -41,12 +42,14 @@ export default function BusinessPoints() {
 
   return (
     <div className="sc-stagger" style={{ display: 'flex', flexDirection: 'column', gap: '1em' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.6em' }}>
-        <h1 style={{ margin: 0, fontSize: '1.6em', fontWeight: 800 }}>Мої точки</h1>
-        <Link href="/contribute" style={{ textDecoration: 'none' }}>
-          <Button variant="secondary" style={{ minHeight: '2.3em', fontSize: '0.85em' }}>+ Додати точку</Button>
-        </Link>
-      </div>
+      <DashboardHeader
+        title="Мої точки"
+        actions={
+          <Link href="/contribute" style={{ textDecoration: 'none' }}>
+            <Button variant="secondary" style={{ minHeight: '2.3em', fontSize: '0.85em' }}>+ Додати точку</Button>
+          </Link>
+        }
+      />
 
       <section style={{ background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', overflow: 'hidden' }}>
         {me.points.length === 0 ? (

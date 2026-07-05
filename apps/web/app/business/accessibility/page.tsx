@@ -5,6 +5,7 @@ import { ShieldCheck, Clock, CircleHelp, Wrench, PartyPopper, Check, X, HelpCirc
 import type { AccessibilityFeature, AccessLevel, CriterionState, FeatureValue, LevelBreakdown } from '@safecity/shared';
 import { accessLevelBreakdown } from '@safecity/shared';
 import { Button } from '@/components/ui';
+import { DashboardHeader } from '@/components/DashboardHeader';
 import { levelLabel, levelColor } from '@/lib/filters';
 import { getCatalog } from '@/lib/catalog';
 import { toast } from '@/lib/toast';
@@ -237,12 +238,10 @@ export default function BusinessAccessibility() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.2em' }}>
       <style>{`.sc-a11y-row2 { display: grid; grid-template-columns: 1.15fr 2fr; gap: 1em; align-items: stretch; } @media (max-width: 880px) { .sc-a11y-row2 { grid-template-columns: 1fr; } }`}</style>
 
-      <div>
-        <h1 style={{ margin: 0, fontSize: '1.6em', fontWeight: 800 }}>Доступність і верифікація</h1>
-        <p style={{ margin: '0.3em 0 0', color: 'var(--sc-muted)', fontSize: '0.92em' }}>
-          Ваша оцінка доступності, що покращити найперше, і як підтвердити дані модератором. Точку оберіть угорі праворуч.
-        </p>
-      </div>
+      <DashboardHeader
+        title="Доступність і верифікація"
+        subtitle="Ваша оцінка доступності, що покращити найперше, і як підтвердити дані модератором."
+      />
 
       {!point ? (
         <section style={card}><p style={{ margin: 0, color: 'var(--sc-muted)' }}>У вас ще немає точок.</p></section>

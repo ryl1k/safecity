@@ -6,6 +6,7 @@ import { Eye, Search, MessageSquare, Star, type LucideIcon } from 'lucide-react'
 import type { AccessibilityFeature, AccessLevel, PointSummary } from '@safecity/shared';
 import { accessLevel } from '@safecity/shared';
 import { categoryLabel } from '@/lib/format';
+import { DashboardHeader } from '@/components/DashboardHeader';
 import { levelLabel, levelColor } from '@/lib/filters';
 import { getCatalog } from '@/lib/catalog';
 import { pointById, pointsNear } from '@/lib/points';
@@ -185,7 +186,7 @@ export default function BusinessAnalytics() {
 
   return (
     <div className="sc-stagger" style={{ display: 'flex', flexDirection: 'column', gap: '1.2em' }}>
-      <h1 style={{ margin: 0, fontSize: '1.6em', fontWeight: 800 }}>Аналітика</h1>
+      <DashboardHeader title="Аналітика" />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.9em' }}>
         <StatCard label="Перегляди" value={totalViews} accent />
