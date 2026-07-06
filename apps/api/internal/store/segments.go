@@ -11,10 +11,10 @@ import (
 
 // AccessibleRoute is the pgRouting result for wheelchair-accessible routing.
 type AccessibleRoute struct {
-	Coordinates  [][]float64      `json:"coordinates"`
-	DistanceM    float64          `json:"distance_m"`
+	Coordinates   [][]float64        `json:"coordinates"`
+	DistanceM     float64            `json:"distance_m"`
 	RatingSummary map[string]float64 `json:"rating_summary"`
-	Error        string           `json:"error,omitempty"`
+	Error         string             `json:"error,omitempty"`
 }
 
 // RouteAccessible calls the route_accessible() pgRouting RPC and returns the
@@ -43,20 +43,20 @@ func (s *Store) RouteAccessible(ctx context.Context, startLng, startLat, endLng,
 
 // StreetSegment is one surveyed walking path with accessibility attributes.
 type StreetSegment struct {
-	ID               string            `json:"id"`
-	StreetName       string            `json:"streetName"`
-	SidewalkWidthM   *float64          `json:"sidewalkWidthM"`
-	SurfaceType      *string           `json:"surfaceType"`
-	InclinePercent   *float64          `json:"inclinePercent"`
-	HasTactilePaving *bool             `json:"hasTactilePaving"`
-	IsStepFree       *bool             `json:"isStepFree"`
-	HasCurbCuts      *bool             `json:"hasCurbCuts"`
-	HasRamp          *bool             `json:"hasRamp"`
-	Lit              *bool             `json:"lit"`
-	IsObstacleFree   *bool             `json:"isObstacleFree"`
-	Smoothness       *string           `json:"smoothness"`
-	VerifyStatus     string            `json:"verifyStatus"`
-	Rating           string            `json:"rating"` // "full" | "partial" | "none" | "unknown"
+	ID               string   `json:"id"`
+	StreetName       string   `json:"streetName"`
+	SidewalkWidthM   *float64 `json:"sidewalkWidthM"`
+	SurfaceType      *string  `json:"surfaceType"`
+	InclinePercent   *float64 `json:"inclinePercent"`
+	HasTactilePaving *bool    `json:"hasTactilePaving"`
+	IsStepFree       *bool    `json:"isStepFree"`
+	HasCurbCuts      *bool    `json:"hasCurbCuts"`
+	HasRamp          *bool    `json:"hasRamp"`
+	Lit              *bool    `json:"lit"`
+	IsObstacleFree   *bool    `json:"isObstacleFree"`
+	Smoothness       *string  `json:"smoothness"`
+	VerifyStatus     string   `json:"verifyStatus"`
+	Rating           string   `json:"rating"` // "full" | "partial" | "none" | "unknown"
 	// FieldSources maps each populated field to its provenance: osm|dem|gov|user.
 	FieldSources map[string]string `json:"fieldSources"`
 	GeoJSON      string            `json:"geojson"` // ST_AsGeoJSON result (LineString geometry)
@@ -112,20 +112,21 @@ func (s *Store) AddSegment(ctx context.Context, userID string, in NewSegment) (s
 	return id, classify(err)
 }
 
-const noneSegmentMidpointsSQL = `
+const segmentMidpointsSQL = `
 select
   ST_X(ST_LineInterpolatePoint(geom, 0.5)) as lng,
   ST_Y(ST_LineInterpolatePoint(geom, 0.5)) as lat
 from street_segments
 where geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)
-  and segment_rating(surface_type, smoothness, sidewalk_width_m, incline_percent, is_step_free) = 'none'
-limit 30`
+  and segment_rating(surface_type, smoothness, sidewalk_width_m, incline_percent, is_step_free) = any($5)
+limit $6`
 
-// NoneSegmentMidpointsInBBox returns midpoints of "none"-rated segments in the
-// bbox — used to build ORS avoid_polygons so the ORS fallback also steers clear
-// of red (impassable) segments.
-func (s *Store) NoneSegmentMidpointsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]LngLat, error) {
-	rows, err := s.db.Pool.Query(ctx, noneSegmentMidpointsSQL, minLng, minLat, maxLng, maxLat)
+// SegmentMidpointsInBBox returns midpoints of segments in the bbox whose rating is
+// in `ratings` — used to build ORS avoid_polygons so the fallback steers clear of
+// impassable ("none") and, in strict mode, marginal ("partial") segments. `limit`
+// caps the count so we never hand ORS an avoid set large enough to fail the request.
+func (s *Store) SegmentMidpointsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64, ratings []string, limit int) ([]LngLat, error) {
+	rows, err := s.db.Pool.Query(ctx, segmentMidpointsSQL, minLng, minLat, maxLng, maxLat, ratings, limit)
 	if err != nil {
 		return nil, err
 	}

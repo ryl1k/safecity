@@ -13,6 +13,8 @@ import type { GeoPlace } from '@/lib/geocode';
 import { planTransit, fmtTime, type TransitItinerary } from '@/lib/transit';
 import type { RouteDisplay } from './ExploreMap';
 import { PointDetailContent } from './PointDetailContent';
+import { RoutePrefsControl } from './RoutePrefsControl';
+import { loadRoutePrefs, saveRoutePrefs, routePrefsPayload, type RoutePrefs } from '@/lib/routePrefs';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
 
@@ -185,6 +187,9 @@ export function RouteTabContent({
   const [fallback, setFallback] = useState(false);
   const [avoided, setAvoided] = useState(0);
   const [speaking, setSpeaking] = useState(false);
+  const [prefs, setPrefs] = useState<RoutePrefs>(() => loadRoutePrefs());
+  const prefsRef = useRef<RoutePrefs>(prefs);
+  prefsRef.current = prefs;
   // Travel mode: on-foot (ORS wheelchair) or public transport (Transitous).
   const [travelMode, setTravelMode] = useState<'walk' | 'transit'>('walk');
   const [transitIts, setTransitIts] = useState<TransitItinerary[]>([]);
@@ -241,12 +246,12 @@ export function RouteTabContent({
     if (stops.some((s) => !s.coords)) return;
     const via = travelMode === 'transit' ? [] : stops.map((s) => s.coords!); // transit ignores stops
     const wps = [fromCoords, ...via, toCoords];
-    const key = `${travelMode}|${primary}|${JSON.stringify(wps)}`;
+    const key = `${travelMode}|${primary}|${JSON.stringify(prefs)}|${JSON.stringify(wps)}`;
     if (key === lastPlanKey.current) return;
     lastPlanKey.current = key;
     void plan(wps);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromCoords, toCoords, stops, primary, travelMode]);
+  }, [fromCoords, toCoords, stops, primary, travelMode, prefs]);
 
   // Set a waypoint's coords immediately (with a coord label), then upgrade the
   // label to a real address once reverse geocoding resolves.
@@ -339,7 +344,7 @@ export function RouteTabContent({
     try {
       // Barrier avoidance polygons are built server-side from confirmed problems.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data: any = await api.post('/route', { from: start, to: end, via, profile: primary }, { auth: false });
+      const data: any = await api.post('/route', { from: start, to: end, via, profile: primary, ...routePrefsPayload(prefsRef.current) }, { auth: false });
       onRouteDisplay?.(walkDisplay(data.coordinates ?? []));
       setSteps(data.steps ?? []);
       setSummary(data.summary ?? null);
@@ -375,6 +380,10 @@ export function RouteTabContent({
           </button>
         ))}
       </div>
+
+      {travelMode === 'walk' && primary !== 'blind' && (
+        <RoutePrefsControl value={prefs} onChange={(p) => { setPrefs(p); saveRoutePrefs(p); }} />
+      )}
 
       {/* Map pick hint — only shown when a field is active */}
       {activeField !== null && (
@@ -549,7 +558,7 @@ export function RouteTabContent({
           )}
           {avoided > 0 && (
             <p role="status" style={{ margin: 0, padding: '0.55em 0.8em', borderRadius: '0.7em', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', border: 'var(--sc-bw) solid var(--sc-primary)', fontSize: '0.82em', fontWeight: 700 }}>
-              Оминаємо {avoided} бар'єр(и) на шляху.
+              Маршрут оминає {avoided} перешкод(и) поблизу.
             </p>
           )}
 

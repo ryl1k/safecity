@@ -10,6 +10,8 @@ import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { Button, LoadingState, ErrorState } from '@/components/ui';
 import { useProfile } from '@/profile/ProfileProvider';
+import { RoutePrefsControl } from '@/components/RoutePrefsControl';
+import { loadRoutePrefs, saveRoutePrefs, routePrefsPayload, type RoutePrefs } from '@/lib/routePrefs';
 import { pointById, pointsInBbox } from '@/lib/points';
 import { api } from '@/lib/api';
 import { getCatalog } from '@/lib/catalog';
@@ -133,6 +135,9 @@ function RouteInner() {
 
   const [fromCoords, setFromCoords] = useState<[number, number] | null>(null);
   const [fromLabel, setFromLabel] = useState<string>('');
+  const [prefs, setPrefs] = useState<RoutePrefs>(() => loadRoutePrefs());
+  const prefsRef = useRef<RoutePrefs>(prefs);
+  prefsRef.current = prefs;
   const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
   const [dest, setDest] = useState<PointSummary | null>(null);
   const [line, setLine] = useState<[number, number][]>([]);
@@ -177,7 +182,7 @@ function RouteInner() {
       try {
         data = await api.post(
           '/route',
-          { from: start, to: dest, profile: primary },
+          { from: start, to: dest, profile: primary, ...routePrefsPayload(prefsRef.current) },
           { auth: false },
         );
       } catch {
@@ -223,6 +228,13 @@ function RouteInner() {
   }, [fromCoords, to, primary]);
 
   useEffect(() => () => stopSpeech(), []);
+
+  function onPrefs(p: RoutePrefs) {
+    prefsRef.current = p; // so an immediate re-plan uses the new prefs
+    setPrefs(p);
+    saveRoutePrefs(p);
+    if (fromCoords) void plan(fromCoords);
+  }
 
   function toggleSpeak() {
     if (speaking) {
@@ -270,6 +282,12 @@ function RouteInner() {
               </button>
             </p>
 
+            {primary !== 'blind' && (
+              <div style={{ margin: '0 0 1em' }}>
+                <RoutePrefsControl value={prefs} onChange={onPrefs} />
+              </div>
+            )}
+
             {status === 'loading' && <LoadingState label="Прокладання маршруту" />}
             {status === 'error' && <ErrorState title="Не вдалося прокласти маршрут" onRetry={() => void plan(fromCoords)} />}
 
@@ -281,7 +299,7 @@ function RouteInner() {
 
             {status === 'ready' && avoided > 0 && (
               <p role="status" style={{ margin: '0 0 1em', padding: '0.7em 1em', borderRadius: '0.7em', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', border: 'var(--sc-bw) solid var(--sc-primary)', fontSize: '0.85em', fontWeight: 700 }}>
-                Оминаємо {avoided} підтверджених бар'єр(и) на шляху.
+                Маршрут оминає {avoided} перешкод(и) поблизу.
               </p>
             )}
 
