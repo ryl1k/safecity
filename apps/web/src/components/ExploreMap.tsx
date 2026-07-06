@@ -123,11 +123,15 @@ function featureCollection(points: ExploreMarker[]): any {
 function segmentCollection(segs: ExploreSegment[]): any {
   return {
     type: 'FeatureCollection',
-    features: segs.map((s) => ({
-      type: 'Feature',
-      geometry: JSON.parse(s.geojson),
-      properties: { id: s.id, street_name: s.streetName, rating: s.rating },
-    })),
+    // Don't draw streets we have no accessibility data for — an "unknown" grey
+    // line adds noise without telling the user anything.
+    features: segs
+      .filter((s) => s.rating !== 'unknown')
+      .map((s) => ({
+        type: 'Feature',
+        geometry: JSON.parse(s.geojson),
+        properties: { id: s.id, street_name: s.streetName, rating: s.rating },
+      })),
   };
 }
 
