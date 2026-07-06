@@ -5,6 +5,15 @@
 -- unknown → no accessibility data at all (smoothness, step-free, curb cuts all NULL)
 -- partial → everything else
 
+-- This function body reads street_segments.smoothness and .field_sources. Those
+-- columns are added by 0019/0020, which sort AFTER this file — so on a fresh build
+-- they don't exist yet and the CREATE fails (42703). Add them here idempotently
+-- (0019/0020 repeat the same `if not exists` add, so the final schema is unchanged).
+-- Ordering only became an issue once these segment migrations and the b2b ones
+-- (which reused numbers 0017/0021/0022) landed in one tree via the #17 merge.
+alter table street_segments add column if not exists smoothness text;
+alter table street_segments add column if not exists field_sources jsonb not null default '{}'::jsonb;
+
 -- Return-type changes (new columns) can't go through CREATE OR REPLACE — drop first,
 -- matching the pattern in 0019/0020/0021. Without this the fresh-schema build fails
 -- with 42P13 ("cannot change return type of existing function").
