@@ -109,7 +109,7 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 	// with accessibility-weighted costs (full 1×, partial 1.5×, unknown 3×,
 	// none 100×). Fall through to ORS when pgRouting has no path.
 	if wanted == "wheelchair" && s.store != nil && len(req.Via) == 0 {
-		if ar, err := s.store.RouteAccessible(r.Context(), from[0], from[1], to[0], to[1]); err == nil && len(ar.Coordinates) > 1 {
+		if ar, err := s.store.RouteAccessible(r.Context(), from[0], from[1], to[0], to[1]); err == nil && ar != nil && len(ar.Coordinates) > 1 {
 			httpx.JSON(w, http.StatusOK, geo.RouteResult{
 				Profile:     "wheelchair",
 				Coordinates: ar.Coordinates,
