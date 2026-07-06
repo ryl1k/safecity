@@ -227,6 +227,7 @@ export default function BusinessAnalytics() {
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
   const [data, setData] = useState<BusinessAnalyticsData | null>(null);
   const [range, setRange] = useState<Range>('1m');
+  const [scope, setScope] = useState<string>('all'); // 'all' | pointId — scopes the stat cards + time graphs
   const [selId, setSelId] = useState<string | null>(me.points[0]?.id ?? null);
   const [nearby, setNearby] = useState<{ own: AccessLevel; others: AccessLevel[] } | null>(null);
 
@@ -251,10 +252,13 @@ export default function BusinessAnalytics() {
   }, [selId, catalog]);
 
   const pts = me.points;
-  const totalViews = pts.reduce((s, p) => s + p.viewCount, 0);
-  const totalSearch = pts.reduce((s, p) => s + p.searchAppearances, 0);
-  const totalReviews = pts.reduce((s, p) => s + p.reviewCount, 0);
-  const weightedStars = pts.reduce((s, p) => s + (p.avgRating ?? 0) * p.reviewCount, 0);
+  // Stat cards + time graphs follow the scope selector ('all' or one point); the
+  // per-point breakdown sections below always show every point.
+  const scopedPts = scope === 'all' ? pts : pts.filter((p) => p.id === scope);
+  const totalViews = scopedPts.reduce((s, p) => s + p.viewCount, 0);
+  const totalSearch = scopedPts.reduce((s, p) => s + p.searchAppearances, 0);
+  const totalReviews = scopedPts.reduce((s, p) => s + p.reviewCount, 0);
+  const weightedStars = scopedPts.reduce((s, p) => s + (p.avgRating ?? 0) * p.reviewCount, 0);
   const avgRating = totalReviews ? weightedStars / totalReviews : null;
   const maxViews = Math.max(1, ...pts.map((p) => p.viewCount));
   const ranked = [...pts].sort((a, b) => b.viewCount - a.viewCount);
@@ -267,32 +271,59 @@ export default function BusinessAnalytics() {
   );
   const catOf = (p: MyPoint) => categoryLabel[p.category as keyof typeof categoryLabel] ?? p.category;
 
-  // Reviews-over-time bins for the selected range.
+  // Reviews-over-time bins for the selected range, scoped to the chosen point.
   const reviewBins = useMemo(() => {
     const bins = buildBins(range);
-    const times = (data?.reviews ?? []).map((r) => new Date(r.createdAt).getTime());
+    const src = (data?.reviews ?? []).filter((r) => scope === 'all' || r.pointId === scope);
+    const times = src.map((r) => new Date(r.createdAt).getTime());
     const counts = countIntoBins(times, bins.map((b) => b.start));
     return bins.map((b, i) => ({ label: b.label, value: counts[i]! }));
-  }, [data, range]);
+  }, [data, range, scope]);
   const reviewsInRange = reviewBins.reduce((s, b) => s + b.value, 0);
 
-  // View/search daily NEW counts, derived from forward-only cumulative snapshots.
+  // View/search daily NEW counts from forward-only cumulative snapshots. Snapshots
+  // are per-point per-day, so sum the in-scope points' totals per day, then diff.
   const metricBins = useMemo(() => {
-    const m = data?.metrics ?? [];
-    return m.map((d, i) => {
-      const prev = i > 0 ? m[i - 1]! : null;
-      const dv = prev ? Math.max(0, d.viewCount - prev.viewCount) : 0;
-      const ds = prev ? Math.max(0, d.searchAppearances - prev.searchAppearances) : 0;
-      const label = d.day.slice(5); // MM-DD
-      return { day: d.day, label, views: i === 0 ? 0 : dv, search: i === 0 ? 0 : ds };
+    const rows = (data?.metrics ?? []).filter((m) => scope === 'all' || m.pointId === scope);
+    const byDay = new Map<string, { views: number; search: number }>();
+    for (const m of rows) {
+      const cur = byDay.get(m.day) ?? { views: 0, search: 0 };
+      cur.views += m.viewCount;
+      cur.search += m.searchAppearances;
+      byDay.set(m.day, cur);
+    }
+    const days = [...byDay.keys()].sort();
+    return days.map((day, i) => {
+      const cur = byDay.get(day)!;
+      const prev = i > 0 ? byDay.get(days[i - 1]!)! : null;
+      const dv = prev ? Math.max(0, cur.views - prev.views) : 0;
+      const ds = prev ? Math.max(0, cur.search - prev.search) : 0;
+      return { day, label: day.slice(5), views: i === 0 ? 0 : dv, search: i === 0 ? 0 : ds };
     });
-  }, [data]);
-  const metricsSince = data?.metrics[0]?.day ?? null;
+  }, [data, scope]);
+  const metricsSince = metricBins[0]?.day ?? null;
   const hasMetricDeltas = metricBins.some((b) => b.views > 0 || b.search > 0);
 
   return (
     <div className="sc-stagger" style={{ display: 'flex', flexDirection: 'column', gap: '1.2em' }}>
-      <DashboardHeader title="Аналітика" />
+      <DashboardHeader
+        title="Аналітика"
+        hideSelector
+        actions={
+          me.points.length > 1 ? (
+            <select
+              aria-label="Показники для точки"
+              className="sc-foc"
+              value={scope}
+              onChange={(e) => setScope(e.target.value)}
+              style={{ minHeight: '2.75em', maxWidth: 220, padding: '0 0.9em', borderRadius: '0.7em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'var(--font-onest), system-ui, sans-serif', fontWeight: 700, fontSize: '0.9em', cursor: 'pointer' }}
+            >
+              <option value="all">Усі точки</option>
+              {me.points.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+            </select>
+          ) : undefined
+        }
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.9em' }}>
         <StatCard label="Перегляди" value={totalViews} accent />

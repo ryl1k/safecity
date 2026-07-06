@@ -75,13 +75,16 @@ export async function requestPointVerification(pointId: string): Promise<void> {
 
 /** One review's timestamp + rating — for the reviews-over-time graph. */
 export interface ReviewPoint {
+  pointId: string;
   createdAt: string;
   stars: number;
 }
 
-/** One day's snapshot of the running view/search totals (summed across points). */
+/** One point's running view/search totals on a given day (one row per point per
+ * day) — the dashboard sums across points or filters to one. */
 export interface MetricDay {
   day: string; // YYYY-MM-DD
+  pointId: string;
   viewCount: number;
   searchAppearances: number;
 }

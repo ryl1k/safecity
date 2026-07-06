@@ -162,15 +162,19 @@ func (s *Store) RequestPointVerification(ctx context.Context, userID, pointID st
 }
 
 // ReviewPoint is one review's timestamp + rating, for the reviews-over-time graph.
+// PointID lets the dashboard scope the graph to a single point (or aggregate all).
 type ReviewPoint struct {
+	PointID   string    `json:"pointId"`
 	CreatedAt time.Time `json:"createdAt"`
 	Stars     int       `json:"stars"`
 }
 
-// MetricDay is one day's snapshot of the running view/search totals, summed across
-// the caller's points.
+// MetricDay is one point's running view/search totals on a given day (one row per
+// point per day). The dashboard sums across points for the account-wide view, or
+// filters to one point — hence per-point rows rather than a pre-summed total.
 type MetricDay struct {
 	Day               string `json:"day"` // YYYY-MM-DD
+	PointID           string `json:"pointId"`
 	ViewCount         int    `json:"viewCount"`
 	SearchAppearances int    `json:"searchAppearances"`
 }
@@ -184,7 +188,7 @@ type BusinessAnalytics struct {
 }
 
 const reviewsHistorySQL = `
-select r.created_at, r.stars
+select r.point_id::text, r.created_at, r.stars
 from reviews r
 join points p on p.id = r.point_id
 where p.created_by = auth.uid()
@@ -193,11 +197,10 @@ order by r.created_at
 limit 5000`
 
 const metricsHistorySQL = `
-select s.day, sum(s.view_count)::int, sum(s.search_appearances)::int
+select s.day, s.point_id::text, s.view_count, s.search_appearances
 from point_metric_snapshots s
 join points p on p.id = s.point_id
 where p.created_by = auth.uid()
-group by s.day
 order by s.day`
 
 // GetBusinessAnalytics returns the time-series graphs for the caller's points and,
@@ -216,7 +219,7 @@ func (s *Store) GetBusinessAnalytics(ctx context.Context, userID string) (Busine
 		}
 		for rrows.Next() {
 			var rp ReviewPoint
-			if e := rrows.Scan(&rp.CreatedAt, &rp.Stars); e != nil {
+			if e := rrows.Scan(&rp.PointID, &rp.CreatedAt, &rp.Stars); e != nil {
 				rrows.Close()
 				return e
 			}
@@ -235,7 +238,7 @@ func (s *Store) GetBusinessAnalytics(ctx context.Context, userID string) (Busine
 		for mrows.Next() {
 			var day time.Time
 			var md MetricDay
-			if e := mrows.Scan(&day, &md.ViewCount, &md.SearchAppearances); e != nil {
+			if e := mrows.Scan(&day, &md.PointID, &md.ViewCount, &md.SearchAppearances); e != nil {
 				return e
 			}
 			md.Day = day.Format("2006-01-02")
