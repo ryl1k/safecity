@@ -5,6 +5,11 @@
 -- unknown → no accessibility data at all (smoothness, step-free, curb cuts all NULL)
 -- partial → everything else
 
+-- Return-type changes (new columns) can't go through CREATE OR REPLACE — drop first,
+-- matching the pattern in 0019/0020/0021. Without this the fresh-schema build fails
+-- with 42P13 ("cannot change return type of existing function").
+drop function if exists segments_in_bbox(double precision, double precision, double precision, double precision);
+
 create or replace function segments_in_bbox(
   min_lng double precision,
   min_lat double precision,
