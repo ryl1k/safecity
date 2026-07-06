@@ -10,6 +10,9 @@ import (
 	"github.com/safecity/api/internal/httpx"
 )
 
+// walkingSpeedMps is used to estimate duration from pgRouting distance.
+const walkingSpeedMps = 1.1 // ~4 km/h
+
 // routeRequest is the body for POST /route. from/to are [lng,lat]. The avoid
 // polygons are built server-side from confirmed problems, so the client only
 // sends endpoints + profile.
@@ -65,8 +68,9 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build avoidance polygons from confirmed/escalated problems in the corridor.
-	// Best-effort: a barrier-lookup failure must not block routing.
+	// Build avoidance polygons from confirmed/escalated problems AND "none"-rated
+	// (red/impassable) street segments in the corridor. Best-effort: failures
+	// must not block routing.
 	var avoid [][][][]float64
 	if s.store != nil {
 		// Span every leg (from → via… → to) so barriers near a stop are caught too.
@@ -77,14 +81,45 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 		}
 		minLng, maxLng = minLng-avoidPad, maxLng+avoidPad
 		minLat, maxLat = minLat-avoidPad, maxLat+avoidPad
+
+		var avoidPts [][2]float64
 		if barriers, err := s.store.BarriersInBBox(r.Context(), minLng, minLat, maxLng, maxLat); err != nil {
 			s.log.Warn("route barrier lookup failed", "err", err)
-		} else if len(barriers) > 0 {
-			pts := make([][2]float64, len(barriers))
-			for i, b := range barriers {
-				pts[i] = [2]float64{b.Lng, b.Lat}
+		} else {
+			for _, b := range barriers {
+				avoidPts = append(avoidPts, [2]float64{b.Lng, b.Lat})
 			}
-			avoid = geo.AvoidSquares(pts)
+		}
+		// For wheelchair routing, also avoid segments rated "none" (impassable).
+		if wanted == "wheelchair" {
+			if redSegs, err := s.store.NoneSegmentMidpointsInBBox(r.Context(), minLng, minLat, maxLng, maxLat); err != nil {
+				s.log.Warn("route red-segment lookup failed", "err", err)
+			} else {
+				for _, p := range redSegs {
+					avoidPts = append(avoidPts, [2]float64{p.Lng, p.Lat})
+				}
+			}
+		}
+		if len(avoidPts) > 0 {
+			avoid = geo.AvoidSquares(avoidPts)
+		}
+	}
+
+	// For wheelchair profile, try pgRouting first — it uses our segment graph
+	// with accessibility-weighted costs (full 1×, partial 1.5×, unknown 3×,
+	// none 100×). Fall through to ORS when pgRouting has no path.
+	if wanted == "wheelchair" && s.store != nil && len(req.Via) == 0 {
+		if ar, err := s.store.RouteAccessible(r.Context(), from[0], from[1], to[0], to[1]); err == nil && len(ar.Coordinates) > 1 {
+			httpx.JSON(w, http.StatusOK, geo.RouteResult{
+				Profile:     "wheelchair",
+				Coordinates: ar.Coordinates,
+				Steps:       []geo.Step{},
+				Summary: &geo.Summary{
+					Distance: ar.DistanceM,
+					Duration: ar.DistanceM / walkingSpeedMps,
+				},
+			})
+			return
 		}
 	}
 

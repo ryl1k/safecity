@@ -9,6 +9,38 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+// AccessibleRoute is the pgRouting result for wheelchair-accessible routing.
+type AccessibleRoute struct {
+	Coordinates  [][]float64      `json:"coordinates"`
+	DistanceM    float64          `json:"distance_m"`
+	RatingSummary map[string]float64 `json:"rating_summary"`
+	Error        string           `json:"error,omitempty"`
+}
+
+// RouteAccessible calls the route_accessible() pgRouting RPC and returns the
+// path as a list of [lng,lat] coordinates. Returns an error when the DB
+// function signals no_route_found or no_graph_near_points.
+func (s *Store) RouteAccessible(ctx context.Context, startLng, startLat, endLng, endLat float64) (*AccessibleRoute, error) {
+	var raw []byte
+	err := s.db.WithAnon(ctx, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx,
+			`select route_accessible($1, $2, $3, $4)`,
+			startLng, startLat, endLng, endLat,
+		).Scan(&raw)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("route_accessible query: %w", err)
+	}
+	var ar AccessibleRoute
+	if err := json.Unmarshal(raw, &ar); err != nil {
+		return nil, fmt.Errorf("route_accessible decode: %w", err)
+	}
+	if ar.Error != "" {
+		return nil, fmt.Errorf("route_accessible: %s", ar.Error)
+	}
+	return &ar, nil
+}
+
 // StreetSegment is one surveyed walking path with accessibility attributes.
 type StreetSegment struct {
 	ID               string            `json:"id"`
@@ -21,6 +53,7 @@ type StreetSegment struct {
 	HasCurbCuts      *bool             `json:"hasCurbCuts"`
 	HasRamp          *bool             `json:"hasRamp"`
 	Lit              *bool             `json:"lit"`
+	IsObstacleFree   *bool             `json:"isObstacleFree"`
 	Smoothness       *string           `json:"smoothness"`
 	VerifyStatus     string            `json:"verifyStatus"`
 	Rating           string            `json:"rating"` // "full" | "partial" | "none" | "unknown"
@@ -32,7 +65,7 @@ type StreetSegment struct {
 const segmentsInBBoxSQL = `
 select id::text, street_name, sidewalk_width_m, surface_type, incline_percent,
        has_tactile_paving, is_step_free, has_curb_cuts, has_ramp, lit,
-       smoothness, verify_status, rating, field_sources, geojson
+       is_obstacle_free, smoothness, verify_status, rating, field_sources, geojson
 from segments_in_bbox($1, $2, $3, $4)`
 
 // NewSegment is the validated input for submitting a street segment.
@@ -79,6 +112,35 @@ func (s *Store) AddSegment(ctx context.Context, userID string, in NewSegment) (s
 	return id, classify(err)
 }
 
+const noneSegmentMidpointsSQL = `
+select
+  ST_X(ST_LineInterpolatePoint(geom, 0.5)) as lng,
+  ST_Y(ST_LineInterpolatePoint(geom, 0.5)) as lat
+from street_segments
+where geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)
+  and segment_rating(surface_type, smoothness, sidewalk_width_m, incline_percent, is_step_free) = 'none'
+limit 30`
+
+// NoneSegmentMidpointsInBBox returns midpoints of "none"-rated segments in the
+// bbox — used to build ORS avoid_polygons so the ORS fallback also steers clear
+// of red (impassable) segments.
+func (s *Store) NoneSegmentMidpointsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]LngLat, error) {
+	rows, err := s.db.Pool.Query(ctx, noneSegmentMidpointsSQL, minLng, minLat, maxLng, maxLat)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []LngLat
+	for rows.Next() {
+		var p LngLat
+		if err := rows.Scan(&p.Lng, &p.Lat); err != nil {
+			return nil, err
+		}
+		out = append(out, p)
+	}
+	return out, rows.Err()
+}
+
 // SegmentsInBBox returns street segments whose geometry intersects the bounding box.
 func (s *Store) SegmentsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]StreetSegment, error) {
 	rows, err := s.db.Pool.Query(ctx, segmentsInBBoxSQL, minLng, minLat, maxLng, maxLat)
@@ -94,7 +156,7 @@ func (s *Store) SegmentsInBBox(ctx context.Context, minLng, minLat, maxLng, maxL
 		if err := rows.Scan(
 			&seg.ID, &seg.StreetName, &seg.SidewalkWidthM, &seg.SurfaceType,
 			&seg.InclinePercent, &seg.HasTactilePaving, &seg.IsStepFree, &seg.HasCurbCuts,
-			&seg.HasRamp, &seg.Lit, &seg.Smoothness, &seg.VerifyStatus, &seg.Rating,
+			&seg.HasRamp, &seg.Lit, &seg.IsObstacleFree, &seg.Smoothness, &seg.VerifyStatus, &seg.Rating,
 			&fieldSources, &seg.GeoJSON,
 		); err != nil {
 			return nil, err

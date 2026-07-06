@@ -243,6 +243,14 @@ func (f *fakeStore) AddSegment(_ context.Context, _ string, _ store.NewSegment) 
 	return "", nil
 }
 
+func (f *fakeStore) RouteAccessible(_ context.Context, _, _, _, _ float64) (*store.AccessibleRoute, error) {
+	return nil, nil
+}
+
+func (f *fakeStore) NoneSegmentMidpointsInBBox(_ context.Context, _, _, _, _ float64) ([]store.LngLat, error) {
+	return nil, nil
+}
+
 func (f *fakeStore) FeatureCatalog(_ context.Context) ([]store.Feature, error) {
 	return f.catalog, f.catalogErr
 }

@@ -50,8 +50,8 @@ function sourceLabel(fieldSources: Record<string, string> | null | undefined): s
   return parts.length ? `дані: ${parts.join(', ')}` : 'дані OpenStreetMap';
 }
 
-function Pill({ ok, label }: { ok: boolean | null; label: string }) {
-  if (ok === null) return null;
+function Pill({ ok, label }: { ok: boolean | null | undefined; label: string }) {
+  if (ok == null) return null; // null or undefined → no data, hide pill
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: '0.3em',
@@ -136,6 +136,7 @@ export function StreetSegmentPanel({
 
       {/* Boolean features as pills */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.4em' }}>
+        <Pill ok={segment.isObstacleFree}   label="Без перешкод" />
         <Pill ok={segment.isStepFree}       label="Без сходинок" />
         <Pill ok={segment.hasTactilePaving} label="Тактильне покриття" />
         <Pill ok={segment.hasCurbCuts}      label="Знижений бордюр" />

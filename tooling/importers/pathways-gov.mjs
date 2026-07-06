@@ -33,24 +33,26 @@ const VAL = { 'так': 'yes', 'ні': 'no' };
 // Criterion-title → entity field (first match wins per criterion). Patterns cover
 // both the modern ДБН wording (n≈2097 rows) and the older short LUN wording.
 const FIELD_MATCHERS = [
-  ['width',      /ширин[аи].{0,40}не менше ніж 1,?8|ширина тротуару не менше 1[.,]8/],
-  ['curb_cuts',  /пониження борд|пониження борт|поєднані на одному (спільному )?рівні|пологі з.їзди/],
-  ['step_free',  /відсутні сходи або наявні сходи і пандус|немає перепон|відсутні перешкоди|вільний (від|для).{0,40}перешкод|без будь-яких перешкод для пішохідного/],
-  ['smoothness', /рівн[еий].{0,40}без вибоїн|тверде, ?несипуче/],
-  ['tactile',    /тактильн.{0,30}(смуг|направляюч|маркуванн)|попереджувальн.{0,25}тактильн/],
-  ['ramp',       /уклон пандуса|пандус на маршруті|сходинки замінені пандус|сходи.{0,25}продубльовано пандус|^пандус$/],
-  ['lit',        /^освітленн|штучне освітлення|вуличне.{0,20}освітленн/],
+  ['width',          /ширин[аи].{0,40}не менше ніж 1,?8|ширина тротуару не менше 1[.,]8/],
+  ['curb_cuts',      /пониження борд|пониження борт|поєднані на одному (спільному )?рівні|пологі з.їзди/],
+  ['obstacle_free',  /немає перепон|відсутні перешкоди|вільний (від|для).{0,40}перешкод|без будь-яких перешкод для пішохідного|транзитній.{0,30}зоні тротуару немає/],
+  ['step_free',      /відсутні сходи або наявні сходи і пандус/],
+  ['smoothness',     /рівн[еий].{0,40}без вибоїн|тверде, ?несипуче/],
+  ['tactile',        /тактильн.{0,30}(смуг|направляюч|маркуванн)|попереджувальн.{0,25}тактильн/],
+  ['ramp',           /уклон пандуса|пандус на маршруті|сходинки замінені пандус|сходи.{0,25}продубльовано пандус|^пандус$/],
+  ['lit',            /^освітленн|штучне освітлення|вуличне.{0,20}освітленн/],
 ];
 
 // entity field → { column, sourceKey }
 const FIELD_COL = {
-  width:      { col: 'sidewalk_width_m',   key: 'width' },
-  smoothness: { col: 'smoothness',         key: 'smoothness' },
-  step_free:  { col: 'is_step_free',       key: 'step_free' },
-  curb_cuts:  { col: 'has_curb_cuts',      key: 'curb_cuts' },
-  tactile:    { col: 'has_tactile_paving', key: 'tactile' },
-  ramp:       { col: 'has_ramp',           key: 'ramp' },
-  lit:        { col: 'lit',                key: 'lit' },
+  width:         { col: 'sidewalk_width_m',   key: 'width' },
+  smoothness:    { col: 'smoothness',         key: 'smoothness' },
+  obstacle_free: { col: 'is_obstacle_free',   key: 'obstacle_free' },
+  step_free:     { col: 'is_step_free',       key: 'step_free' },
+  curb_cuts:     { col: 'has_curb_cuts',      key: 'curb_cuts' },
+  tactile:       { col: 'has_tactile_paving', key: 'tactile' },
+  ramp:          { col: 'has_ramp',           key: 'ramp' },
+  lit:           { col: 'lit',                key: 'lit' },
 };
 
 async function ensureFile(name) {
@@ -82,7 +84,8 @@ function decodeFields(props, idTitle) {
   if (acc.width && acc.width.includes('yes')) out.sidewalk_width_m = 1.8; // gov gives a ≥1.8m threshold, store the floor
   if (acc.smoothness) out.smoothness = acc.smoothness.includes('no') ? 'intermediate' : 'good'; // a reported defect dominates
   if (acc.step_free) out.is_step_free = !acc.step_free.includes('no'); // a reported step/barrier dominates
-  if (acc.curb_cuts) out.has_curb_cuts = acc.curb_cuts.includes('yes'); // amenity presence
+  if (acc.obstacle_free) out.is_obstacle_free = !acc.obstacle_free.includes('no');
+  if (acc.curb_cuts) out.has_curb_cuts = acc.curb_cuts.includes('yes');
   if (acc.tactile) out.has_tactile_paving = acc.tactile.includes('yes');
   if (acc.ramp) out.has_ramp = acc.ramp.includes('yes');
   if (acc.lit) out.lit = acc.lit.includes('yes');

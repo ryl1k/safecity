@@ -68,6 +68,8 @@ type DataStore interface {
 	SetUserRole(ctx context.Context, userID, targetID, role string) error
 	// routing support
 	BarriersInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.LngLat, error)
+	RouteAccessible(ctx context.Context, startLng, startLat, endLng, endLat float64) (*store.AccessibleRoute, error)
+	NoneSegmentMidpointsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.LngLat, error)
 	// street segments
 	SegmentsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.StreetSegment, error)
 	AddSegment(ctx context.Context, userID string, in store.NewSegment) (string, error)
