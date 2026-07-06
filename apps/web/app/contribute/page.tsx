@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { MapPin, Footprints, Check, ArrowLeft, ArrowRight } from 'lucide-react';
+import { MapPin, Footprints, ArrowLeft, ArrowRight } from 'lucide-react';
 import type { AccessibilityFeature, Category, FeatureValue } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
@@ -224,21 +224,16 @@ export default function ContributePage() {
           Крок за кроком — місце або пішохідний шлях, який ви знаєте.
         </p>
 
-        {/* Stepper */}
-        <div style={{ display: 'flex', gap: '0.4em', marginBottom: '1.6em' }}>
-          {STEPS.map((label, i) => {
-            const n = i + 1;
-            const done = n < step;
-            const active = n === step;
-            return (
-              <div key={label} style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '0.4em', minWidth: 0 }}>
-                <div style={{ height: '0.4em', borderRadius: '1em', background: done || active ? 'var(--sc-primary)' : 'var(--sc-surface-2)', transition: 'background .3s' }} />
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3em', fontSize: '0.72em', fontWeight: 700, color: active ? 'var(--sc-primary)' : done ? 'var(--sc-text)' : 'var(--sc-muted)', whiteSpace: 'nowrap', overflow: 'hidden' }}>
-                  {done ? <Check size={12} aria-hidden /> : `${n}.`} {label}
-                </span>
-              </div>
-            );
-          })}
+        {/* Stepper — segmented progress with only the current step's title */}
+        <div style={{ marginBottom: '1.6em' }}>
+          <div style={{ display: 'flex', gap: '0.4em' }}>
+            {STEPS.map((label, i) => (
+              <div key={label} style={{ flex: 1, height: '0.4em', borderRadius: '1em', background: i + 1 <= step ? 'var(--sc-primary)' : 'var(--sc-surface-2)', transition: 'background .3s' }} />
+            ))}
+          </div>
+          <div style={{ marginTop: '0.55em', fontWeight: 800, fontSize: '1.05em', color: 'var(--sc-primary)' }}>
+            {STEPS[step - 1]}
+          </div>
         </div>
 
         <div key={`step-${step}-${kind}`} className="sc-animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.1em' }}>
@@ -313,7 +308,7 @@ export default function ContributePage() {
                 <label style={{ display: 'block', fontWeight: 600, fontSize: '0.9em', marginBottom: '0.4em' }}>Покриття</label>
                 <select
                   className="sc-foc" value={surfaceType} onChange={(e) => setSurfaceType(e.target.value)}
-                  style={{ width: '100%', padding: '0.7em 0.9em', borderRadius: '0.7em', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em', border: 'var(--sc-bw) solid var(--sc-border-strong)' }}
+                  style={{ width: '100%', padding: '0.7em 0.9em', borderRadius: '0.7em', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'var(--font-onest), system-ui, sans-serif', fontSize: '1em', border: 'var(--sc-bw) solid var(--sc-border-strong)' }}
                 >
                   {SURFACE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
@@ -401,7 +396,9 @@ export default function ContributePage() {
           <div style={{ display: 'flex', gap: '0.7em', marginTop: '0.4em' }}>
             {step > 1 && (
               <Button variant="secondary" onClick={() => { setError(null); setStep((s) => s - 1); }} disabled={busy} style={{ flex: '0 0 auto' }}>
-                <ArrowLeft size={16} aria-hidden /> Назад
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4em', whiteSpace: 'nowrap' }}>
+                  <ArrowLeft size={16} aria-hidden /> Назад
+                </span>
               </Button>
             )}
             <Button
@@ -409,7 +406,9 @@ export default function ContributePage() {
               disabled={!canProceed() || busy}
               block
             >
-              {primaryLabel} {step < lastStep && <ArrowRight size={16} aria-hidden />}
+              <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '0.5em', whiteSpace: 'nowrap' }}>
+                {primaryLabel} {step < lastStep && <ArrowRight size={16} aria-hidden />}
+              </span>
             </Button>
           </div>
         </div>

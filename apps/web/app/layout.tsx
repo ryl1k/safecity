@@ -11,6 +11,7 @@ const onest = Onest({
   subsets: ['latin', 'cyrillic'],
   weight: ['400', '500', '600', '700', '800', '900'],
   display: 'swap',
+  variable: '--font-onest',
 });
 
 export const metadata: Metadata = {
@@ -33,7 +34,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="uk"
       data-sc-root
       data-theme="standard"
-      className={onest.className}
+      className={`${onest.className} ${onest.variable}`}
       suppressHydrationWarning
     >
       <head>
