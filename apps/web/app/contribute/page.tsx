@@ -164,7 +164,9 @@ export default function ContributePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const features = catalog.filter((f) => f.categories.includes(category));
+  // Wheelchair-only product: the score counts wheelchair-profile criteria, so only
+  // collect those (blind-profile features like Braille / guide dog aren't counted).
+  const features = catalog.filter((f) => f.profile === 'wheelchair' && f.categories.includes(category));
 
   // Elevation split — one DB row per grade sub-segment (from the OSRM-snapped path).
   async function handleRouteChange(coords: [number, number][]) {
