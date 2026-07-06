@@ -139,7 +139,7 @@ func New(d Deps) *Server {
 		// Authorization header (not cookies), so no credentials needed.
 		r.Use(cors.Handler(cors.Options{
 			AllowedOrigins: d.CORSOrigins,
-			AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodDelete, http.MethodOptions},
+			AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodDelete, http.MethodOptions},
 			AllowedHeaders: []string{"Authorization", "Content-Type"},
 			MaxAge:         300,
 		}))
