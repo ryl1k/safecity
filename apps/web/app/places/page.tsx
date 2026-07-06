@@ -23,7 +23,7 @@ import {
 import { pointsNear } from '@/lib/points';
 import { reviewStats, type ReviewStat } from '@/lib/reviews';
 import { categoryLabel, distanceLabel, featureSummary } from '@/lib/format';
-import { CITIES, DEFAULT_CITY_ID, cityById, loadCity, saveCity, type City } from '@/lib/cities';
+import { DEFAULT_CITY_ID, cityById, type City } from '@/lib/cities';
 
 export default function PlacesPage() {
   const router = useRouter();
@@ -55,17 +55,11 @@ export default function PlacesPage() {
     }
   }
   useEffect(() => {
-    const c = loadCity();
+    // Lviv-only dataset — load the default city; no city picker any more.
+    const c = cityById(DEFAULT_CITY_ID);
     setCityState(c);
     void load(c);
   }, []);
-
-  function switchCity(id: string) {
-    const c = cityById(id);
-    setCityState(c);
-    saveCity(c.id);
-    void load(c);
-  }
 
   const st: FilterState = { query, categories, features, levels };
   const filtered = useMemo(
@@ -102,20 +96,7 @@ export default function PlacesPage() {
         className="sc-stagger"
         style={{ flex: 1, width: '100%', maxWidth: 'min(100%, 860px)', margin: '0 auto', padding: '1.4em 1.25em 4em', display: 'flex', flexDirection: 'column', gap: '1em' }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>
-          <h1 style={{ margin: 0, fontSize: '1.7em', fontWeight: 800, flex: '1 1 auto', minWidth: 0 }}>Доступні місця</h1>
-          <select
-            className="sc-foc"
-            aria-label="Місто"
-            value={city.id}
-            onChange={(e) => switchCity(e.target.value)}
-            style={{ minHeight: '2.6em', padding: '0 0.8em', borderRadius: '0.7em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.9em', cursor: 'pointer' }}
-          >
-            {CITIES.map((c) => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
-        </div>
+        <h1 style={{ margin: 0, fontSize: '1.7em', fontWeight: 800 }}>Доступні місця</h1>
         <p style={{ margin: 0, color: 'var(--sc-muted)', lineHeight: 1.5 }}>
           Шукайте заклади, транспорт і переходи — за назвою, категорією чи зручністю доступності.
         </p>

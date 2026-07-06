@@ -48,9 +48,9 @@ function Capability({
 }) {
   return (
     <section
-      className="sc-snap-section"
+      className="sc-snap-section sc-cap-section"
       style={{
-        minHeight: '88vh', display: 'flex', alignItems: 'center', padding: '3.5em 0',
+        display: 'flex', alignItems: 'center',
         // full-bleed tint band that fades to the base bg at the top/bottom edges, so
         // neighbouring sections blend into each other (no hard seam). color-mix keeps
         // it theme-aware — a teal band in light, a dark teal band in dark.

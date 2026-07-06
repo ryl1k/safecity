@@ -85,7 +85,7 @@ export function StreetSegmentPanel({
   const rating = RATING_META[segment.rating] ?? UNKNOWN_RATING;
 
   return (
-    <div role="dialog" aria-label={`Деталі вулиці: ${segment.streetName}`} style={panel}>
+    <div role="dialog" aria-label={`Деталі вулиці: ${segment.streetName}`} className="sc-map-panel" style={panel}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5em', marginBottom: '0.75em' }}>
         <Route size={18} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0, marginTop: '0.15em' }} />
@@ -147,12 +147,9 @@ export function StreetSegmentPanel({
   );
 }
 
-const panel = {
-  position: 'absolute' as const, top: 0, left: 0, height: '100%', width: 'min(420px, 100vw)',
-  zIndex: 55, background: 'var(--sc-bg)', boxShadow: '4px 0 24px rgba(0,0,0,0.18)',
-  overflowY: 'auto' as const, borderRight: 'var(--sc-bw) solid var(--sc-border)',
-  padding: '1.2em 1.4em 2.5em',
-} as const;
+// Positioning/shell comes from the shared .sc-map-panel class (side panel on
+// desktop, bottom sheet on phones); only padding is panel-specific here.
+const panel = { padding: '1.2em 1.4em 2.5em' } as const;
 
 const closeBtn = {
   flexShrink: 0, width: '2.2em', height: '2.2em', borderRadius: '50%', cursor: 'pointer',

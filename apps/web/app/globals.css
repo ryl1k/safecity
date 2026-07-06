@@ -86,8 +86,15 @@
    scroll-padding-top clears the sticky header so snapped titles aren't hidden. */
 html.sc-snap-page { scroll-snap-type: y proximity; scroll-padding-top: 4.6em; }
 .sc-snap-section { scroll-snap-align: start; scroll-snap-stop: normal; }
+.sc-cap-section { min-height: 88vh; padding: 3.5em 0; }
 @media (prefers-reduced-motion: reduce) {
   html.sc-snap-page { scroll-snap-type: none; }
+}
+/* On phones the tall snap sections + 88vh height read as huge empty gaps; free the
+   scroll and let each capability size to its content. */
+@media (max-width: 760px) {
+  html.sc-snap-page { scroll-snap-type: none; scroll-padding-top: 0; }
+  .sc-cap-section { min-height: auto; padding: 2.2em 0; }
 }
 
 /* Capability section: text + visual two-up, alternating sides; stacks on narrow
@@ -132,6 +139,45 @@ html.sc-snap-page { scroll-snap-type: y proximity; scroll-padding-top: 4.6em; }
     border-top: var(--sc-bw) solid var(--sc-border);
     box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
   }
+}
+
+/* ── Map side panels → bottom sheet on mobile ──────────────────────────────
+   Point detail, dropped-marker actions and street details share this shell: a
+   left side panel on desktop, a bottom sheet on phones so the map stays visible
+   (and tappable — the route flow needs the user to tap the map to pick points). */
+.sc-map-panel {
+  position: absolute; top: 0; left: 0; height: 100%; width: min(420px, 100vw);
+  z-index: 60; background: var(--sc-bg); overflow-y: auto;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+  border-right: var(--sc-bw) solid var(--sc-border);
+  display: flex; flex-direction: column;
+}
+@media (max-width: 760px) {
+  .sc-map-panel {
+    top: auto; bottom: 0; left: 0; right: 0; width: auto; height: auto;
+    max-height: 72vh;
+    border-right: none; border-top: var(--sc-bw) solid var(--sc-border);
+    border-radius: 1em 1em 0 0;
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.18);
+  }
+  /* While the user is picking a point on the map, get the sheet out of the way. */
+  .sc-map-panel--hidden { display: none; }
+}
+
+/* Centered hint pill shown at the top of the map while picking a route point. */
+.sc-map-pickhint {
+  position: absolute; top: 0.8em; left: 50%; transform: translateX(-50%); z-index: 58;
+  max-width: calc(100vw - 1.6em);
+  background: var(--sc-primary); color: var(--sc-on-primary);
+  padding: 0.6em 1em; border-radius: 2em; font-weight: 700; font-size: 0.88em;
+  box-shadow: var(--sc-shadow-2); text-align: center;
+}
+
+/* Accessibility/theme menu: anchored under its trigger on desktop; pinned to the
+   viewport's right edge on phones so it never clips off the left. */
+.sc-a11y-menu { position: absolute; right: 0; top: calc(100% + 0.5em); }
+@media (max-width: 760px) {
+  .sc-a11y-menu { position: fixed; right: 0.75em; left: auto; top: calc(0.55em + 3em); }
 }
 
 /* MapLibre attribution credits are links in a text block — underline so they're

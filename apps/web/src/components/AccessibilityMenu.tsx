@@ -38,8 +38,9 @@ export function AccessibilityMenu() {
           <div
             role="dialog"
             aria-label="Налаштування вигляду"
+            className="sc-a11y-menu"
             style={{
-              position: 'absolute', right: 0, top: 'calc(100% + 0.5em)', zIndex: 41, width: 'min(86vw, 260px)',
+              zIndex: 41, width: 'min(86vw, 260px)',
               background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)',
               borderRadius: '0.9em', boxShadow: 'var(--sc-shadow-2)', padding: '0.9em',
             }}

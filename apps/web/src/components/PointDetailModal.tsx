@@ -578,12 +578,14 @@ export function RouteTabContent({
 // ── Main modal / side-panel ────────────────────────────────────────────────
 export function PointDetailModal({
   id,
+  hidden,
   onClose,
   onRequestMapPick,
   onCancelMapPick,
   onRouteDisplay,
 }: {
   id: string;
+  hidden?: boolean;
   onClose: () => void;
   onRequestMapPick?: (cb: (lng: number, lat: number) => void) => void;
   onCancelMapPick?: () => void;
@@ -618,7 +620,7 @@ export function PointDetailModal({
       role="dialog"
       aria-modal="true"
       aria-label="Деталі місця"
-      style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: 'min(420px, 100vw)', zIndex: 60, background: 'var(--sc-bg)', boxShadow: '4px 0 24px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', overflowY: 'auto', borderRight: 'var(--sc-bw) solid var(--sc-border)' }}
+      className={`sc-map-panel${hidden ? ' sc-map-panel--hidden' : ''}`}
     >
       {/* Tab bar + close */}
       <div style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--sc-bg)', borderBottom: 'var(--sc-bw) solid var(--sc-border)', display: 'flex', alignItems: 'center' }}>

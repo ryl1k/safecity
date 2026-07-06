@@ -387,20 +387,26 @@ export default function MapPage() {
           />
         )}
 
-        {/* Floating search — mobile only; desktop puts it in the navbar. */}
-        {!isDesktop && (
-          <div style={{ position: 'absolute', top: 0, left: 0, right: 0, padding: '0.8em', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
+        {/* Floating search — mobile only; desktop puts it in the navbar. Right gap
+            leaves room for the filter button so they don't overlap on phones. */}
+        {!isDesktop && !pickFromCb && (
+          <div style={{ position: 'absolute', top: 0, left: 0, right: '3.6em', padding: '0.8em', display: 'flex', justifyContent: 'center', pointerEvents: 'none' }}>
             <div style={{ position: 'relative', width: '100%', maxWidth: 560, pointerEvents: 'auto' }}>{searchBox}</div>
           </div>
+        )}
+
+        {/* Pick-a-point hint — shown while the sheet is hidden for map tapping. */}
+        {!isDesktop && pickFromCb && (
+          <div className="sc-map-pickhint" role="status">Торкніться мапи, щоб обрати точку</div>
         )}
 
         {/* Filters popover (top-right) */}
         <div ref={filterRef} style={{ position: 'absolute', right: '0.8em', top: '0.8em' }}>
           <button
-            type="button" className="sc-foc" aria-haspopup="dialog" aria-expanded={filtersOpen}
+            type="button" className="sc-foc" aria-haspopup="dialog" aria-expanded={filtersOpen} aria-label="Фільтри"
             onClick={() => setFiltersOpen((o) => !o)} style={filterTrigger}
           >
-            <SlidersHorizontal size={16} aria-hidden /> Фільтри
+            <SlidersHorizontal size={16} aria-hidden />{isDesktop ? ' Фільтри' : ''}
             {activeFilters > 0 && <span aria-label={`${activeFilters} активних`} style={filterBadge}>{activeFilters}</span>}
           </button>
           {filtersOpen && (
@@ -459,7 +465,12 @@ export default function MapPage() {
 
         {/* Dropped-marker panel: address + route actions */}
         {dropped && !modalId && (
-          <div role="dialog" aria-label="Мітка на мапі" style={markerPanel}>
+          <div
+            role="dialog"
+            aria-label="Мітка на мапі"
+            className={`sc-map-panel${pickFromCb && !isDesktop ? ' sc-map-panel--hidden' : ''}`}
+            style={{ padding: '1.2em 1.4em 2.5em' }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5em', marginBottom: '0.7em' }}>
               <MapPinIcon size={18} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
               <strong style={{ flex: 1, minWidth: 0, fontSize: '1.05em' }}>Мітка на мапі</strong>
@@ -470,10 +481,8 @@ export default function MapPage() {
             </p>
             {routeDir === null ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6em' }}>
-                <div style={{ display: 'flex', gap: '0.6em', flexWrap: 'wrap' }}>
-                  <button type="button" className="sc-foc" onClick={() => setRouteDir('to')} style={panelPrimary}>Маршрут сюди</button>
-                  <button type="button" className="sc-foc" onClick={() => setRouteDir('from')} style={panelSecondary}>Маршрут звідси</button>
-                </div>
+                <button type="button" className="sc-foc" onClick={() => setRouteDir('to')} style={panelPrimary}>Маршрут сюди</button>
+                <button type="button" className="sc-foc" onClick={() => setRouteDir('from')} style={panelSecondary}>Маршрут звідси</button>
                 <button
                   type="button" className="sc-foc"
                   onClick={() => router.push(`/contribute?lng=${dropped.lng}&lat=${dropped.lat}&address=${encodeURIComponent(dropped.address ?? '')}`)}
@@ -510,6 +519,7 @@ export default function MapPage() {
         {modalId && (
           <PointDetailModal
             id={modalId}
+            hidden={Boolean(pickFromCb) && !isDesktop}
             onClose={() => { setModalId(null); setPickFromCb(null); setRouteDisplay(null); }}
             onRequestMapPick={(cb) => setPickFromCb(() => cb)}
             onCancelMapPick={() => setPickFromCb(null)}
@@ -548,7 +558,6 @@ const filterTrigger = { position: 'relative', display: 'inline-flex', alignItems
 const filterBadge = { minWidth: '1.5em', height: '1.5em', borderRadius: '50%', background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontSize: '0.7em', fontWeight: 800, padding: '0 0.3em' } as const;
 const filterPanel = { position: 'absolute', right: 0, top: 'calc(100% + 0.5em)', zIndex: 6, width: 'min(92vw, 380px)', maxHeight: '70vh', overflowY: 'auto', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '0.9em', boxShadow: 'var(--sc-shadow-2)', padding: '0.7em' } as const;
 const grid2 = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0 0.6em' } as const;
-const markerPanel ={ position: 'absolute', top: 0, left: 0, height: '100%', width: 'min(420px, 100vw)', zIndex: 55, background: 'var(--sc-bg)', boxShadow: '4px 0 24px rgba(0,0,0,0.18)', overflowY: 'auto', borderRight: 'var(--sc-bw) solid var(--sc-border)', padding: '1.2em 1.4em 2.5em' } as const;
 const panelClose = { flexShrink: 0, width: '2.2em', height: '2.2em', borderRadius: '50%', cursor: 'pointer', border: 'var(--sc-bw) solid var(--sc-border)', background: 'var(--sc-surface)', color: 'var(--sc-text)', display: 'grid', placeItems: 'center' } as const;
 const panelPrimary = { display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em', borderRadius: '0.7em', fontWeight: 800, background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95em' } as const;
 const panelSecondary = { display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em', borderRadius: '0.7em', fontWeight: 800, background: 'var(--sc-surface)', color: 'var(--sc-primary)', border: 'var(--sc-bw) solid var(--sc-primary)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95em' } as const;
