@@ -18,6 +18,7 @@ import { categoryLabel } from '@/lib/format';
 import { loadCity } from '@/lib/cities';
 import { submitSegment } from '@/lib/segments';
 import { splitByElevation, type ElevSegment } from '@/lib/elevation';
+import { reverseGeocode } from '@/lib/geocode';
 
 type Kind = 'point' | 'pathway';
 
@@ -126,6 +127,25 @@ export default function ContributePage() {
 
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [addrBusy, setAddrBusy] = useState(false);
+  const revAbortRef = useRef<AbortController | null>(null);
+
+  // Reverse-geocode a user-picked map location into the address field. Only fires
+  // on a genuine pin pick (LocationPicker never emits on mount / external value),
+  // so a prefilled address is never clobbered.
+  async function fillAddressFromPin(lng: number, lat: number) {
+    revAbortRef.current?.abort();
+    const ctrl = new AbortController();
+    revAbortRef.current = ctrl;
+    setAddrBusy(true);
+    try {
+      const label = await reverseGeocode(lng, lat, ctrl.signal);
+      if (ctrl.signal.aborted) return;
+      if (label) setAddress(label);
+    } finally {
+      if (!ctrl.signal.aborted) setAddrBusy(false);
+    }
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -319,10 +339,15 @@ export default function ContributePage() {
           {/* ── Step 3: location ── */}
           {step === 3 && kind === 'point' && (
             <>
-              <Field label="Адреса" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="вул. Прикладна, 1" />
+              <div>
+                <Field label="Адреса" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="вул. Прикладна, 1" />
+                <p style={{ margin: '0.35em 0 0', fontSize: '0.78em', color: 'var(--sc-muted)' }}>
+                  {addrBusy ? 'Визначаємо адресу за міткою…' : 'Підставляється автоматично з мітки на мапі — можна змінити.'}
+                </p>
+              </div>
               <div>
                 <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Місцезнаходження <span style={{ color: 'var(--sc-bad)' }}>*</span></div>
-                <LocationPicker value={loc} onChange={(lng, lat) => setLoc([lng, lat])} />
+                <LocationPicker value={loc} onChange={(lng, lat) => { setLoc([lng, lat]); void fillAddressFromPin(lng, lat); }} />
               </div>
             </>
           )}
