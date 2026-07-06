@@ -163,3 +163,8 @@ html.sc-snap-page { scroll-snap-type: y proximity; scroll-padding-top: 4.6em; }
   .sc-biz-side { width: 100%; position: static; top: auto; }
   .sc-biz-side nav { flex-direction: row !important; flex-wrap: wrap; }
 }
+
+/* Subtle lift on hover for clickable cards. */
+.sc-lift { transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease; }
+.sc-lift:hover { transform: translateY(-2px); border-color: var(--sc-border-strong); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08); }
+@media (prefers-reduced-motion: reduce) { .sc-lift { transition: none; } .sc-lift:hover { transform: none; } }
