@@ -156,23 +156,31 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 		return n
 	}
 
-	// For wheelchair profile, try pgRouting first — it uses our segment graph
-	// with accessibility-weighted costs (full 1×, partial 1.5×, unknown 3×,
-	// none 100×). Fall through to ORS when pgRouting has no path.
+	pgResult := func(ar *store.AccessibleRoute) geo.RouteResult {
+		return geo.RouteResult{
+			Profile:     "wheelchair",
+			Coordinates: ar.Coordinates,
+			Steps:       []geo.Step{},
+			Summary:     &geo.Summary{Distance: ar.DistanceM, Duration: ar.DistanceM / walkingSpeedMps},
+		}
+	}
+
+	// For wheelchair profile, try pgRouting first — our segment graph with
+	// accessibility-weighted costs. BUT its "none" penalty is soft (100×, not
+	// infinite): when red is the only connected path it routes straight through,
+	// and it never sees the ORS avoid buffers. So we only take a pgRouting route
+	// outright when it's red-free; a red-crossing one is held and compared against
+	// ORS below (ORS usually detours around red via the buffer polygons).
+	var pgRoute *store.AccessibleRoute
 	if wanted == "wheelchair" && s.store != nil && len(req.Via) == 0 {
 		if ar, err := s.store.RouteAccessible(r.Context(), from[0], from[1], to[0], to[1]); err == nil && ar != nil && len(ar.Coordinates) > 1 {
-			httpx.JSON(w, http.StatusOK, geo.RouteResult{
-				Profile:     "wheelchair",
-				Avoided:     avoidedBy(ar.Coordinates),
-				CrossesRed:  crossesRedBy(ar.Coordinates),
-				Coordinates: ar.Coordinates,
-				Steps:       []geo.Step{},
-				Summary: &geo.Summary{
-					Distance: ar.DistanceM,
-					Duration: ar.DistanceM / walkingSpeedMps,
-				},
-			})
-			return
+			if crossesRedBy(ar.Coordinates) == 0 {
+				res := pgResult(ar)
+				res.Avoided = avoidedBy(ar.Coordinates)
+				httpx.JSON(w, http.StatusOK, res)
+				return
+			}
+			pgRoute = ar // crosses red — see if ORS does better
 		}
 	}
 
@@ -241,13 +249,19 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 			httpx.Error(w, http.StatusServiceUnavailable, "unavailable", "routing is not configured")
 			return
 		}
-		if errors.Is(err, geo.ErrNoRoute) {
+		if pgRoute != nil {
+			res = pgResult(pgRoute) // ORS failed but pgRouting has a route — use it
+		} else if errors.Is(err, geo.ErrNoRoute) {
 			httpx.Error(w, http.StatusNotFound, "no_route", "не вдалося прокласти маршрут між цими точками")
 			return
+		} else {
+			s.log.Error("route", "err", err)
+			httpx.Error(w, http.StatusBadGateway, "upstream_error", "routing failed")
+			return
 		}
-		s.log.Error("route", "err", err)
-		httpx.Error(w, http.StatusBadGateway, "upstream_error", "routing failed")
-		return
+	} else if pgRoute != nil && crossesRedBy(pgRoute.Coordinates) < crossesRedBy(res.Coordinates) {
+		// Both engines produced a route; keep the one that crosses fewer red segments.
+		res = pgResult(pgRoute)
 	}
 	res.Avoided = avoidedBy(res.Coordinates) // authoritative, replaces geo's polygon count
 	res.CrossesRed = crossesRedBy(res.Coordinates)
