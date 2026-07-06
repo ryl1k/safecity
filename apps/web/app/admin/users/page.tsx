@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LoadingState, ErrorState } from '@/components/ui';
 import { AdminPanel, SearchBar, FilterChips, AdminRow, Empty } from '@/components/AdminUI';
+import { toast } from '@/lib/toast';
 import { useAdmin } from '@/lib/adminContext';
 import { listUsers, setUserRole, type AdminUser, type UserRole } from '@/lib/admin';
 
@@ -35,8 +36,16 @@ export default function UsersPage() {
   }, [users, q, role]);
 
   async function onRole(id: string, next: UserRole) {
-    await setUserRole(id, next);
+    const prev = (users ?? []).find((x) => x.id === id)?.role;
     setUsers((u) => (u ?? []).map((x) => (x.id === id ? { ...x, role: next } : x)));
+    try {
+      await setUserRole(id, next);
+      toast(`Роль оновлено: ${roleLabel[next]}.`, 'success');
+    } catch (e) {
+      // Revert the optimistic change on failure.
+      setUsers((u) => (u ?? []).map((x) => (x.id === id && prev ? { ...x, role: prev } : x)));
+      toast(e instanceof Error ? e.message : 'Не вдалося змінити роль', 'error');
+    }
   }
 
   if (err) return <ErrorState onRetry={() => location.reload()} />;

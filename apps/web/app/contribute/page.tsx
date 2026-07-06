@@ -19,6 +19,7 @@ import { loadCity } from '@/lib/cities';
 import { submitSegment } from '@/lib/segments';
 import { splitByElevation, type ElevSegment } from '@/lib/elevation';
 import { reverseGeocode } from '@/lib/geocode';
+import { toast } from '@/lib/toast';
 
 type Kind = 'point' | 'pathway';
 
@@ -200,6 +201,7 @@ export default function ContributePage() {
         const res = await api.post<{ id: string }>('/points', {
           name, category, lat: p[1], lng: p[0], address, description, features: cleaned, photos: photoUrls,
         });
+        toast('Місце додано. Дякуємо за внесок!', 'success');
         router.push(`/point/${res.id}`);
         return;
       }
@@ -216,6 +218,7 @@ export default function ContributePage() {
         const coords = routedCoords.length >= 2 ? routedCoords : waypoints;
         await submitSegment({ ...common, coords, inclinePercent: null });
       }
+      toast('Пішохідний шлях додано. Дякуємо за внесок!', 'success');
       router.push('/map');
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Не вдалося зберегти');

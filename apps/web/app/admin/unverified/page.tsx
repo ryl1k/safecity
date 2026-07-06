@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { LoadingState, ErrorState, Button } from '@/components/ui';
 import { AdminPanel, SearchBar, FilterChips, AdminRow, Empty, btnCol, smallBtn } from '@/components/AdminUI';
 import { categoryLabel } from '@/lib/format';
+import { toast } from '@/lib/toast';
 import { unverifiedPoints, setPointVerify, deletePoint, type AdminPoint } from '@/lib/admin';
 
 export default function UnverifiedPage() {
@@ -31,12 +32,22 @@ export default function UnverifiedPage() {
   }, [points, q, cat]);
 
   async function onVerify(id: string, status: 'verified' | 'official') {
-    await setPointVerify(id, status);
-    setPoints((p) => (p ?? []).filter((x) => x.id !== id));
+    try {
+      await setPointVerify(id, status);
+      setPoints((p) => (p ?? []).filter((x) => x.id !== id));
+      toast(status === 'official' ? 'Місце позначено офіційним.' : 'Місце підтверджено.', 'success');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не вдалося оновити місце', 'error');
+    }
   }
   async function onDelete(id: string) {
-    await deletePoint(id);
-    setPoints((p) => (p ?? []).filter((x) => x.id !== id));
+    try {
+      await deletePoint(id);
+      setPoints((p) => (p ?? []).filter((x) => x.id !== id));
+      toast('Місце видалено.', 'success');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не вдалося видалити', 'error');
+    }
   }
 
   if (err) return <ErrorState onRetry={() => location.reload()} />;

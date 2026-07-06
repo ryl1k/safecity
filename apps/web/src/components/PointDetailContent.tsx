@@ -10,6 +10,7 @@ import { PhotoGallery } from '@/components/PhotoGallery';
 import { getCatalog } from '@/lib/catalog';
 import { pointById } from '@/lib/points';
 import { reviewsFor, addReview, type ReviewRow } from '@/lib/reviews';
+import { toast } from '@/lib/toast';
 import { uploadPhotos } from '@/lib/storage';
 import { supabase } from '@/lib/supabase';
 import { categoryLabel } from '@/lib/format';
@@ -93,6 +94,7 @@ export function PointDetailContent({ id, onRouteClick }: { id: string; onRouteCl
       setText('');
       setStars(5);
       setReviewPhotos([]);
+      toast('Відгук опубліковано. Дякуємо!', 'success');
     } catch (err: any) {
       if (err?.message === 'not-authenticated') router.push(`/auth?next=/point/${id}`);
       else setReviewError(err?.message ?? 'Не вдалося опублікувати');

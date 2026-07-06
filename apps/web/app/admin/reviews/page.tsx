@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LoadingState, ErrorState, Button } from '@/components/ui';
 import { AdminPanel, SearchBar, FilterChips, AdminRow, Empty, btnCol, smallBtn } from '@/components/AdminUI';
+import { toast } from '@/lib/toast';
 import { recentReviews, deleteReview, type AdminReview } from '@/lib/admin';
 
 const STAR_OPTIONS = [
@@ -34,8 +35,13 @@ export default function ReviewsPage() {
   }, [reviews, q, stars]);
 
   async function onDelete(id: string) {
-    await deleteReview(id);
-    setReviews((r) => (r ?? []).filter((x) => x.id !== id));
+    try {
+      await deleteReview(id);
+      setReviews((r) => (r ?? []).filter((x) => x.id !== id));
+      toast('Відгук видалено.', 'success');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не вдалося видалити', 'error');
+    }
   }
 
   if (err) return <ErrorState onRetry={() => location.reload()} />;

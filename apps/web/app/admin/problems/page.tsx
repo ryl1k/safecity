@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { LoadingState, ErrorState, Button } from '@/components/ui';
 import { StatusPill } from '@/components/StatusPill';
 import { AdminPanel, SearchBar, FilterChips, AdminRow, Empty, btnCol, smallBtn } from '@/components/AdminUI';
+import { toast } from '@/lib/toast';
 import { openProblems, resolveProblem, deleteProblem, type AdminProblem } from '@/lib/admin';
 
 const statusLabel: Record<string, string> = {
@@ -36,12 +37,22 @@ export default function ProblemsPage() {
   }, [problems, q, status]);
 
   async function onResolve(id: string) {
-    await resolveProblem(id);
-    setProblems((p) => (p ?? []).filter((x) => x.id !== id));
+    try {
+      await resolveProblem(id);
+      setProblems((p) => (p ?? []).filter((x) => x.id !== id));
+      toast('Проблему позначено вирішеною.', 'success');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не вдалося оновити проблему', 'error');
+    }
   }
   async function onDelete(id: string) {
-    await deleteProblem(id);
-    setProblems((p) => (p ?? []).filter((x) => x.id !== id));
+    try {
+      await deleteProblem(id);
+      setProblems((p) => (p ?? []).filter((x) => x.id !== id));
+      toast('Проблему видалено.', 'success');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Не вдалося видалити', 'error');
+    }
   }
 
   if (err) return <ErrorState onRetry={() => location.reload()} />;

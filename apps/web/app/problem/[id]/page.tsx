@@ -11,6 +11,7 @@ import { PhotoGallery } from '@/components/PhotoGallery';
 import { problemById, createPetition, type ProblemRow, type PetitionRow } from '@/lib/civic';
 import { api, ApiError } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import { toast } from '@/lib/toast';
 
 const PETITION_GOAL = 250;
 const ESCALATE_AT = 5; // confirmations needed before we suggest a petition
@@ -82,11 +83,16 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
         `/problems/${id}/confirm`,
       );
       setConfirms(res.confirmations);
+      setConfirmed(true);
+      toast('Дякуємо! Ваше підтвердження додано.', 'success');
     } catch (e) {
       // 409 = already confirmed → treat as success; anything else is a genuine error.
-      if (!(e instanceof ApiError && e.status === 409)) return;
+      if (e instanceof ApiError && e.status === 409) {
+        setConfirmed(true);
+      } else {
+        toast('Не вдалося підтвердити. Спробуйте ще раз.', 'error');
+      }
     }
-    setConfirmed(true);
   }
 
   function openDraft() {
@@ -108,8 +114,10 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
       const pet = await createPetition(problem.id, draftTitle.trim() || `Петиція: ${problem.title}`, draftBody.trim());
       setPetition(pet);
       setDraftOpen(false);
+      toast('Петицію створено.', 'success');
     } catch {
       /* leave the draft open so the user can retry */
+      toast('Не вдалося створити петицію. Спробуйте ще раз.', 'error');
     } finally {
       setCreating(false);
     }
@@ -121,10 +129,15 @@ export default function ProblemPage({ params }: { params: Promise<{ id: string }
     if (!uid) return;
     try {
       await api.post(`/petitions/${petition.id}/sign`);
+      setSigned(true);
+      toast('Ви підписали петицію. Дякуємо!', 'success');
     } catch (e) {
-      if (!(e instanceof ApiError && e.status === 409)) return; // 409 = already signed
+      if (e instanceof ApiError && e.status === 409) {
+        setSigned(true); // already signed
+      } else {
+        toast('Не вдалося підписати. Спробуйте ще раз.', 'error');
+      }
     }
-    setSigned(true);
   }
 
   return (
