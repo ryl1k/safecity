@@ -109,9 +109,29 @@ html.sc-snap-page { scroll-snap-type: y proximity; scroll-padding-top: 4.6em; }
 @media (max-width: 1180px) {
   .sc-hide-sm { display: none; }
 }
-/* Very small: drop the primary nav onto its own full-width row, centred. */
-@media (max-width: 560px) {
-  .sc-header-nav { order: 2; flex-basis: 100%; justify-content: center; }
+
+/* ── Mobile bottom navigation ──────────────────────────────────────────────
+   On phones the primary destinations move to a fixed bottom bar; the header's
+   inline nav is hidden (account + accessibility stay top-right). --sc-bottomnav-h
+   reserves space so scrolling content and the full-height map clear the bar. */
+:root { --sc-bottomnav-h: 0px; }
+.sc-bottom-nav { display: none; }
+@media (max-width: 760px) {
+  :root { --sc-bottomnav-h: calc(56px + env(safe-area-inset-bottom, 0px)); }
+  body { padding-bottom: var(--sc-bottomnav-h); }
+  .sc-header-nav { display: none !important; }
+  .sc-bottom-nav {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 40;
+    display: flex;
+    align-items: stretch;
+    height: var(--sc-bottomnav-h);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--sc-surface);
+    border-top: var(--sc-bw) solid var(--sc-border);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+  }
 }
 
 /* MapLibre attribution credits are links in a text block — underline so they're
@@ -168,3 +188,10 @@ html.sc-snap-page { scroll-snap-type: y proximity; scroll-padding-top: 4.6em; }
 .sc-lift { transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease; }
 .sc-lift:hover { transform: translateY(-2px); border-color: var(--sc-border-strong); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08); }
 @media (prefers-reduced-motion: reduce) { .sc-lift { transition: none; } .sc-lift:hover { transform: none; } }
+
+/* Moderation list row: info + actions inline; stacks so actions don't crush the
+   title on narrow screens. */
+.sc-admin-row { display: flex; align-items: center; gap: 0.8em; padding: 0.7em; border: var(--sc-bw) solid var(--sc-border); border-radius: 0.7em; }
+@media (max-width: 560px) {
+  .sc-admin-row { flex-direction: column; align-items: stretch; }
+}

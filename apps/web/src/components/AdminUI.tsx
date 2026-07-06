@@ -96,7 +96,7 @@ export function FilterChips<T extends string>({
 }
 
 export function AdminRow({ children }: { children: React.ReactNode }) {
-  return <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', padding: '0.7em', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '0.7em' }}>{children}</div>;
+  return <div className="sc-admin-row">{children}</div>;
 }
 
 export function Empty({ children }: { children: React.ReactNode }) {

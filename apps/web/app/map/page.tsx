@@ -358,7 +358,7 @@ export default function MapPage() {
   );
 
   return (
-    <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ height: 'calc(100dvh - var(--sc-bottomnav-h))', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="map" search={isDesktop ? searchBox : undefined} />
       <main id="main-content" tabIndex={-1} style={{ position: 'relative', flex: 1, minHeight: 0, overflow: 'hidden' }}>
         <h1 className="sc-sr">Мапа доступних місць</h1>
