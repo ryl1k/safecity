@@ -112,32 +112,59 @@ func (s *Store) AddSegment(ctx context.Context, userID string, in NewSegment) (s
 	return id, classify(err)
 }
 
-const segmentMidpointsSQL = `
+// SegmentAvoid is one rated segment shaped for routing avoidance: a buffered
+// polygon (to hand ORS as an avoid area — covers the WHOLE segment, not just a
+// point), the raw line (to detect whether the chosen route still crosses it), and
+// the midpoint (for corridor scoping + the honest "avoided" count).
+type SegmentAvoid struct {
+	Mid  LngLat       // segment midpoint [lng,lat]
+	Line [][2]float64 // raw segment vertices
+	Poly [][2]float64 // buffered exterior ring
+}
+
+const segmentAvoidsSQL = `
 select
-  ST_X(ST_LineInterpolatePoint(geom, 0.5)) as lng,
-  ST_Y(ST_LineInterpolatePoint(geom, 0.5)) as lat
+  ST_X(ST_LineInterpolatePoint(geom, 0.5)) as mid_lng,
+  ST_Y(ST_LineInterpolatePoint(geom, 0.5)) as mid_lat,
+  ST_AsGeoJSON(geom) as line,
+  -- ~10 m buffer as a low-vertex polygon (2 segments/quarter, then simplified).
+  ST_AsGeoJSON(ST_SimplifyPreserveTopology(ST_Buffer(geom::geography, 10, 2)::geometry, 0.00002)) as poly
 from street_segments
 where geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)
   and segment_rating(surface_type, smoothness, sidewalk_width_m, incline_percent, is_step_free) = any($5)
 limit $6`
 
-// SegmentMidpointsInBBox returns midpoints of segments in the bbox whose rating is
-// in `ratings` — used to build ORS avoid_polygons so the fallback steers clear of
-// impassable ("none") and, in strict mode, marginal ("partial") segments. `limit`
-// caps the count so we never hand ORS an avoid set large enough to fail the request.
-func (s *Store) SegmentMidpointsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64, ratings []string, limit int) ([]LngLat, error) {
-	rows, err := s.db.Pool.Query(ctx, segmentMidpointsSQL, minLng, minLat, maxLng, maxLat, ratings, limit)
+// SegmentAvoidsInBBox returns segments in the bbox whose rating is in `ratings`,
+// each with a buffered avoid polygon + raw line + midpoint. Used to build ORS
+// avoid_polygons that cover the full impassable ("none") / marginal ("partial")
+// path, and to report residual crossings. `limit` caps the count so we never hand
+// ORS an avoid set large enough to fail the request.
+func (s *Store) SegmentAvoidsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64, ratings []string, limit int) ([]SegmentAvoid, error) {
+	rows, err := s.db.Pool.Query(ctx, segmentAvoidsSQL, minLng, minLat, maxLng, maxLat, ratings, limit)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var out []LngLat
+	var out []SegmentAvoid
 	for rows.Next() {
-		var p LngLat
-		if err := rows.Scan(&p.Lng, &p.Lat); err != nil {
+		var sa SegmentAvoid
+		var lineJSON, polyJSON []byte
+		if err := rows.Scan(&sa.Mid.Lng, &sa.Mid.Lat, &lineJSON, &polyJSON); err != nil {
 			return nil, err
 		}
-		out = append(out, p)
+		var line struct {
+			Coordinates [][2]float64 `json:"coordinates"`
+		}
+		if json.Unmarshal(lineJSON, &line) == nil {
+			sa.Line = line.Coordinates
+		}
+		var poly struct {
+			Coordinates [][][2]float64 `json:"coordinates"` // Polygon: [exterior, holes...]
+		}
+		if json.Unmarshal(polyJSON, &poly) == nil && len(poly.Coordinates) > 0 {
+			sa.Poly = poly.Coordinates[0]
+		}
+		out = append(out, sa)
 	}
 	return out, rows.Err()
 }

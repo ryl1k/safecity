@@ -73,7 +73,7 @@ type DataStore interface {
 	// routing support
 	BarriersInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.LngLat, error)
 	RouteAccessible(ctx context.Context, startLng, startLat, endLng, endLat float64) (*store.AccessibleRoute, error)
-	SegmentMidpointsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64, ratings []string, limit int) ([]store.LngLat, error)
+	SegmentAvoidsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64, ratings []string, limit int) ([]store.SegmentAvoid, error)
 	// street segments
 	SegmentsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.StreetSegment, error)
 	AddSegment(ctx context.Context, userID string, in store.NewSegment) (string, error)

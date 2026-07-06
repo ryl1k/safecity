@@ -186,6 +186,7 @@ export function RouteTabContent({
   const [summary, setSummary] = useState<{ distance: number; duration: number } | null>(null);
   const [fallback, setFallback] = useState(false);
   const [avoided, setAvoided] = useState(0);
+  const [crossesRed, setCrossesRed] = useState(0);
   const [speaking, setSpeaking] = useState(false);
   const [prefs, setPrefs] = useState<RoutePrefs>(() => loadRoutePrefs());
   const prefsRef = useRef<RoutePrefs>(prefs);
@@ -315,7 +316,7 @@ export function RouteTabContent({
   async function plan(waypoints: [number, number][]) {
     if (waypoints.length < 2) return;
     stopSpeech(); setSpeaking(false);
-    setStatus('loading'); setAvoided(0);
+    setStatus('loading'); setAvoided(0); setCrossesRed(0);
     const [start, end] = [waypoints[0], waypoints[waypoints.length - 1]];
     const via = waypoints.slice(1, -1);
 
@@ -350,6 +351,7 @@ export function RouteTabContent({
       setSummary(data.summary ?? null);
       setFallback(Boolean(data.fallback));
       setAvoided(data.avoided ?? 0);
+      setCrossesRed(data.crossesRed ?? 0);
       setStatus('ready');
     } catch { setStatus('error'); }
   }
@@ -559,6 +561,11 @@ export function RouteTabContent({
           {avoided > 0 && (
             <p role="status" style={{ margin: 0, padding: '0.55em 0.8em', borderRadius: '0.7em', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', border: 'var(--sc-bw) solid var(--sc-primary)', fontSize: '0.82em', fontWeight: 700 }}>
               Маршрут оминає {avoided} перешкод(и) поблизу.
+            </p>
+          )}
+          {crossesRed > 0 && (
+            <p role="status" style={{ margin: 0, padding: '0.55em 0.8em', borderRadius: '0.7em', background: 'var(--sc-bad-bg)', color: 'var(--sc-bad)', border: 'var(--sc-bw) solid var(--sc-bad-line)', fontSize: '0.82em', fontWeight: 700 }}>
+              Увага: {crossesRed} недоступних ділянок на шляху — обхід відсутній.
             </p>
           )}
 

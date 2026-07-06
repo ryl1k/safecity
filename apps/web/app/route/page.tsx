@@ -145,6 +145,7 @@ function RouteInner() {
   const [summary, setSummary] = useState<{ distance: number; duration: number } | null>(null);
   const [fallback, setFallback] = useState(false);
   const [avoided, setAvoided] = useState(0);
+  const [crossesRed, setCrossesRed] = useState(0);
   const [nearby, setNearby] = useState<Nearby[]>([]);
   const [speaking, setSpeaking] = useState(false);
   const stepsRef = useRef<Step[]>([]);
@@ -166,6 +167,7 @@ function RouteInner() {
     setSpeaking(false);
     setStatus('loading');
     setAvoided(0);
+    setCrossesRed(0);
     setNearby([]);
     try {
       const point = await pointById(to);
@@ -195,6 +197,7 @@ function RouteInner() {
       setSummary(data.summary);
       setFallback(Boolean(data.fallback));
       setAvoided(data.avoided ?? 0);
+      setCrossesRed(data.crossesRed ?? 0);
       setStatus('ready');
 
       // Along-route accessible-points callouts (best-effort, after the route renders).
@@ -300,6 +303,12 @@ function RouteInner() {
             {status === 'ready' && avoided > 0 && (
               <p role="status" style={{ margin: '0 0 1em', padding: '0.7em 1em', borderRadius: '0.7em', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', border: 'var(--sc-bw) solid var(--sc-primary)', fontSize: '0.85em', fontWeight: 700 }}>
                 Маршрут оминає {avoided} перешкод(и) поблизу.
+              </p>
+            )}
+
+            {status === 'ready' && crossesRed > 0 && (
+              <p role="status" style={{ margin: '0 0 1em', padding: '0.7em 1em', borderRadius: '0.7em', background: 'var(--sc-bad-bg)', color: 'var(--sc-bad)', border: 'var(--sc-bw) solid var(--sc-bad-line)', fontSize: '0.85em', fontWeight: 700 }}>
+                Увага: маршрут проходить {crossesRed} недоступних ділянок — обхід відсутній.
               </p>
             )}
 

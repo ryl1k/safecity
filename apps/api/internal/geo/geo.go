@@ -93,6 +93,7 @@ type RouteResult struct {
 	Profile     string      `json:"profile"`
 	Fallback    bool        `json:"fallback"`
 	Avoided     int         `json:"avoided"`
+	CrossesRed  int         `json:"crossesRed"` // inaccessible segments the final route still runs along
 	Coordinates [][]float64 `json:"coordinates"`
 	Steps       []Step      `json:"steps"`
 	Summary     *Summary    `json:"summary"`

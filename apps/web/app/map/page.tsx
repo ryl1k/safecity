@@ -238,6 +238,8 @@ export default function MapPage() {
   // Drop a marker at coords, then resolve its address in the background.
   function dropAt(lng: number, lat: number) {
     setRouteDir(null);
+    setRouteDisplay(null); // clear any route line from a previous marker
+    setPickFromCb(null);
     setModalId(null);
     setDropped({ lng, lat, address: null });
     void reverseGeocode(lng, lat).then((addr) =>
@@ -378,8 +380,11 @@ export default function MapPage() {
             focus={focus}
             pickMode={pickFromCb !== null}
             onMapClick={(lng, lat) => {
+              // Active point-pick consumes the click; otherwise a tap always drops a
+              // fresh marker (dropAt clears any open route/panel). No routeDir guard —
+              // that left the map unclickable after a route was built.
               if (pickFromCb) { pickFromCb(lng, lat); setPickFromCb(null); }
-              else if (!routeDir) dropAt(lng, lat);
+              else dropAt(lng, lat);
             }}
             route={routeDisplay}
             marker={dropped ? { lng: dropped.lng, lat: dropped.lat } : null}
