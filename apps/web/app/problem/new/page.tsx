@@ -111,7 +111,7 @@ function NewProblemInner() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="problem" />
-      <main id="main-content" tabIndex={-1} style={{ flex: 1, width: '100%', maxWidth: 'min(100%, 560px)', margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
+      <main id="main-content" tabIndex={-1} className="sc-stagger" style={{ flex: 1, width: '100%', maxWidth: 'min(100%, 560px)', margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
         <Link href={pointId ? `/point/${pointId}` : '/map'} className="sc-foc" style={{ color: 'var(--sc-primary)', fontWeight: 700, textDecoration: 'none', fontSize: '0.9em' }}>
           ‹ Назад
         </Link>

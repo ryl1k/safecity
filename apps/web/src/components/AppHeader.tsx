@@ -2,17 +2,31 @@
 
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Map as MapIcon, List as ListIcon, Megaphone, Plus, CircleUserRound, type LucideIcon } from 'lucide-react';
+import { Map as MapIcon, List as ListIcon, Megaphone, Plus, MapPin, CircleUserRound, type LucideIcon } from 'lucide-react';
 import { AccessibilityMenu } from '@/components/AccessibilityMenu';
 import { supabase } from '@/lib/supabase';
+import { businessMe } from '@/lib/business';
 
-export function AppHeader({ active, search }: { active?: 'map' | 'places' | 'civic' | 'problem'; search?: ReactNode }) {
+export function AppHeader({ active, search }: { active?: 'map' | 'places' | 'civic' | 'problem' | 'business'; search?: ReactNode }) {
   const [signedIn, setSignedIn] = useState(false);
+  // "Мої точки" only appears once the user owns at least one point.
+  const [ownsPoints, setOwnsPoints] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setSignedIn(Boolean(data.user)));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setSignedIn(Boolean(session?.user)));
-    return () => sub.subscription.unsubscribe();
+    let active = true;
+    const refresh = (signed: boolean) => {
+      setSignedIn(signed);
+      if (!signed) {
+        setOwnsPoints(false);
+        return;
+      }
+      businessMe()
+        .then((m) => { if (active) setOwnsPoints(m.points.length > 0); })
+        .catch(() => {});
+    };
+    supabase.auth.getUser().then(({ data }) => refresh(Boolean(data.user)));
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => refresh(Boolean(session?.user)));
+    return () => { active = false; sub.subscription.unsubscribe(); };
   }, []);
 
   return (
@@ -24,8 +38,8 @@ export function AppHeader({ active, search }: { active?: 'map' | 'places' | 'civ
     >
       <div
         style={{
-          maxWidth: 1080, margin: '0 auto', padding: '0.55em 1.25em',
-          display: 'flex', alignItems: 'center', gap: '0.6em 1.2em', flexWrap: 'wrap',
+          maxWidth: 1280, margin: '0 auto', padding: '0.55em 1.25em',
+          display: 'flex', alignItems: 'center', gap: '0.5em 0.85em', flexWrap: 'wrap',
         }}
       >
         <Link
@@ -42,11 +56,12 @@ export function AppHeader({ active, search }: { active?: 'map' | 'places' | 'civ
           <NavLink href="/places" icon={ListIcon} label="Місця" current={active === 'places'} />
           <NavLink href="/problem/new" icon={Megaphone} label="Повідомити" current={active === 'problem'} />
           <NavLink href="/contribute" icon={Plus} label="Додати" />
+          {signedIn && ownsPoints && <NavLink href="/business" icon={MapPin} label="Мої точки" current={active === 'business'} />}
         </nav>
 
         {/* Optional search slot (desktop map view puts its search here). */}
         {search ? (
-          <div style={{ flex: 1, minWidth: 180, maxWidth: 560, margin: '0 auto', position: 'relative' }}>{search}</div>
+          <div style={{ flex: 1, minWidth: 150, maxWidth: 460, margin: '0 auto', position: 'relative' }}>{search}</div>
         ) : null}
 
         <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '0.6em', flexWrap: 'wrap' }}>

@@ -45,6 +45,44 @@ func (s *Store) AddPoint(ctx context.Context, userID string, in NewPoint) (strin
 	return id, classify(err)
 }
 
+const updatePointSQL = `select update_point($1::uuid, $2, $3::point_category, $4, $5, $6, $7, $8::jsonb)`
+
+// UpdatePoint edits a point the caller owns (name/category/location/address/
+// description + feature set). ErrNotFound if the point isn't the caller's.
+func (s *Store) UpdatePoint(ctx context.Context, userID, pointID string, in NewPoint) error {
+	featuresJSON := []byte("{}")
+	if len(in.Features) > 0 {
+		b, err := json.Marshal(in.Features)
+		if err != nil {
+			return err
+		}
+		featuresJSON = b
+	}
+	err := s.db.WithUser(ctx, userID, func(tx pgx.Tx) error {
+		_, e := tx.Exec(ctx, updatePointSQL,
+			pointID, in.Name, in.Category, in.Lng, in.Lat,
+			nullable(in.Address), nullable(in.Description), string(featuresJSON))
+		return e
+	})
+	return classify(err)
+}
+
+// DeleteOwnPoint removes a point the caller owns. ErrNotFound if not theirs.
+// (Distinct from the moderator DeletePoint in admin.go.)
+func (s *Store) DeleteOwnPoint(ctx context.Context, userID, pointID string) error {
+	err := s.db.WithUser(ctx, userID, func(tx pgx.Tx) error {
+		_, e := tx.Exec(ctx, `select delete_point($1::uuid)`, pointID)
+		return e
+	})
+	return classify(err)
+}
+
+// IncrementView bumps a point's view counter. Best-effort analytics — runs on the
+// privileged pool (no auth needed) and callers fire it without blocking the read.
+func (s *Store) IncrementView(ctx context.Context, pointID string) {
+	_, _ = s.db.Pool.Exec(ctx, `update points set view_count = view_count + 1 where id = $1`, pointID)
+}
+
 // NewReview is validated input for rating a point for one accessibility profile.
 type NewReview struct {
 	Profile string // wheelchair | blind

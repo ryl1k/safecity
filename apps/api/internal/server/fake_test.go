@@ -35,21 +35,30 @@ type fakeStore struct {
 	pointID  string
 	pointErr error
 
-	// CreateBusinessPoint
-	gotBizPoint store.NewPoint
-	bizPointID  string
-	bizPointErr error
+	// UpdatePoint / DeleteOwnPoint / IncrementView (delete reuses gotDeleteID/deleteErr below)
+	gotUpdateID string
+	updateErr   error
+	gotViewID   string
 
-	// MyBusinessPoints
-	bizPoints    []store.BusinessPointRow
-	bizPointsErr error
+	// SubscribeBusiness
+	gotSubPlan string
+	subErr     error
 
-	// MarkVerifiedPaid / SetSubscription
-	gotVerifyPaidID string
-	verifyPaidErr   error
-	gotSubID        string
-	gotSubPlan      string
-	subErr          error
+	// GetBusinessMe
+	bizMe    store.BusinessMe
+	bizMeErr error
+
+	// GetBusinessAnalytics
+	bizAnalytics    store.BusinessAnalytics
+	bizAnalyticsErr error
+
+	// GetBusinessReports
+	bizReports    []store.BusinessReport
+	bizReportsErr error
+
+	// RequestPointVerification
+	gotVerifyReqID string
+	verifyReqErr   error
 
 	// UpsertReview
 	gotReviewPoint string
@@ -158,25 +167,42 @@ func (f *fakeStore) AddPoint(_ context.Context, userID string, in store.NewPoint
 	return f.pointID, f.pointErr
 }
 
-func (f *fakeStore) CreateBusinessPoint(_ context.Context, userID string, in store.NewPoint) (string, error) {
-	f.gotUser = userID
-	f.gotBizPoint = in
-	return f.bizPointID, f.bizPointErr
+func (f *fakeStore) UpdatePoint(_ context.Context, userID, pointID string, in store.NewPoint) error {
+	f.gotUser, f.gotUpdateID, f.gotPoint = userID, pointID, in
+	return f.updateErr
 }
 
-func (f *fakeStore) MyBusinessPoints(_ context.Context, userID string) ([]store.BusinessPointRow, error) {
-	f.gotUser = userID
-	return f.bizPoints, f.bizPointsErr
+func (f *fakeStore) DeleteOwnPoint(_ context.Context, userID, pointID string) error {
+	f.gotUser, f.gotDeleteID = userID, pointID
+	return f.deleteErr
 }
 
-func (f *fakeStore) MarkVerifiedPaid(_ context.Context, userID, pointID string) error {
-	f.gotUser, f.gotVerifyPaidID = userID, pointID
-	return f.verifyPaidErr
-}
+func (f *fakeStore) IncrementView(_ context.Context, pointID string) { f.gotViewID = pointID }
 
-func (f *fakeStore) SetSubscription(_ context.Context, userID, pointID, plan string) error {
-	f.gotUser, f.gotSubID, f.gotSubPlan = userID, pointID, plan
+func (f *fakeStore) SubscribeBusiness(_ context.Context, userID, plan string) error {
+	f.gotUser, f.gotSubPlan = userID, plan
 	return f.subErr
+}
+
+func (f *fakeStore) GetBusinessMe(_ context.Context, userID string) (store.BusinessMe, error) {
+	f.gotUser = userID
+	return f.bizMe, f.bizMeErr
+}
+
+func (f *fakeStore) GetBusinessAnalytics(_ context.Context, userID string) (store.BusinessAnalytics, error) {
+	f.gotUser = userID
+	return f.bizAnalytics, f.bizAnalyticsErr
+}
+
+func (f *fakeStore) GetBusinessReports(_ context.Context, userID string) ([]store.BusinessReport, error) {
+	f.gotUser = userID
+	return f.bizReports, f.bizReportsErr
+}
+
+func (f *fakeStore) RequestPointVerification(_ context.Context, userID, pointID string) error {
+	f.gotUser = userID
+	f.gotVerifyReqID = pointID
+	return f.verifyReqErr
 }
 
 func (f *fakeStore) UpsertReview(_ context.Context, userID, pointID string, in store.NewReview) (store.Review, error) {

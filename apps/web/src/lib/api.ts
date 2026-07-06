@@ -52,7 +52,9 @@ async function request<T>(
     headers['Authorization'] = `Bearer ${token}`;
   }
 
-  const res = await fetch(`${BASE}${path}`, { method, headers, body: payload, signal });
+  // no-store: this is a live data API — never serve a stale browser-cached response
+  // (a catalog/point change must show immediately, not after the HTTP cache expires).
+  const res = await fetch(`${BASE}${path}`, { method, headers, body: payload, signal, cache: 'no-store' });
   const text = await res.text();
   const json = text ? JSON.parse(text) : null;
   if (!res.ok) {
@@ -68,7 +70,9 @@ export const api = {
   /** POST defaults to authenticated (most writes need it); pass {auth:false} for public posts. */
   post: <T>(path: string, body?: unknown, opts?: { auth?: boolean }) =>
     request<T>('POST', path, body, opts?.auth ?? true),
-  /** DELETE is always authenticated (only moderation uses it). */
+  /** PATCH is always authenticated (owner edits). */
+  patch: <T>(path: string, body?: unknown) => request<T>('PATCH', path, body, true),
+  /** DELETE is always authenticated (moderation + owner deletes). */
   del: <T>(path: string) => request<T>('DELETE', path, undefined, true),
 };
 

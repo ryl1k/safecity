@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import type { AccessibilityFeature, Category, PointSummary } from '@safecity/shared';
+import type { AccessibilityFeature, AccessLevel, Category, PointSummary } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { SearchBar, Chip, ListRow, LoadingState, ErrorState, EmptyState } from '@/components/ui';
@@ -14,7 +14,9 @@ import {
   categoryColor,
   featuresForCategories,
   filterPoints,
-  ratingOf,
+  levelOf,
+  levelLabel,
+  levelColor,
   suggestFilters,
   type FilterState,
 } from '@/lib/filters';
@@ -33,7 +35,7 @@ export default function PlacesPage() {
   const [query, setQuery] = useState('');
   const [categories, setCategories] = useState<Set<Category>>(new Set());
   const [features, setFeatures] = useState<Set<string>>(new Set());
-  const [showInaccessible, setShowInaccessible] = useState(false);
+  const [levels, setLevels] = useState<Set<AccessLevel>>(new Set());
 
   async function load(c: City) {
     setStatus('loading');
@@ -65,12 +67,13 @@ export default function PlacesPage() {
     void load(c);
   }
 
-  const st: FilterState = { query, categories, features, showInaccessible };
+  const st: FilterState = { query, categories, features, levels };
   const filtered = useMemo(
     () => filterPoints(points, catalog, st),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [points, catalog, query, categories, features, showInaccessible],
+    [points, catalog, query, categories, features, levels],
   );
+  function toggleLevel(l: AccessLevel) { setLevels((prev) => { const n = new Set(prev); n.has(l) ? n.delete(l) : n.add(l); return n; }); }
   const featureChips = useMemo(() => featuresForCategories(catalog, categories), [catalog, categories]);
 
   const suggestions = useMemo(() => {
@@ -96,6 +99,7 @@ export default function PlacesPage() {
       <main
         id="main-content"
         tabIndex={-1}
+        className="sc-stagger"
         style={{ flex: 1, width: '100%', maxWidth: 'min(100%, 860px)', margin: '0 auto', padding: '1.4em 1.25em 4em', display: 'flex', flexDirection: 'column', gap: '1em' }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>
@@ -153,9 +157,12 @@ export default function PlacesPage() {
               {f.label}
             </Chip>
           ))}
-          <Chip pressed={showInaccessible} onToggle={() => setShowInaccessible((v) => !v)}>
-            Показати недоступні
-          </Chip>
+          {(['high', 'medium', 'low'] as AccessLevel[]).map((l) => (
+            <Chip key={l} pressed={levels.has(l)} onToggle={() => toggleLevel(l)}>
+              <span aria-hidden style={{ display: 'inline-block', width: '0.55em', height: '0.55em', borderRadius: '50%', background: levelColor[l], marginRight: '0.4em', verticalAlign: 'middle' }} />
+              {levelLabel[l]}
+            </Chip>
+          ))}
         </div>
 
         <span aria-live="polite" style={{ color: 'var(--sc-muted)', fontSize: '0.85em' }}>
@@ -169,7 +176,7 @@ export default function PlacesPage() {
             title="Нічого не знайдено"
             message="Спробуйте змінити пошук або фільтри."
             actionLabel="Скинути"
-            onAction={() => { setQuery(''); setCategories(new Set()); setFeatures(new Set()); setShowInaccessible(false); }}
+            onAction={() => { setQuery(''); setCategories(new Set()); setFeatures(new Set()); setLevels(new Set()); }}
           />
         )}
 
@@ -178,11 +185,12 @@ export default function PlacesPage() {
             {filtered.map((point, i) => {
               const summary = featureSummary(point, catalog, 'wheelchair');
               const meta = [categoryLabel[point.category], distanceLabel(point.distanceM), summary || 'немає даних'].join(' · ');
+              const lvl = levelOf(point, catalog);
               return (
                 <li key={point.id} style={{ borderTop: i ? 'var(--sc-bw) solid var(--sc-border)' : 'none' }}>
                   <ListRow
                     name={point.name}
-                    rating={ratingOf(point, catalog)}
+                    badge={{ label: levelLabel[lvl], color: levelColor[lvl] }}
                     icon={<PlaceIcon category={point.category} name={point.name} size={20} />}
                     stars={stats[point.id]?.avg}
                     meta={meta}

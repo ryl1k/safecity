@@ -4,7 +4,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { SlidersHorizontal, Check, MapPin as MapPinIcon, Search, X } from 'lucide-react';
-import type { AccessibilityFeature, Category, PointSummary } from '@safecity/shared';
+import type { AccessibilityFeature, AccessLevel, Category, PointSummary } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
 import { PointDetailModal, RouteTabContent } from '@/components/PointDetailModal';
 import type { RouteDisplay } from '@/components/ExploreMap';
@@ -14,9 +14,9 @@ import { pointsInBbox, pointById, searchPointsByName, type PointHit } from '@/li
 import { problemsInBbox, type ProblemMarker } from '@/lib/civic';
 import { reviewStats, type ReviewStat } from '@/lib/reviews';
 import { geocodePlaces, reverseGeocode, type GeoPlace } from '@/lib/geocode';
-import { featuresForCategories, isAccessible, suggestFilters } from '@/lib/filters';
+import { featuresForCategories, levelOf, levelLabel, levelColor, suggestFilters } from '@/lib/filters';
 import { categoryLabel } from '@/lib/format';
-import { CITIES, DEFAULT_CITY_ID, cityBbox, cityById, loadCity, saveCity, type City } from '@/lib/cities';
+import { DEFAULT_CITY_ID, cityBbox, cityById, loadCity, type City } from '@/lib/cities';
 import { segmentsInBbox, type StreetSegment } from '@/lib/segments';
 import { StreetSegmentPanel } from '@/components/StreetSegmentPanel';
 import type { ExploreSegment } from '@/components/ExploreMap';
@@ -24,6 +24,9 @@ import type { ExploreSegment } from '@/components/ExploreMap';
 const CATEGORIES: Category[] = ['venue', 'transit', 'crossing', 'toilet', 'parking'];
 
 const ExploreMap = dynamic(() => import('@/components/ExploreMap').then((m) => m.ExploreMap), { ssr: false });
+
+// Filterable accessibility levels, best-first (the weighted model never yields 'unknown').
+const LEVEL_ORDER: AccessLevel[] = ['high', 'medium', 'low'];
 
 interface Bbox { minLng: number; minLat: number; maxLng: number; maxLat: number; zoom?: number }
 
@@ -36,7 +39,7 @@ export default function MapPage() {
   const [catalog, setCatalog] = useState<AccessibilityFeature[]>([]);
   const [points, setPoints] = useState<PointSummary[]>([]);
   const [stats, setStats] = useState<Record<string, ReviewStat>>({});
-  const [showInaccessible, setShowInaccessible] = useState(false);
+  const [levelFilter, setLevelFilter] = useState<Set<AccessLevel>>(new Set());
   const [features, setFeatures] = useState<Set<string>>(new Set());
   const [enabled, setEnabled] = useState<Set<Category>>(new Set(CATEGORIES));
   const [showProblems, setShowProblems] = useState(false);
@@ -72,19 +75,34 @@ export default function MapPage() {
     return () => mq.removeEventListener('change', sync);
   }, []);
 
+  // Zooming far out makes MapLibre's bounds exceed ±180 lng / ±90 lat; the API
+  // rejects those, so clamp to the valid world before every fetch.
+  function clampBbox(b: Bbox): Bbox {
+    return {
+      minLng: Math.max(-180, Math.min(180, b.minLng)),
+      maxLng: Math.max(-180, Math.min(180, b.maxLng)),
+      minLat: Math.max(-90, Math.min(90, b.minLat)),
+      maxLat: Math.max(-90, Math.min(90, b.maxLat)),
+      zoom: b.zoom,
+    };
+  }
+
   async function loadPoints(bb: Bbox) {
+    const c = clampBbox(bb);
     try {
-      setPoints(await pointsInBbox(bb.minLng, bb.minLat, bb.maxLng, bb.maxLat));
-      loadedBboxRef.current = bb;
+      setPoints(await pointsInBbox(c.minLng, c.minLat, c.maxLng, c.maxLat));
+      loadedBboxRef.current = c;
       setStatus('ready');
     } catch {
-      setStatus('error');
+      // Only fail hard on the very first load; a later hiccup must not nuke a live map.
+      setStatus((s) => (s === 'loading' ? 'error' : s));
     }
   }
 
   async function loadSegments(bb: Bbox, fit = false) {
+    const c = clampBbox(bb);
     try {
-      const segs = await segmentsInBbox(bb.minLng, bb.minLat, bb.maxLng, bb.maxLat);
+      const segs = await segmentsInBbox(c.minLng, c.minLat, c.maxLng, c.maxLat);
       setSegments(segs);
       // On a city switch, frame the map to the segments so the (scattered,
       // often off-centre) accessibility data is visible instead of an empty
@@ -138,17 +156,6 @@ export default function MapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  function switchCity(id: string) {
-    const c = cityById(id);
-    setCityState(c);
-    saveCity(c.id);
-    setModalId(null);
-    nonceRef.current += 1;
-    setFocus({ lng: c.lng, lat: c.lat, nonce: nonceRef.current, zoom: 12.5 });
-    void loadPoints(cityBbox(c));
-    void loadSegments(cityBbox(c), true);
-  }
-
   function onMoveEnd(b: Bbox) {
     lastBbox.current = b;
     const loaded = loadedBboxRef.current;
@@ -193,10 +200,11 @@ export default function MapPage() {
     return points
       .filter((p) => enabled.has(p.category))
       .filter((p) => {
-        // Feature chips act as the accessibility filter; otherwise default hides
-        // non-accessible points unless "show inaccessible" is on.
-        if (keys.length) return keys.every((k) => p.features[k] === 'yes');
-        return showInaccessible || isAccessible(p, catalog);
+        // Feature chips require every chosen amenity; the level chips keep only the
+        // selected inclusiveness levels. Both combine; empty = show everything.
+        if (keys.length && !keys.every((k) => p.features[k] === 'yes')) return false;
+        if (levelFilter.size > 0 && !levelFilter.has(levelOf(p, catalog))) return false;
+        return true;
       })
       .map((p) => ({
         id: p.id,
@@ -204,9 +212,9 @@ export default function MapPage() {
         lng: p.lng,
         lat: p.lat,
         category: p.category,
-        accessible: isAccessible(p, catalog),
+        level: levelOf(p, catalog),
       }));
-  }, [points, enabled, features, showInaccessible, catalog]);
+  }, [points, enabled, features, levelFilter, catalog]);
 
   // Shape segments for ExploreMap (only the fields the map layer needs).
   const exploreSegments = useMemo<ExploreSegment[]>(
@@ -266,7 +274,8 @@ export default function MapPage() {
 
   function toggleCat(c: Category) { setEnabled((prev) => { const n = new Set(prev); n.has(c) ? n.delete(c) : n.add(c); return n; }); }
   function toggleFeature(id: string) { setFeatures((prev) => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; }); }
-  const activeFilters = (showInaccessible ? 1 : 0) + features.size + (showProblems ? 1 : 0) + (CATEGORIES.length - enabled.size);
+  const activeFilters = levelFilter.size + features.size + (showProblems ? 1 : 0) + (CATEGORIES.length - enabled.size);
+  function toggleLevel(l: AccessLevel) { setLevelFilter((prev) => { const n = new Set(prev); n.has(l) ? n.delete(l) : n.add(l); return n; }); }
 
   useEffect(() => {
     if (!filtersOpen) return;
@@ -320,13 +329,22 @@ export default function MapPage() {
           {searching && !hasResults && <li style={resultMuted}>Пошук…</li>}
           {!searching && !hasResults && <li style={resultMuted}>Нічого не знайдено</li>}
           {pointHits.length > 0 && <li style={resultHead} aria-hidden>Місця SafeCity</li>}
-          {pointHits.map((p, i) => (
+          {pointHits.map((p, i) => {
+            const lvl = levelOf({ features: p.features, category: p.category } as PointSummary, catalog);
+            return (
             <li key={p.id} id={`map-opt-${i}`} role="option" aria-selected={activeIndex === i} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setActiveIndex(i)} onClick={() => void pickPoint(p.id)} style={{ ...resultRow, background: activeIndex === i ? 'var(--sc-primary-tint)' : 'transparent' }}>
               <MapPinIcon size={16} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
-              <span style={{ minWidth: 0, flex: 1 }}><span style={resultTitle}>{p.name}</span><span style={resultSub}>{categoryLabel[p.category]}{p.address ? ` · ${p.address}` : ''}</span></span>
+              <span style={{ minWidth: 0, flex: 1 }}>
+                <span style={resultTitle}>{p.name}</span>
+                <span style={resultSub}>
+                  <span aria-hidden style={{ display: 'inline-block', width: '0.55em', height: '0.55em', borderRadius: '50%', background: levelColor[lvl], marginRight: '0.4em', verticalAlign: 'baseline' }} />
+                  {levelLabel[lvl]}{p.address ? ` · ${p.address}` : ` · ${categoryLabel[p.category]}`}
+                </span>
+              </span>
               {((s) => (s ? <span style={{ flexShrink: 0, fontSize: '0.8em', fontWeight: 800, color: 'var(--sc-warn)' }}>★ {s.avg.toFixed(1)}</span> : null))(stats[p.id])}
             </li>
-          ))}
+            );
+          })}
           {placeHits.length > 0 && <li style={resultHead} aria-hidden>Адреси та місця</li>}
           {placeHits.map((pl, j) => { const idx = placeBase + j; return (
             <li key={pl.id} id={`map-opt-${idx}`} role="option" aria-selected={activeIndex === idx} onMouseDown={(e) => e.preventDefault()} onMouseEnter={() => setActiveIndex(idx)} onClick={() => pickPlace(pl)} style={{ ...resultRow, background: activeIndex === idx ? 'var(--sc-primary-tint)' : 'transparent' }}>
@@ -376,19 +394,6 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* City picker (top-left; below the floating search on mobile) */}
-        <select
-          className="sc-foc"
-          aria-label="Місто"
-          value={city.id}
-          onChange={(e) => switchCity(e.target.value)}
-          style={{ ...cityPicker, top: isDesktop ? '0.8em' : '4.5em' }}
-        >
-          {CITIES.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-
         {/* Filters popover (top-right) */}
         <div ref={filterRef} style={{ position: 'absolute', right: '0.8em', top: '0.8em' }}>
           <button
@@ -401,7 +406,21 @@ export default function MapPage() {
           {filtersOpen && (
             <>
               <div role="dialog" aria-label="Фільтри мапи" style={filterPanel}>
-                <ToggleRow checked={showInaccessible} onChange={() => setShowInaccessible((v) => !v)} label="Показати недоступні" />
+                <div style={{ fontSize: '0.72em', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--sc-muted)', marginBottom: '0.4em' }}>Рівень доступності</div>
+                <div style={{ display: 'flex', gap: '0.4em', flexWrap: 'wrap', marginBottom: '0.6em' }}>
+                  {LEVEL_ORDER.map((l) => {
+                    const on = levelFilter.has(l);
+                    return (
+                      <button key={l} type="button" className="sc-foc" aria-pressed={on} onClick={() => toggleLevel(l)}
+                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.4em', padding: '0.35em 0.7em', borderRadius: '2em', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.82em',
+                          border: `var(--sc-bw) solid ${on ? levelColor[l] : 'var(--sc-border-strong)'}`,
+                          background: on ? levelColor[l] : 'transparent', color: on ? '#fff' : 'var(--sc-text)' }}>
+                        <span aria-hidden style={{ width: '0.55em', height: '0.55em', borderRadius: '50%', background: on ? '#fff' : levelColor[l] }} />
+                        {levelLabel[l]}
+                      </button>
+                    );
+                  })}
+                </div>
                 <ToggleRow checked={showProblems} onChange={() => setShowProblems((v) => !v)} label="Показати проблеми" />
                 <div style={{ height: 1, background: 'var(--sc-border)', margin: '0.5em 0' }} />
                 <div style={{ fontSize: '0.72em', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--sc-muted)', marginBottom: '0.3em' }}>Зручності</div>
@@ -417,7 +436,7 @@ export default function MapPage() {
                     <ToggleRow key={c} checked={enabled.has(c)} onChange={() => toggleCat(c)} label={categoryLabel[c]} />
                   ))}
                 </div>
-                <button type="button" className="sc-foc" onClick={() => { setShowInaccessible(false); setFeatures(new Set()); setShowProblems(false); setEnabled(new Set(CATEGORIES)); }} style={{ marginTop: '0.6em', background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.85em' }}>
+                <button type="button" className="sc-foc" onClick={() => { setLevelFilter(new Set()); setFeatures(new Set()); setShowProblems(false); setEnabled(new Set(CATEGORIES)); }} style={{ marginTop: '0.6em', background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.85em' }}>
                   Скинути фільтри
                 </button>
               </div>
@@ -529,7 +548,6 @@ const filterTrigger = { position: 'relative', display: 'inline-flex', alignItems
 const filterBadge = { minWidth: '1.5em', height: '1.5em', borderRadius: '50%', background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', display: 'grid', placeItems: 'center', fontSize: '0.7em', fontWeight: 800, padding: '0 0.3em' } as const;
 const filterPanel = { position: 'absolute', right: 0, top: 'calc(100% + 0.5em)', zIndex: 6, width: 'min(92vw, 380px)', maxHeight: '70vh', overflowY: 'auto', background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '0.9em', boxShadow: 'var(--sc-shadow-2)', padding: '0.7em' } as const;
 const grid2 = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: '0 0.6em' } as const;
-const cityPicker = { position: 'absolute', left: '0.8em', minHeight: '2.6em', padding: '0 0.8em', borderRadius: '1.4em', border: 'var(--sc-bw) solid var(--sc-border-strong)', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.9em', cursor: 'pointer', boxShadow: 'var(--sc-shadow-2)' } as const;
 const markerPanel ={ position: 'absolute', top: 0, left: 0, height: '100%', width: 'min(420px, 100vw)', zIndex: 55, background: 'var(--sc-bg)', boxShadow: '4px 0 24px rgba(0,0,0,0.18)', overflowY: 'auto', borderRight: 'var(--sc-bw) solid var(--sc-border)', padding: '1.2em 1.4em 2.5em' } as const;
 const panelClose = { flexShrink: 0, width: '2.2em', height: '2.2em', borderRadius: '50%', cursor: 'pointer', border: 'var(--sc-bw) solid var(--sc-border)', background: 'var(--sc-surface)', color: 'var(--sc-text)', display: 'grid', placeItems: 'center' } as const;
 const panelPrimary = { display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em', borderRadius: '0.7em', fontWeight: 800, background: 'var(--sc-primary)', color: 'var(--sc-on-primary)', border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95em' } as const;
