@@ -1,6 +1,8 @@
-// Current device location → [lng, lat], falling back to central Lviv. Permission
-// is requested lazily; denial, timeout, or an implausible fix silently falls back
-// so the app never blocks (and we never plan a "3000 km" route from a bad fix).
+// Current device location → [lng, lat]. Permission is requested lazily;
+// tryGetCurrentLocation() reports denial/timeout/error as null so callers can
+// decide (e.g. the route screen refuses to seed a start from a bad fix), while
+// getCurrentLocation() keeps the old always-resolves contract by falling back
+// to central Lviv.
 import * as Location from 'expo-location';
 
 export const LVIV: [number, number] = [24.0316, 49.8419];
@@ -15,19 +17,24 @@ export function metersBetween(a: [number, number], b: [number, number]): number 
   return Math.sqrt(x * x + dLat * dLat) * R;
 }
 
-export async function getCurrentLocation(): Promise<[number, number]> {
+/** Device location, or null on permission denial, timeout, or error. */
+export async function tryGetCurrentLocation(): Promise<[number, number] | null> {
   try {
     const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') return LVIV;
+    if (status !== 'granted') return null;
     // Race the GPS read against a timeout so a stuck emulator fix can't hang us.
     const timeout = new Promise<null>((resolve) => setTimeout(() => resolve(null), 6000));
     const pos = await Promise.race([
       Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }),
       timeout,
     ]);
-    if (!pos) return LVIV;
+    if (!pos) return null;
     return [pos.coords.longitude, pos.coords.latitude];
   } catch {
-    return LVIV;
+    return null;
   }
+}
+
+export async function getCurrentLocation(): Promise<[number, number]> {
+  return (await tryGetCurrentLocation()) ?? LVIV;
 }
