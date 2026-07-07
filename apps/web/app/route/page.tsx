@@ -18,6 +18,8 @@ import { getCatalog } from '@/lib/catalog';
 import { categoryLabel, distanceLabel } from '@/lib/format';
 import { speak, stopSpeech } from '@/lib/tts';
 import { geocodePlaces } from '@/lib/geocode';
+import { toast } from '@/lib/toast';
+import { projectOntoRoute, stepCumulative, currentStepIndex, type LngLat } from '@/lib/nav';
 import type { GeoPlace } from '@/lib/geocode';
 
 import { loadCity } from '@/lib/cities';
@@ -153,6 +155,21 @@ function RouteInner() {
   const nearbyRef = useRef<Nearby[]>([]);
   nearbyRef.current = nearby;
 
+  // ── Live navigation ────────────────────────────────────────────────────────
+  const [navigating, setNavigating] = useState(false);
+  const [userPos, setUserPos] = useState<LngLat | null>(null);
+  const [navStep, setNavStep] = useState(0);
+  const [distToNext, setDistToNext] = useState(0);
+  const [remaining, setRemaining] = useState(0);
+  const [offRoute, setOffRoute] = useState(0);
+  const [arrived, setArrived] = useState(false);
+  const watchIdRef = useRef<number | null>(null);
+  const lineRef = useRef<LngLat[]>([]);
+  lineRef.current = line as LngLat[];
+  const stepEndsRef = useRef<number[]>([]);
+  const lastAnnouncedRef = useRef(-1);
+  const arrivedRef = useRef(false);
+
   function pickFrom(coords: [number, number], label: string) {
     setFromCoords(coords);
     setFromLabel(label);
@@ -165,6 +182,10 @@ function RouteInner() {
     }
     stopSpeech();
     setSpeaking(false);
+    if (watchIdRef.current != null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
+    setNavigating(false);
+    setUserPos(null);
+    setArrived(false);
     setStatus('loading');
     setAvoided(0);
     setCrossesRed(0);
@@ -230,7 +251,54 @@ function RouteInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromCoords, to, primary]);
 
-  useEffect(() => () => stopSpeech(), []);
+  useEffect(() => () => { stopSpeech(); if (watchIdRef.current != null) navigator.geolocation.clearWatch(watchIdRef.current); }, []);
+
+  // Live navigation: track position, advance the current step, announce turns.
+  function updateProgress(pos: LngLat) {
+    const ln = lineRef.current;
+    if (ln.length < 2) return;
+    const { along, off } = projectOntoRoute(pos, ln);
+    setOffRoute(Math.round(off));
+    const total = stepEndsRef.current[stepEndsRef.current.length - 1] ?? 0;
+    setRemaining(Math.max(0, Math.round(total - along)));
+    const cur = currentStepIndex(along, stepEndsRef.current);
+    setNavStep(cur);
+    setDistToNext(Math.max(0, Math.round((stepEndsRef.current[cur] ?? total) - along)));
+    if (total - along <= 20) {
+      if (!arrivedRef.current) { arrivedRef.current = true; setArrived(true); speak('Ви прибули до місця призначення.'); }
+    } else {
+      if (arrivedRef.current) { arrivedRef.current = false; setArrived(false); }
+      if (cur !== lastAnnouncedRef.current) { lastAnnouncedRef.current = cur; speak(stepsRef.current[cur]?.instruction ?? ''); }
+    }
+  }
+
+  function startNav() {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      toast('Геолокація недоступна в цьому браузері', 'error');
+      return;
+    }
+    if (lineRef.current.length < 2) return;
+    stepEndsRef.current = stepCumulative(stepsRef.current);
+    lastAnnouncedRef.current = -1;
+    arrivedRef.current = false;
+    setArrived(false);
+    stopSpeech();
+    setSpeaking(false);
+    setNavigating(true);
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (p) => { const pos: LngLat = [p.coords.longitude, p.coords.latitude]; setUserPos(pos); updateProgress(pos); },
+      () => { toast('Не вдалося отримати місцезнаходження. Дозвольте доступ до геолокації.', 'error'); },
+      { enableHighAccuracy: true, maximumAge: 2000, timeout: 12000 },
+    );
+  }
+
+  function stopNav() {
+    if (watchIdRef.current != null) { navigator.geolocation.clearWatch(watchIdRef.current); watchIdRef.current = null; }
+    setNavigating(false);
+    setUserPos(null);
+    setArrived(false);
+    stopSpeech();
+  }
 
   function onPrefs(p: RoutePrefs) {
     prefsRef.current = p; // so an immediate re-plan uses the new prefs
@@ -314,8 +382,30 @@ function RouteInner() {
 
             {status === 'ready' && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '1em' }}>
-                <div style={{ width: '100%', height: 'min(50vh, 420px)', minHeight: 280 }}>
-                  <MapView points={[]} center={dest ? [dest.lng, dest.lat] : [loadCity().lng, loadCity().lat]} onSelect={() => {}} line={line} />
+                {/* Live navigation banner — the next maneuver, updating as you move. */}
+                {navigating && (
+                  <section aria-live="polite" style={{ background: arrived ? 'var(--sc-ok)' : 'var(--sc-primary)', color: 'var(--sc-on-primary)', borderRadius: '1em', padding: '1em 1.2em' }}>
+                    {arrived ? (
+                      <div style={{ fontSize: '1.15em', fontWeight: 800 }}>Ви прибули 🎉</div>
+                    ) : (
+                      <>
+                        <div style={{ fontSize: '0.78em', fontWeight: 700, opacity: 0.85, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                          Через {distanceLabel(distToNext)}
+                        </div>
+                        <div style={{ fontSize: '1.2em', fontWeight: 800, marginTop: '0.15em', lineHeight: 1.2 }}>
+                          {steps[navStep]?.instruction ?? ''}
+                        </div>
+                        <div style={{ fontSize: '0.82em', opacity: 0.85, marginTop: '0.4em' }}>
+                          Залишилось {distanceLabel(remaining)}
+                          {offRoute > 40 && <span> · ви відхилились від маршруту ({distanceLabel(offRoute)})</span>}
+                        </div>
+                      </>
+                    )}
+                  </section>
+                )}
+
+                <div style={{ width: '100%', height: navigating ? 'min(60vh, 520px)' : 'min(50vh, 420px)', minHeight: 280 }}>
+                  <MapView points={[]} center={userPos ?? (dest ? [dest.lng, dest.lat] : [loadCity().lng, loadCity().lat])} onSelect={() => {}} line={line} userPos={userPos} follow={navigating} />
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>
@@ -324,9 +414,16 @@ function RouteInner() {
                       {distanceLabel(summary.distance)} · {Math.round(summary.duration / 60)} хв
                     </span>
                   ) : null}
-                  <Button variant={speaking ? 'secondary' : 'accent'} onClick={toggleSpeak} style={{ marginLeft: 'auto' }}>
-                    {speaking ? 'Зупинити' : 'Озвучити'}
-                  </Button>
+                  {navigating ? (
+                    <Button variant="danger" onClick={stopNav} style={{ marginLeft: 'auto' }}>Завершити</Button>
+                  ) : (
+                    <>
+                      {steps.length > 0 && <Button onClick={startNav} style={{ marginLeft: 'auto' }}>Розпочати навігацію</Button>}
+                      <Button variant={speaking ? 'secondary' : 'accent'} onClick={toggleSpeak} style={steps.length > 0 ? undefined : { marginLeft: 'auto' }}>
+                        {speaking ? 'Зупинити' : 'Озвучити'}
+                      </Button>
+                    </>
+                  )}
                 </div>
 
                 {nearby.length > 0 && (
@@ -345,13 +442,17 @@ function RouteInner() {
                 )}
 
                 <ol style={{ listStyle: 'none', margin: 0, padding: 0, background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '1em', overflow: 'hidden' }}>
-                  {steps.map((s, i) => (
-                    <li key={i} style={{ display: 'flex', gap: '0.7em', padding: '0.7em 0.9em', borderTop: i ? 'var(--sc-bw) solid var(--sc-border)' : 'none' }}>
-                      <span aria-hidden style={{ width: '1.7em', height: '1.7em', flexShrink: 0, borderRadius: '50%', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '0.8em' }}>{i + 1}</span>
-                      <span style={{ flex: 1, minWidth: 0, fontSize: '0.92em' }}>{s.instruction}</span>
-                      <span style={{ color: 'var(--sc-muted)', fontSize: '0.8em', whiteSpace: 'nowrap', flexShrink: 0 }}>{distanceLabel(s.distance)}</span>
-                    </li>
-                  ))}
+                  {steps.map((s, i) => {
+                    const active = navigating && i === navStep;
+                    const done = navigating && i < navStep;
+                    return (
+                      <li key={i} style={{ display: 'flex', gap: '0.7em', padding: '0.7em 0.9em', borderTop: i ? 'var(--sc-bw) solid var(--sc-border)' : 'none', background: active ? 'var(--sc-primary-tint)' : 'transparent', opacity: done ? 0.5 : 1 }}>
+                        <span aria-hidden style={{ width: '1.7em', height: '1.7em', flexShrink: 0, borderRadius: '50%', background: active ? 'var(--sc-primary)' : 'var(--sc-primary-tint)', color: active ? 'var(--sc-on-primary)' : 'var(--sc-primary)', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: '0.8em' }}>{i + 1}</span>
+                        <span style={{ flex: 1, minWidth: 0, fontSize: '0.92em', fontWeight: active ? 700 : 400 }}>{s.instruction}</span>
+                        <span style={{ color: 'var(--sc-muted)', fontSize: '0.8em', whiteSpace: 'nowrap', flexShrink: 0 }}>{distanceLabel(s.distance)}</span>
+                      </li>
+                    );
+                  })}
                 </ol>
               </div>
             )}
