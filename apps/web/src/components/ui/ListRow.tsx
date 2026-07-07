@@ -6,6 +6,8 @@ export interface ListRowProps {
   name: string;
   /** Omit (or pass 'unknown') to hide the rating — discovery-first list. */
   rating?: RatingKey;
+  /** Accessibility-level badge (label + colour). Takes precedence over `rating`. */
+  badge?: { label: string; color: string } | null;
   /** Leading icon (category) shown when the rating is hidden. */
   icon?: ReactNode;
   /** Average review stars (1–5) — shown only when the point has reviews. */
@@ -21,11 +23,12 @@ export interface ListRowProps {
  * The audio-first list primitive. Carries a rich aria-label so a screen reader
  * announces name + status + distance + direction in one pass (KB 02 blind list).
  */
-export function ListRow({ name, rating: r, icon, stars, meta, ariaLabel, onClick }: ListRowProps) {
+export function ListRow({ name, rating: r, badge, icon, stars, meta, ariaLabel, onClick }: ListRowProps) {
   const hasRating = !!r && r !== 'unknown';
   const meta_ = hasRating ? rating[r] : null;
   const starText = stars != null ? `, ${stars.toFixed(1)} з 5 зірок` : '';
-  const label = ariaLabel ?? (meta_ ? `${name}, ${meta_.label}${starText}, ${meta}` : `${name}${starText}, ${meta}`);
+  const badgeLabel = badge?.label ?? meta_?.label ?? null;
+  const label = ariaLabel ?? (badgeLabel ? `${name}, ${badgeLabel}${starText}, ${meta}` : `${name}${starText}, ${meta}`);
   const btn: CSSProperties = {
     display: 'flex',
     width: '100%',
@@ -43,7 +46,11 @@ export function ListRow({ name, rating: r, icon, stars, meta, ariaLabel, onClick
   };
   return (
     <button className="sc-foc" aria-label={label} onClick={onClick} style={btn}>
-      {meta_ ? (
+      {badge && !icon ? (
+        <span aria-hidden style={{ width: '2.6em', flexShrink: 0, display: 'grid', placeItems: 'center' }}>
+          <span style={{ width: '0.85em', height: '0.85em', borderRadius: '50%', background: badge.color }} />
+        </span>
+      ) : !badge && meta_ ? (
         <RatingDot rating={r as RatingKey} size={2.6} />
       ) : (
         <span aria-hidden style={{ fontSize: '1.4em', width: '1.6em', textAlign: 'center', flexShrink: 0 }}>
@@ -53,7 +60,9 @@ export function ListRow({ name, rating: r, icon, stars, meta, ariaLabel, onClick
       <span style={{ flex: 1, minWidth: 0 }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: '0.5em', flexWrap: 'wrap' }}>
           <span style={{ fontWeight: 800, fontSize: '1.02em' }}>{name}</span>
-          {meta_ ? (
+          {badge ? (
+            <span style={{ fontSize: '0.78em', fontWeight: 800, color: badge.color }}>{badge.label}</span>
+          ) : meta_ ? (
             <span style={{ fontSize: '0.78em', fontWeight: 800, color: `var(--sc-${meta_.key})` }}>{meta_.label}</span>
           ) : null}
           {stars != null ? (

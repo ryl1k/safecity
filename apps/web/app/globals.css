@@ -55,11 +55,129 @@
   .sc-marquee-track { animation: none; }
 }
 
-/* Hide non-essential labels on small screens (icon-only nav) */
-@media (max-width: 560px) {
+/* Dashboard card spawn — staggered fade-rise + gauge/bar reveals. Dashboard cards
+   carry no position:fixed descendants, so `both` (retain final state) is safe.
+   Stagger via inline animation-delay. */
+@keyframes sc-rise { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+@keyframes sc-arc { from { stroke-dashoffset: 260; } to { stroke-dashoffset: 0; } }
+@keyframes sc-grow { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+@keyframes sc-draw { to { stroke-dashoffset: 0; } }
+.sc-rise { animation: sc-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.sc-gauge-arc { animation: sc-arc 0.9s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.sc-bar-fill { transform-origin: left center; animation: sc-grow 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.sc-draw { animation: sc-draw 1s cubic-bezier(0.22, 1, 0.36, 1) both; }
+/* Drop-in stagger: animate a container's direct children in sequence. */
+.sc-stagger > * { animation: sc-rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.sc-stagger > *:nth-child(1) { animation-delay: 0ms; }
+.sc-stagger > *:nth-child(2) { animation-delay: 70ms; }
+.sc-stagger > *:nth-child(3) { animation-delay: 140ms; }
+.sc-stagger > *:nth-child(4) { animation-delay: 210ms; }
+.sc-stagger > *:nth-child(5) { animation-delay: 280ms; }
+.sc-stagger > *:nth-child(6) { animation-delay: 350ms; }
+.sc-stagger > *:nth-child(n + 7) { animation-delay: 420ms; }
+@media (prefers-reduced-motion: reduce) {
+  .sc-rise, .sc-gauge-arc, .sc-bar-fill, .sc-draw, .sc-stagger > * { animation: none !important; }
+}
+
+/* Landing "how it works" scroll-snap. `proximity` (not mandatory) so the hero,
+   reviews and CTA above/below stay freely scrollable — only the tall capability
+   sections gently lock as you reach them. Scoped to the landing route via
+   .sc-snap-page on <html> (toggled by <ScrollSnap/>), so it never leaks elsewhere.
+   scroll-padding-top clears the sticky header so snapped titles aren't hidden. */
+html.sc-snap-page { scroll-snap-type: y proximity; scroll-padding-top: 4.6em; }
+.sc-snap-section { scroll-snap-align: start; scroll-snap-stop: normal; }
+.sc-cap-section { min-height: 88vh; padding: 3.5em 0; }
+@media (prefers-reduced-motion: reduce) {
+  html.sc-snap-page { scroll-snap-type: none; }
+}
+/* On phones the tall snap sections + 88vh height read as huge empty gaps; free the
+   scroll and let each capability size to its content. */
+@media (max-width: 760px) {
+  html.sc-snap-page { scroll-snap-type: none; scroll-padding-top: 0; }
+  .sc-cap-section { min-height: auto; padding: 2.2em 0; }
+}
+
+/* Capability section: text + visual two-up, alternating sides; stacks on narrow
+   (text always first in DOM, so mobile reads text → visual regardless of flip). */
+.sc-cap-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 2.6em; align-items: center; width: 100%; }
+.sc-cap-flip .sc-cap-text { order: 2; }
+.sc-cap-flip .sc-cap-visual { order: 1; }
+@media (max-width: 900px) {
+  .sc-cap-grid { grid-template-columns: 1fr; gap: 1.7em; }
+  .sc-cap-flip .sc-cap-text, .sc-cap-flip .sc-cap-visual { order: 0; }
+}
+
+/* Slow drift for the big watermark icon behind each capability visual. */
+@keyframes sc-drift { from { transform: translateY(0.4em); } to { transform: translateY(-0.4em); } }
+.sc-drift { animation: sc-drift 5s ease-in-out infinite alternate; }
+@media (prefers-reduced-motion: reduce) { .sc-drift { animation: none; } }
+
+/* Collapse nav/action labels to icons before the header would wrap to two rows. */
+@media (max-width: 1180px) {
   .sc-hide-sm { display: none; }
-  /* Header: drop the primary nav onto its own full-width row, centred. */
-  .sc-header-nav { order: 2; flex-basis: 100%; justify-content: center; }
+}
+
+/* ── Mobile bottom navigation ──────────────────────────────────────────────
+   On phones the primary destinations move to a fixed bottom bar; the header's
+   inline nav is hidden (account + accessibility stay top-right). --sc-bottomnav-h
+   reserves space so scrolling content and the full-height map clear the bar. */
+:root { --sc-bottomnav-h: 0px; }
+.sc-bottom-nav { display: none; }
+@media (max-width: 760px) {
+  :root { --sc-bottomnav-h: calc(56px + env(safe-area-inset-bottom, 0px)); }
+  body { padding-bottom: var(--sc-bottomnav-h); }
+  .sc-header-nav { display: none !important; }
+  .sc-bottom-nav {
+    position: fixed;
+    left: 0; right: 0; bottom: 0;
+    z-index: 40;
+    display: flex;
+    align-items: stretch;
+    height: var(--sc-bottomnav-h);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--sc-surface);
+    border-top: var(--sc-bw) solid var(--sc-border);
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
+  }
+}
+
+/* ── Map side panels → bottom sheet on mobile ──────────────────────────────
+   Point detail, dropped-marker actions and street details share this shell: a
+   left side panel on desktop, a bottom sheet on phones so the map stays visible
+   (and tappable — the route flow needs the user to tap the map to pick points). */
+.sc-map-panel {
+  position: absolute; top: 0; left: 0; height: 100%; width: min(420px, 100vw);
+  z-index: 60; background: var(--sc-bg); overflow-y: auto;
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
+  border-right: var(--sc-bw) solid var(--sc-border);
+  display: flex; flex-direction: column;
+}
+@media (max-width: 760px) {
+  .sc-map-panel {
+    top: auto; bottom: 0; left: 0; right: 0; width: auto; height: auto;
+    max-height: 72vh;
+    border-right: none; border-top: var(--sc-bw) solid var(--sc-border);
+    border-radius: 1em 1em 0 0;
+    box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.18);
+  }
+  /* While the user is picking a point on the map, get the sheet out of the way. */
+  .sc-map-panel--hidden { display: none; }
+}
+
+/* Centered hint pill shown at the top of the map while picking a route point. */
+.sc-map-pickhint {
+  position: absolute; top: 0.8em; left: 50%; transform: translateX(-50%); z-index: 58;
+  max-width: calc(100vw - 1.6em);
+  background: var(--sc-primary); color: var(--sc-on-primary);
+  padding: 0.6em 1em; border-radius: 2em; font-weight: 700; font-size: 0.88em;
+  box-shadow: var(--sc-shadow-2); text-align: center;
+}
+
+/* Accessibility/theme menu: anchored under its trigger on desktop; pinned to the
+   viewport's right edge on phones so it never clips off the left. */
+.sc-a11y-menu { position: absolute; right: 0; top: calc(100% + 0.5em); }
+@media (max-width: 760px) {
+  .sc-a11y-menu { position: fixed; right: 0.75em; left: auto; top: calc(0.55em + 3em); }
 }
 
 /* MapLibre attribution credits are links in a text block — underline so they're
@@ -92,4 +210,34 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Business dashboard: sidebar + content, stacks on narrow screens. */
+.sc-biz-grid {
+  display: flex;
+  gap: 1.6em;
+  align-items: flex-start;
+}
+.sc-biz-side {
+  width: 210px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 4.8em;
+}
+@media (max-width: 760px) {
+  .sc-biz-grid { flex-direction: column; }
+  .sc-biz-side { width: 100%; position: static; top: auto; }
+  .sc-biz-side nav { flex-direction: row !important; flex-wrap: wrap; }
+}
+
+/* Subtle lift on hover for clickable cards. */
+.sc-lift { transition: transform 0.12s ease, box-shadow 0.12s ease, border-color 0.12s ease; }
+.sc-lift:hover { transform: translateY(-2px); border-color: var(--sc-border-strong); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08); }
+@media (prefers-reduced-motion: reduce) { .sc-lift { transition: none; } .sc-lift:hover { transform: none; } }
+
+/* Moderation list row: info + actions inline; stacks so actions don't crush the
+   title on narrow screens. */
+.sc-admin-row { display: flex; align-items: center; gap: 0.8em; padding: 0.7em; border: var(--sc-bw) solid var(--sc-border); border-radius: 0.7em; }
+@media (max-width: 560px) {
+  .sc-admin-row { flex-direction: column; align-items: stretch; }
 }

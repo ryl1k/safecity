@@ -2,11 +2,44 @@ package store
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 
 	"github.com/jackc/pgx/v5"
 )
+
+// AccessibleRoute is the pgRouting result for wheelchair-accessible routing.
+type AccessibleRoute struct {
+	Coordinates   [][]float64        `json:"coordinates"`
+	DistanceM     float64            `json:"distance_m"`
+	RatingSummary map[string]float64 `json:"rating_summary"`
+	Error         string             `json:"error,omitempty"`
+}
+
+// RouteAccessible calls the route_accessible() pgRouting RPC and returns the
+// path as a list of [lng,lat] coordinates. Returns an error when the DB
+// function signals no_route_found or no_graph_near_points.
+func (s *Store) RouteAccessible(ctx context.Context, startLng, startLat, endLng, endLat float64) (*AccessibleRoute, error) {
+	var raw []byte
+	err := s.db.WithAnon(ctx, func(tx pgx.Tx) error {
+		return tx.QueryRow(ctx,
+			`select route_accessible($1, $2, $3, $4)`,
+			startLng, startLat, endLng, endLat,
+		).Scan(&raw)
+	})
+	if err != nil {
+		return nil, fmt.Errorf("route_accessible query: %w", err)
+	}
+	var ar AccessibleRoute
+	if err := json.Unmarshal(raw, &ar); err != nil {
+		return nil, fmt.Errorf("route_accessible decode: %w", err)
+	}
+	if ar.Error != "" {
+		return nil, fmt.Errorf("route_accessible: %s", ar.Error)
+	}
+	return &ar, nil
+}
 
 // StreetSegment is one surveyed walking path with accessibility attributes.
 type StreetSegment struct {
@@ -20,15 +53,19 @@ type StreetSegment struct {
 	HasCurbCuts      *bool    `json:"hasCurbCuts"`
 	HasRamp          *bool    `json:"hasRamp"`
 	Lit              *bool    `json:"lit"`
+	IsObstacleFree   *bool    `json:"isObstacleFree"`
+	Smoothness       *string  `json:"smoothness"`
 	VerifyStatus     string   `json:"verifyStatus"`
 	Rating           string   `json:"rating"` // "full" | "partial" | "none" | "unknown"
-	GeoJSON          string   `json:"geojson"` // ST_AsGeoJSON result (LineString geometry)
+	// FieldSources maps each populated field to its provenance: osm|dem|gov|user.
+	FieldSources map[string]string `json:"fieldSources"`
+	GeoJSON      string            `json:"geojson"` // ST_AsGeoJSON result (LineString geometry)
 }
 
 const segmentsInBBoxSQL = `
 select id::text, street_name, sidewalk_width_m, surface_type, incline_percent,
        has_tactile_paving, is_step_free, has_curb_cuts, has_ramp, lit,
-       verify_status, rating, geojson
+       is_obstacle_free, smoothness, verify_status, rating, field_sources, geojson
 from segments_in_bbox($1, $2, $3, $4)`
 
 // NewSegment is the validated input for submitting a street segment.
@@ -75,6 +112,63 @@ func (s *Store) AddSegment(ctx context.Context, userID string, in NewSegment) (s
 	return id, classify(err)
 }
 
+// SegmentAvoid is one rated segment shaped for routing avoidance: a buffered
+// polygon (to hand ORS as an avoid area — covers the WHOLE segment, not just a
+// point), the raw line (to detect whether the chosen route still crosses it), and
+// the midpoint (for corridor scoping + the honest "avoided" count).
+type SegmentAvoid struct {
+	Mid  LngLat       // segment midpoint [lng,lat]
+	Line [][2]float64 // raw segment vertices
+	Poly [][2]float64 // buffered exterior ring
+}
+
+const segmentAvoidsSQL = `
+select
+  ST_X(ST_LineInterpolatePoint(geom, 0.5)) as mid_lng,
+  ST_Y(ST_LineInterpolatePoint(geom, 0.5)) as mid_lat,
+  ST_AsGeoJSON(geom) as line,
+  -- ~10 m buffer as a low-vertex polygon (2 segments/quarter, then simplified).
+  ST_AsGeoJSON(ST_SimplifyPreserveTopology(ST_Buffer(geom::geography, 10, 2)::geometry, 0.00002)) as poly
+from street_segments
+where geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)
+  and segment_rating(surface_type, smoothness, sidewalk_width_m, incline_percent, is_step_free) = any($5)
+limit $6`
+
+// SegmentAvoidsInBBox returns segments in the bbox whose rating is in `ratings`,
+// each with a buffered avoid polygon + raw line + midpoint. Used to build ORS
+// avoid_polygons that cover the full impassable ("none") / marginal ("partial")
+// path, and to report residual crossings. `limit` caps the count so we never hand
+// ORS an avoid set large enough to fail the request.
+func (s *Store) SegmentAvoidsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64, ratings []string, limit int) ([]SegmentAvoid, error) {
+	rows, err := s.db.Pool.Query(ctx, segmentAvoidsSQL, minLng, minLat, maxLng, maxLat, ratings, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []SegmentAvoid
+	for rows.Next() {
+		var sa SegmentAvoid
+		var lineJSON, polyJSON []byte
+		if err := rows.Scan(&sa.Mid.Lng, &sa.Mid.Lat, &lineJSON, &polyJSON); err != nil {
+			return nil, err
+		}
+		var line struct {
+			Coordinates [][2]float64 `json:"coordinates"`
+		}
+		if json.Unmarshal(lineJSON, &line) == nil {
+			sa.Line = line.Coordinates
+		}
+		var poly struct {
+			Coordinates [][][2]float64 `json:"coordinates"` // Polygon: [exterior, holes...]
+		}
+		if json.Unmarshal(polyJSON, &poly) == nil && len(poly.Coordinates) > 0 {
+			sa.Poly = poly.Coordinates[0]
+		}
+		out = append(out, sa)
+	}
+	return out, rows.Err()
+}
+
 // SegmentsInBBox returns street segments whose geometry intersects the bounding box.
 func (s *Store) SegmentsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]StreetSegment, error) {
 	rows, err := s.db.Pool.Query(ctx, segmentsInBBoxSQL, minLng, minLat, maxLng, maxLat)
@@ -86,12 +180,17 @@ func (s *Store) SegmentsInBBox(ctx context.Context, minLng, minLat, maxLng, maxL
 	out := []StreetSegment{}
 	for rows.Next() {
 		var seg StreetSegment
+		var fieldSources []byte
 		if err := rows.Scan(
 			&seg.ID, &seg.StreetName, &seg.SidewalkWidthM, &seg.SurfaceType,
 			&seg.InclinePercent, &seg.HasTactilePaving, &seg.IsStepFree, &seg.HasCurbCuts,
-			&seg.HasRamp, &seg.Lit, &seg.VerifyStatus, &seg.Rating, &seg.GeoJSON,
+			&seg.HasRamp, &seg.Lit, &seg.IsObstacleFree, &seg.Smoothness, &seg.VerifyStatus, &seg.Rating,
+			&fieldSources, &seg.GeoJSON,
 		); err != nil {
 			return nil, err
+		}
+		if len(fieldSources) > 0 {
+			_ = json.Unmarshal(fieldSources, &seg.FieldSources)
 		}
 		out = append(out, seg)
 	}

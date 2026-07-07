@@ -4,11 +4,16 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"github.com/safecity/api/internal/geo"
 	"github.com/safecity/api/internal/httpx"
+	"github.com/safecity/api/internal/store"
 )
+
+// walkingSpeedMps is used to estimate duration from pgRouting distance.
+const walkingSpeedMps = 1.1 // ~4 km/h
 
 // routeRequest is the body for POST /route. from/to are [lng,lat]. The avoid
 // polygons are built server-side from confirmed problems, so the client only
@@ -19,6 +24,9 @@ type routeRequest struct {
 	Via     [][2]float64 `json:"via" validate:"omitempty,max=10"` // intermediate stops, in order
 	Profile string       `json:"profile" validate:"omitempty,oneof=wheelchair blind"`
 	Params  *routeParams `json:"params"`
+	// Strict widens avoidance to also steer clear of "partial" (marginal) segments,
+	// not just "none" (impassable) ones. Off by default.
+	Strict bool `json:"strict"`
 }
 
 type routeParams struct {
@@ -65,9 +73,12 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build avoidance polygons from confirmed/escalated problems in the corridor.
-	// Best-effort: a barrier-lookup failure must not block routing.
-	var avoid [][][][]float64
+	// Gather barriers. `problems` are point barriers (confirmed reports); `noneSegs`
+	// / `partialSegs` are rated segments with a BUFFERED avoid polygon (covers the
+	// whole path, not just a point) + the raw line (to detect residual crossings).
+	// Best-effort — a lookup failure must never block routing.
+	var problems [][2]float64
+	var noneSegs, partialSegs []store.SegmentAvoid
 	if s.store != nil {
 		// Span every leg (from → via… → to) so barriers near a stop are caught too.
 		minLng, maxLng, minLat, maxLat := from[0], from[0], from[1], from[1]
@@ -77,35 +88,269 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 		}
 		minLng, maxLng = minLng-avoidPad, maxLng+avoidPad
 		minLat, maxLat = minLat-avoidPad, maxLat+avoidPad
+
 		if barriers, err := s.store.BarriersInBBox(r.Context(), minLng, minLat, maxLng, maxLat); err != nil {
 			s.log.Warn("route barrier lookup failed", "err", err)
-		} else if len(barriers) > 0 {
-			pts := make([][2]float64, len(barriers))
-			for i, b := range barriers {
-				pts[i] = [2]float64{b.Lng, b.Lat}
+		} else {
+			for _, b := range barriers {
+				problems = append(problems, [2]float64{b.Lng, b.Lat})
 			}
-			avoid = geo.AvoidSquares(pts)
+		}
+		if wanted == "wheelchair" {
+			if segs, err := s.store.SegmentAvoidsInBBox(r.Context(), minLng, minLat, maxLng, maxLat, []string{"none"}, 3*maxAvoidPolys); err != nil {
+				s.log.Warn("route none-segment lookup failed", "err", err)
+			} else {
+				noneSegs = segs
+			}
+			if req.Strict {
+				if segs, err := s.store.SegmentAvoidsInBBox(r.Context(), minLng, minLat, maxLng, maxLat, []string{"partial"}, 3*maxAvoidPolys); err != nil {
+					s.log.Warn("route partial-segment lookup failed", "err", err)
+				} else {
+					partialSegs = segs
+				}
+			}
 		}
 	}
 
-	res, err := s.geo.Route(r.Context(), geo.RouteInput{
-		From:         from,
-		To:           to,
-		Via:          req.Via,
-		Profile:      wanted,
-		Restrictions: rest,
-		Avoid:        avoid,
-	})
+	mid := func(sa store.SegmentAvoid) [2]float64 { return [2]float64{sa.Mid.Lng, sa.Mid.Lat} }
+
+	// The "avoided" count is corridor-scoped (barriers on streets the trip actually
+	// passes) — the avoid SET below is bbox-scoped so a curving route still dodges
+	// segments beside the straight line.
+	var corridorPts [][2]float64
+	for _, p := range problems {
+		if distPointToSegMeters(p, from, to) <= corridorMeters {
+			corridorPts = append(corridorPts, p)
+		}
+	}
+	countSegs := noneSegs
+	if req.Strict {
+		countSegs = append(append([]store.SegmentAvoid{}, noneSegs...), partialSegs...)
+	}
+	for _, sa := range countSegs {
+		if distPointToSegMeters(mid(sa), from, to) <= corridorMeters {
+			corridorPts = append(corridorPts, mid(sa))
+		}
+	}
+	avoidedBy := func(route [][]float64) int {
+		n := 0
+		for _, b := range corridorPts {
+			if distPointToPathMeters(b, route) > clearMeters {
+				n++
+			}
+		}
+		return n
+	}
+	// crossesRedBy: impassable ("none") segments the FINAL route runs ALONG — not
+	// just directly on top of, but parallel-and-close for a meaningful stretch.
+	// This catches the road-vs-sidewalk case: ORS routes on the road centerline
+	// while our red data is the sidewalk ~10 m aside, so an honest "you're being
+	// sent down an inaccessible street" needs a wider, length-aware test. A segment
+	// counts when ≥30% of its length runs within alongMeters of the route.
+	crossesRedBy := func(route [][]float64) int {
+		n := 0
+		for _, sa := range noneSegs {
+			if fractionOfLineNearRoute(sa.Line, route, alongMeters) >= 0.3 {
+				n++
+			}
+		}
+		return n
+	}
+
+	pgResult := func(ar *store.AccessibleRoute) geo.RouteResult {
+		return geo.RouteResult{
+			Profile:     "wheelchair",
+			Coordinates: ar.Coordinates,
+			Steps:       []geo.Step{},
+			Summary:     &geo.Summary{Distance: ar.DistanceM, Duration: ar.DistanceM / walkingSpeedMps},
+		}
+	}
+
+	// For wheelchair profile, try pgRouting first — our segment graph with
+	// accessibility-weighted costs. BUT its "none" penalty is soft (100×, not
+	// infinite): when red is the only connected path it routes straight through,
+	// and it never sees the ORS avoid buffers. So we only take a pgRouting route
+	// outright when it's red-free; a red-crossing one is held and compared against
+	// ORS below (ORS usually detours around red via the buffer polygons).
+	var pgRoute *store.AccessibleRoute
+	if wanted == "wheelchair" && s.store != nil && len(req.Via) == 0 {
+		if ar, err := s.store.RouteAccessible(r.Context(), from[0], from[1], to[0], to[1]); err == nil && ar != nil && len(ar.Coordinates) > 1 {
+			if crossesRedBy(ar.Coordinates) == 0 {
+				res := pgResult(ar)
+				res.Avoided = avoidedBy(ar.Coordinates)
+				httpx.JSON(w, http.StatusOK, res)
+				return
+			}
+			pgRoute = ar // crosses red — see if ORS does better
+		}
+	}
+
+	// Build an ORS avoid MultiPolygon from problem squares + segment buffer polygons,
+	// capping segments nearest the direct line so we stay under ORS's polygon budget.
+	segBudget := maxAvoidPolys - len(problems)
+	if segBudget < 0 {
+		segBudget = 0
+	}
+	capSegs := func(segs []store.SegmentAvoid) []store.SegmentAvoid {
+		segs = append([]store.SegmentAvoid{}, segs...)
+		if len(segs) > segBudget {
+			sort.Slice(segs, func(i, j int) bool {
+				return distPointToSegMeters(mid(segs[i]), from, to) < distPointToSegMeters(mid(segs[j]), from, to)
+			})
+			s.log.Warn("route avoid set capped", "have", len(segs), "cap", segBudget)
+			segs = segs[:segBudget]
+		}
+		return segs
+	}
+	mkAvoid := func(segs []store.SegmentAvoid) [][][][]float64 {
+		out := geo.AvoidSquares(problems)
+		for _, sa := range capSegs(segs) {
+			if len(sa.Poly) >= 4 {
+				ring := make([][]float64, len(sa.Poly))
+				for i, c := range sa.Poly {
+					ring[i] = []float64{c[0], c[1]}
+				}
+				out = append(out, [][][]float64{ring})
+			}
+		}
+		return out
+	}
+
+	// Relax ladder: strict(none+partial) → none → no avoidance. Over-constrained
+	// requests (ErrNoRoute) drop a tier so the user always gets a best-effort route.
+	var ladder [][][][][]float64
+	if req.Strict && len(partialSegs) > 0 {
+		ladder = append(ladder, mkAvoid(append(append([]store.SegmentAvoid{}, noneSegs...), partialSegs...)))
+	}
+	ladder = append(ladder, mkAvoid(noneSegs))
+	ladder = append(ladder, nil) // last resort: no avoidance at all
+
+	var res geo.RouteResult
+	var err error
+	for i, avoid := range ladder {
+		res, err = s.geo.Route(r.Context(), geo.RouteInput{
+			From:         from,
+			To:           to,
+			Via:          req.Via,
+			Profile:      wanted,
+			Restrictions: rest,
+			Avoid:        avoid,
+		})
+		if err == nil {
+			break
+		}
+		if errors.Is(err, geo.ErrNoRoute) && i < len(ladder)-1 {
+			s.log.Info("route over-constrained, relaxing avoidance", "attempt", i)
+			continue
+		}
+		break
+	}
 	if err != nil {
 		if errors.Is(err, geo.ErrUnavailable) {
 			httpx.Error(w, http.StatusServiceUnavailable, "unavailable", "routing is not configured")
 			return
 		}
-		s.log.Error("route", "err", err)
-		httpx.Error(w, http.StatusBadGateway, "upstream_error", "routing failed")
-		return
+		if pgRoute != nil {
+			res = pgResult(pgRoute) // ORS failed but pgRouting has a route — use it
+		} else if errors.Is(err, geo.ErrNoRoute) {
+			httpx.Error(w, http.StatusNotFound, "no_route", "не вдалося прокласти маршрут між цими точками")
+			return
+		} else {
+			s.log.Error("route", "err", err)
+			httpx.Error(w, http.StatusBadGateway, "upstream_error", "routing failed")
+			return
+		}
+	} else if pgRoute != nil && crossesRedBy(pgRoute.Coordinates) < crossesRedBy(res.Coordinates) {
+		// Both engines produced a route; keep the one that crosses fewer red segments.
+		res = pgResult(pgRoute)
 	}
+	res.Avoided = avoidedBy(res.Coordinates) // authoritative, replaces geo's polygon count
+	res.CrossesRed = crossesRedBy(res.Coordinates)
 	httpx.JSON(w, http.StatusOK, res)
+}
+
+// Corridor + clearance thresholds for barrier avoidance/counting, and the cap on
+// avoid polygons sent to ORS.
+const (
+	corridorMeters = 110.0 // barrier must be within this of the direct line to count
+	clearMeters    = 25.0  // route must be at least this far from a barrier to "avoid" it
+	alongMeters    = 15.0  // route within this of a "none" segment = running alongside it
+	maxAvoidPolys  = 100   // ORS can fail with too many avoid polygons
+)
+
+// distPointToPathMeters is the shortest distance from a point to a polyline.
+func distPointToPathMeters(p [2]float64, path [][]float64) float64 {
+	if len(path) == 0 {
+		return math.Inf(1)
+	}
+	if len(path) == 1 {
+		return metersBetween(p, [2]float64{path[0][0], path[0][1]})
+	}
+	best := math.Inf(1)
+	for i := 0; i+1 < len(path); i++ {
+		a := [2]float64{path[i][0], path[i][1]}
+		b := [2]float64{path[i+1][0], path[i+1][1]}
+		if d := distPointToSegMeters(p, a, b); d < best {
+			best = d
+		}
+	}
+	return best
+}
+
+// fractionOfLineNearRoute densifies `line` (samples every ~5 m along it) and
+// returns the fraction of its length whose samples fall within `dist` of the
+// route polyline — i.e. how much of the segment the route runs alongside.
+func fractionOfLineNearRoute(line [][2]float64, route [][]float64, dist float64) float64 {
+	if len(line) < 2 || len(route) < 2 {
+		return 0
+	}
+	const stepM = 5.0
+	total, near := 0, 0
+	for i := 0; i+1 < len(line); i++ {
+		a, b := line[i], line[i+1]
+		segLen := metersBetween(a, b)
+		steps := int(segLen/stepM) + 1
+		for s := 0; s <= steps; s++ {
+			t := float64(s) / float64(steps)
+			p := [2]float64{a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t}
+			total++
+			if distPointToPathMeters(p, route) <= dist {
+				near++
+			}
+		}
+	}
+	if total == 0 {
+		return 0
+	}
+	return float64(near) / float64(total)
+}
+
+// distPointToSegMeters is the distance from p to segment a–b, using a local
+// equirectangular projection (accurate at city scale).
+func distPointToSegMeters(p, a, b [2]float64) float64 {
+	latRad := a[1] * math.Pi / 180
+	mPerDegLat := 110540.0
+	mPerDegLng := 111320.0 * math.Cos(latRad)
+	px := (p[0] - a[0]) * mPerDegLng
+	py := (p[1] - a[1]) * mPerDegLat
+	bx := (b[0] - a[0]) * mPerDegLng
+	by := (b[1] - a[1]) * mPerDegLat
+	segLen2 := bx*bx + by*by
+	if segLen2 == 0 {
+		return math.Hypot(px, py)
+	}
+	t := (px*bx + py*by) / segLen2
+	t = math.Max(0, math.Min(1, t))
+	dx := px - t*bx
+	dy := py - t*by
+	return math.Hypot(dx, dy)
+}
+
+func metersBetween(a, b [2]float64) float64 {
+	latRad := a[1] * math.Pi / 180
+	dx := (b[0] - a[0]) * 111320.0 * math.Cos(latRad)
+	dy := (b[1] - a[1]) * 110540.0
+	return math.Hypot(dx, dy)
 }
 
 // handleGeocode: GET /geocode?q=&limit= — public address search.

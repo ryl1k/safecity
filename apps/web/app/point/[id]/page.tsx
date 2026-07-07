@@ -1,11 +1,13 @@
 'use client';
 
+import { use } from 'react';
 import Link from 'next/link';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { PointDetailContent } from '@/components/PointDetailContent';
 
-export default function PointDetailPage({ params }: { params: { id: string } }) {
+export default function PointDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="map" />
@@ -14,7 +16,7 @@ export default function PointDetailPage({ params }: { params: { id: string } }) 
           ‹ До мапи
         </Link>
         <div style={{ marginTop: '0.8em' }}>
-          <PointDetailContent id={params.id} />
+          <PointDetailContent id={id} />
         </div>
       </main>
       <Footer />

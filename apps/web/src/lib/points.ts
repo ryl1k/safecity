@@ -27,6 +27,7 @@ export interface PointHit {
   name: string;
   category: PointSummary['category'];
   address: string | null;
+  features: PointSummary['features'];
 }
 
 /** Name/address search across all points (for the full-screen map search box). */
@@ -34,6 +35,26 @@ export async function searchPointsByName(query: string, limit = 6): Promise<Poin
   const q = query.trim();
   if (q.length < 2) return [];
   return api.get<PointHit[]>(`/points/search${qs({ q, limit })}`);
+}
+
+export interface EditPointInput {
+  name: string;
+  category: PointSummary['category'];
+  lat: number;
+  lng: number;
+  address?: string;
+  description?: string;
+  features?: Record<string, 'yes' | 'no' | 'unknown'>;
+}
+
+/** Edit a point the caller owns. */
+export async function updatePoint(id: string, in_: EditPointInput): Promise<void> {
+  await api.patch(`/points/${id}`, in_);
+}
+
+/** Delete a point the caller owns. */
+export async function deletePoint(id: string): Promise<void> {
+  await api.del(`/points/${id}`);
 }
 
 /** A single point by id (coords + feature values), or null. */

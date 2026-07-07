@@ -35,6 +35,31 @@ type fakeStore struct {
 	pointID  string
 	pointErr error
 
+	// UpdatePoint / DeleteOwnPoint / IncrementView (delete reuses gotDeleteID/deleteErr below)
+	gotUpdateID string
+	updateErr   error
+	gotViewID   string
+
+	// SubscribeBusiness
+	gotSubPlan string
+	subErr     error
+
+	// GetBusinessMe
+	bizMe    store.BusinessMe
+	bizMeErr error
+
+	// GetBusinessAnalytics
+	bizAnalytics    store.BusinessAnalytics
+	bizAnalyticsErr error
+
+	// GetBusinessReports
+	bizReports    []store.BusinessReport
+	bizReportsErr error
+
+	// RequestPointVerification
+	gotVerifyReqID string
+	verifyReqErr   error
+
 	// UpsertReview
 	gotReviewPoint string
 	gotReview      store.NewReview
@@ -142,6 +167,44 @@ func (f *fakeStore) AddPoint(_ context.Context, userID string, in store.NewPoint
 	return f.pointID, f.pointErr
 }
 
+func (f *fakeStore) UpdatePoint(_ context.Context, userID, pointID string, in store.NewPoint) error {
+	f.gotUser, f.gotUpdateID, f.gotPoint = userID, pointID, in
+	return f.updateErr
+}
+
+func (f *fakeStore) DeleteOwnPoint(_ context.Context, userID, pointID string) error {
+	f.gotUser, f.gotDeleteID = userID, pointID
+	return f.deleteErr
+}
+
+func (f *fakeStore) IncrementView(_ context.Context, pointID string) { f.gotViewID = pointID }
+
+func (f *fakeStore) SubscribeBusiness(_ context.Context, userID, plan string) error {
+	f.gotUser, f.gotSubPlan = userID, plan
+	return f.subErr
+}
+
+func (f *fakeStore) GetBusinessMe(_ context.Context, userID string) (store.BusinessMe, error) {
+	f.gotUser = userID
+	return f.bizMe, f.bizMeErr
+}
+
+func (f *fakeStore) GetBusinessAnalytics(_ context.Context, userID string) (store.BusinessAnalytics, error) {
+	f.gotUser = userID
+	return f.bizAnalytics, f.bizAnalyticsErr
+}
+
+func (f *fakeStore) GetBusinessReports(_ context.Context, userID string) ([]store.BusinessReport, error) {
+	f.gotUser = userID
+	return f.bizReports, f.bizReportsErr
+}
+
+func (f *fakeStore) RequestPointVerification(_ context.Context, userID, pointID string) error {
+	f.gotUser = userID
+	f.gotVerifyReqID = pointID
+	return f.verifyReqErr
+}
+
 func (f *fakeStore) UpsertReview(_ context.Context, userID, pointID string, in store.NewReview) (store.Review, error) {
 	f.gotUser = userID
 	f.gotReviewPoint = pointID
@@ -204,6 +267,14 @@ func (f *fakeStore) SegmentsInBBox(_ context.Context, _, _, _, _ float64) ([]sto
 
 func (f *fakeStore) AddSegment(_ context.Context, _ string, _ store.NewSegment) (string, error) {
 	return "", nil
+}
+
+func (f *fakeStore) RouteAccessible(_ context.Context, _, _, _, _ float64) (*store.AccessibleRoute, error) {
+	return nil, nil
+}
+
+func (f *fakeStore) SegmentAvoidsInBBox(_ context.Context, _, _, _, _ float64, _ []string, _ int) ([]store.SegmentAvoid, error) {
+	return nil, nil
 }
 
 func (f *fakeStore) FeatureCatalog(_ context.Context) ([]store.Feature, error) {

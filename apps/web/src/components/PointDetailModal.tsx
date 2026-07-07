@@ -13,6 +13,8 @@ import type { GeoPlace } from '@/lib/geocode';
 import { planTransit, fmtTime, type TransitItinerary } from '@/lib/transit';
 import type { RouteDisplay } from './ExploreMap';
 import { PointDetailContent } from './PointDetailContent';
+import { RoutePrefsControl } from './RoutePrefsControl';
+import { loadRoutePrefs, saveRoutePrefs, routePrefsPayload, type RoutePrefs } from '@/lib/routePrefs';
 
 const FOCUSABLE = 'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
 
@@ -184,7 +186,11 @@ export function RouteTabContent({
   const [summary, setSummary] = useState<{ distance: number; duration: number } | null>(null);
   const [fallback, setFallback] = useState(false);
   const [avoided, setAvoided] = useState(0);
+  const [crossesRed, setCrossesRed] = useState(0);
   const [speaking, setSpeaking] = useState(false);
+  const [prefs, setPrefs] = useState<RoutePrefs>(() => loadRoutePrefs());
+  const prefsRef = useRef<RoutePrefs>(prefs);
+  prefsRef.current = prefs;
   // Travel mode: on-foot (ORS wheelchair) or public transport (Transitous).
   const [travelMode, setTravelMode] = useState<'walk' | 'transit'>('walk');
   const [transitIts, setTransitIts] = useState<TransitItinerary[]>([]);
@@ -241,12 +247,12 @@ export function RouteTabContent({
     if (stops.some((s) => !s.coords)) return;
     const via = travelMode === 'transit' ? [] : stops.map((s) => s.coords!); // transit ignores stops
     const wps = [fromCoords, ...via, toCoords];
-    const key = `${travelMode}|${primary}|${JSON.stringify(wps)}`;
+    const key = `${travelMode}|${primary}|${JSON.stringify(prefs)}|${JSON.stringify(wps)}`;
     if (key === lastPlanKey.current) return;
     lastPlanKey.current = key;
     void plan(wps);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromCoords, toCoords, stops, primary, travelMode]);
+  }, [fromCoords, toCoords, stops, primary, travelMode, prefs]);
 
   // Set a waypoint's coords immediately (with a coord label), then upgrade the
   // label to a real address once reverse geocoding resolves.
@@ -310,7 +316,7 @@ export function RouteTabContent({
   async function plan(waypoints: [number, number][]) {
     if (waypoints.length < 2) return;
     stopSpeech(); setSpeaking(false);
-    setStatus('loading'); setAvoided(0);
+    setStatus('loading'); setAvoided(0); setCrossesRed(0);
     const [start, end] = [waypoints[0], waypoints[waypoints.length - 1]];
     const via = waypoints.slice(1, -1);
 
@@ -339,12 +345,13 @@ export function RouteTabContent({
     try {
       // Barrier avoidance polygons are built server-side from confirmed problems.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const data: any = await api.post('/route', { from: start, to: end, via, profile: primary }, { auth: false });
+      const data: any = await api.post('/route', { from: start, to: end, via, profile: primary, ...routePrefsPayload(prefsRef.current) }, { auth: false });
       onRouteDisplay?.(walkDisplay(data.coordinates ?? []));
       setSteps(data.steps ?? []);
       setSummary(data.summary ?? null);
       setFallback(Boolean(data.fallback));
       setAvoided(data.avoided ?? 0);
+      setCrossesRed(data.crossesRed ?? 0);
       setStatus('ready');
     } catch { setStatus('error'); }
   }
@@ -375,6 +382,10 @@ export function RouteTabContent({
           </button>
         ))}
       </div>
+
+      {travelMode === 'walk' && primary !== 'blind' && (
+        <RoutePrefsControl value={prefs} onChange={(p) => { setPrefs(p); saveRoutePrefs(p); }} />
+      )}
 
       {/* Map pick hint — only shown when a field is active */}
       {activeField !== null && (
@@ -549,7 +560,12 @@ export function RouteTabContent({
           )}
           {avoided > 0 && (
             <p role="status" style={{ margin: 0, padding: '0.55em 0.8em', borderRadius: '0.7em', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', border: 'var(--sc-bw) solid var(--sc-primary)', fontSize: '0.82em', fontWeight: 700 }}>
-              Оминаємо {avoided} бар'єр(и) на шляху.
+              Маршрут оминає {avoided} перешкод(и) поблизу.
+            </p>
+          )}
+          {crossesRed > 0 && (
+            <p role="status" style={{ margin: 0, padding: '0.55em 0.8em', borderRadius: '0.7em', background: 'var(--sc-bad-bg)', color: 'var(--sc-bad)', border: 'var(--sc-bw) solid var(--sc-bad-line)', fontSize: '0.82em', fontWeight: 700 }}>
+              Увага: {crossesRed} недоступних ділянок на шляху — обхід відсутній.
             </p>
           )}
 
@@ -578,12 +594,14 @@ export function RouteTabContent({
 // ── Main modal / side-panel ────────────────────────────────────────────────
 export function PointDetailModal({
   id,
+  hidden,
   onClose,
   onRequestMapPick,
   onCancelMapPick,
   onRouteDisplay,
 }: {
   id: string;
+  hidden?: boolean;
   onClose: () => void;
   onRequestMapPick?: (cb: (lng: number, lat: number) => void) => void;
   onCancelMapPick?: () => void;
@@ -618,7 +636,7 @@ export function PointDetailModal({
       role="dialog"
       aria-modal="true"
       aria-label="Деталі місця"
-      style={{ position: 'absolute', top: 0, left: 0, height: '100%', width: 'min(420px, 100vw)', zIndex: 60, background: 'var(--sc-bg)', boxShadow: '4px 0 24px rgba(0,0,0,0.18)', display: 'flex', flexDirection: 'column', overflowY: 'auto', borderRight: 'var(--sc-bw) solid var(--sc-border)' }}
+      className={`sc-map-panel${hidden ? ' sc-map-panel--hidden' : ''}`}
     >
       {/* Tab bar + close */}
       <div style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--sc-bg)', borderBottom: 'var(--sc-bw) solid var(--sc-border)', display: 'flex', alignItems: 'center' }}>

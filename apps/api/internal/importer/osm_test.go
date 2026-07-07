@@ -130,6 +130,9 @@ func TestFetchOverpass(t *testing.T) {
 		if !strings.HasPrefix(string(b), "data=") {
 			t.Errorf("expected form-encoded data= body, got %q", string(b))
 		}
+		if ua := r.Header.Get("User-Agent"); ua != userAgent {
+			t.Errorf("User-Agent = %q, want %q", ua, userAgent)
+		}
 		_, _ = io.WriteString(w, `{"elements":[{"type":"node","id":1,"lat":49.8,"lon":24.0,"tags":{"amenity":"toilets"}}]}`)
 	}))
 	defer srv.Close()

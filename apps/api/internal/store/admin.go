@@ -12,20 +12,25 @@ import (
 // as at the middleware — an update/delete that touches 0 rows maps to
 // ErrNotFound.
 
-// AdminPoint is a point row in the moderation queue.
+// AdminPoint is a point row in the moderation queue. RequestedAt is set when the
+// point's owner has asked for verification (nil otherwise).
 type AdminPoint struct {
-	ID           string  `json:"id"`
-	Name         string  `json:"name"`
-	Category     string  `json:"category"`
-	Address      *string `json:"address"`
-	VerifyStatus string  `json:"verifyStatus"`
+	ID           string     `json:"id"`
+	Name         string     `json:"name"`
+	Category     string     `json:"category"`
+	Address      *string    `json:"address"`
+	VerifyStatus string     `json:"verifyStatus"`
+	RequestedAt  *time.Time `json:"requestedAt"`
 }
 
+// Owner-requested points surface first (newest request), then the rest newest-first.
 const unverifiedPointsSQL = `
-select id::text, name, category::text, address, verify_status::text
+select id::text, name, category::text, address, verify_status::text, verification_requested_at
 from points
 where verify_status = 'unverified'
-order by created_at desc`
+order by (verification_requested_at is not null) desc,
+         verification_requested_at desc nulls last,
+         created_at desc`
 
 // UnverifiedPoints lists points awaiting verification, newest first.
 func (s *Store) UnverifiedPoints(ctx context.Context) ([]AdminPoint, error) {
@@ -38,7 +43,7 @@ func (s *Store) UnverifiedPoints(ctx context.Context) ([]AdminPoint, error) {
 	out := []AdminPoint{}
 	for rows.Next() {
 		var p AdminPoint
-		if err := rows.Scan(&p.ID, &p.Name, &p.Category, &p.Address, &p.VerifyStatus); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Category, &p.Address, &p.VerifyStatus, &p.RequestedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, p)

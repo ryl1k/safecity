@@ -10,6 +10,11 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+// userAgent identifies this service to Overpass (matches the identity already
+// used for Nominatim in internal/geo). Public OSM-adjacent APIs commonly
+// reject requests carrying the default Go HTTP client user agent.
+const userAgent = "SafeCity/1.0 (+https://safecity.lviv)"
+
 // PointRecord is one point to upsert.
 type PointRecord struct {
 	Name         string

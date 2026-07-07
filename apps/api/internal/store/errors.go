@@ -15,6 +15,9 @@ var (
 	ErrNotFound = errors.New("not found")
 	// ErrInvalid is a check-constraint violation, e.g. an out-of-range value.
 	ErrInvalid = errors.New("invalid")
+	// ErrPointLimit is the per-user point cap hit by a non-business user (add_point
+	// raises SQLSTATE 'PT001'). Deliberately only surfaced at the moment it's hit.
+	ErrPointLimit = errors.New("point limit reached")
 )
 
 // classify maps Postgres SQLSTATE codes to store sentinels; other errors pass
@@ -34,6 +37,10 @@ func classify(err error) error {
 		return ErrNotFound
 	case "23514": // check_violation
 		return ErrInvalid
+	case "PT001": // custom: per-user point cap reached (add_point)
+		return ErrPointLimit
+	case "PT404": // custom: point not owned by caller (update_point/delete_point)
+		return ErrNotFound
 	default:
 		return err
 	}

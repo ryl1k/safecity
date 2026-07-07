@@ -42,7 +42,16 @@ type DataStore interface {
 	FeatureCatalog(ctx context.Context) ([]store.Feature, error)
 	// contribution writes
 	AddPoint(ctx context.Context, userID string, in store.NewPoint) (string, error)
+	UpdatePoint(ctx context.Context, userID, pointID string, in store.NewPoint) error
+	DeleteOwnPoint(ctx context.Context, userID, pointID string) error
+	IncrementView(ctx context.Context, pointID string)
 	UpsertReview(ctx context.Context, userID, pointID string, in store.NewReview) (store.Review, error)
+	// account-level business (self-serve; payments mocked)
+	SubscribeBusiness(ctx context.Context, userID, plan string) error
+	GetBusinessMe(ctx context.Context, userID string) (store.BusinessMe, error)
+	GetBusinessAnalytics(ctx context.Context, userID string) (store.BusinessAnalytics, error)
+	GetBusinessReports(ctx context.Context, userID string) ([]store.BusinessReport, error)
+	RequestPointVerification(ctx context.Context, userID, pointID string) error
 	// civic writes
 	CreateProblem(ctx context.Context, userID string, in store.NewProblem) (store.Problem, error)
 	ConfirmProblem(ctx context.Context, userID, problemID string) (store.ConfirmResult, error)
@@ -63,6 +72,8 @@ type DataStore interface {
 	SetUserRole(ctx context.Context, userID, targetID, role string) error
 	// routing support
 	BarriersInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.LngLat, error)
+	RouteAccessible(ctx context.Context, startLng, startLat, endLng, endLat float64) (*store.AccessibleRoute, error)
+	SegmentAvoidsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64, ratings []string, limit int) ([]store.SegmentAvoid, error)
 	// street segments
 	SegmentsInBBox(ctx context.Context, minLng, minLat, maxLng, maxLat float64) ([]store.StreetSegment, error)
 	AddSegment(ctx context.Context, userID string, in store.NewSegment) (string, error)
@@ -128,7 +139,7 @@ func New(d Deps) *Server {
 		// Authorization header (not cookies), so no credentials needed.
 		r.Use(cors.Handler(cors.Options{
 			AllowedOrigins: d.CORSOrigins,
-			AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodDelete, http.MethodOptions},
+			AllowedMethods: []string{http.MethodGet, http.MethodPost, http.MethodPatch, http.MethodDelete, http.MethodOptions},
 			AllowedHeaders: []string{"Authorization", "Content-Type"},
 			MaxAge:         300,
 		}))
@@ -170,6 +181,8 @@ func (s *Server) routes() {
 			r.Group(func(r chi.Router) {
 				s.authed(r)
 				r.Post("/", s.handleAddPoint)
+				r.Patch("/{id}", s.handleUpdatePoint)
+				r.Delete("/{id}", s.handleDeletePoint)
 				r.Post("/{id}/reviews", s.handleAddReview)
 			})
 		})
@@ -245,6 +258,11 @@ func (s *Server) routes() {
 			r.Post("/problems/{id}/confirm", s.handleConfirmProblem)
 			r.Post("/petitions", s.handleCreatePetition)
 			r.Post("/petitions/{id}/sign", s.handleSignPetition)
+			r.Post("/business/subscribe", s.handleSubscribeBusiness)
+			r.Get("/business/me", s.handleBusinessMe)
+			r.Get("/business/analytics", s.handleBusinessAnalytics)
+			r.Get("/business/reports", s.handleBusinessReports)
+			r.Post("/business/points/{id}/request-verification", s.handleRequestPointVerification)
 		}
 	})
 }

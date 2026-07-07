@@ -26,6 +26,11 @@ const userAgent = "SafeCity/1.0 (+https://safecity.lviv)"
 // ErrUnavailable means the upstream is not configured (e.g. missing ORS key).
 var ErrUnavailable = errors.New("routing service unavailable")
 
+// ErrNoRoute means ORS found no path — usually because avoidance polygons or
+// accessibility restrictions over-constrained the request. Callers can retry
+// with a looser avoid set. Distinct from a transport/decoding failure.
+var ErrNoRoute = errors.New("no route found")
+
 // Client talks to ORS + Nominatim.
 type Client struct {
 	http         *http.Client
@@ -88,6 +93,7 @@ type RouteResult struct {
 	Profile     string      `json:"profile"`
 	Fallback    bool        `json:"fallback"`
 	Avoided     int         `json:"avoided"`
+	CrossesRed  int         `json:"crossesRed"` // inaccessible segments the final route still runs along
 	Coordinates [][]float64 `json:"coordinates"`
 	Steps       []Step      `json:"steps"`
 	Summary     *Summary    `json:"summary"`
@@ -115,6 +121,10 @@ func (c *Client) Route(ctx context.Context, in RouteInput) (RouteResult, error) 
 		if err != nil {
 			return RouteResult{}, err
 		}
+	}
+	if status == http.StatusNotFound {
+		// ORS code 2009 "route could not be found" — over-constrained. Retryable.
+		return RouteResult{}, ErrNoRoute
 	}
 	if status != http.StatusOK {
 		return RouteResult{}, fmt.Errorf("ors routing failed (status %d): %s", status, truncate(string(body), 300))

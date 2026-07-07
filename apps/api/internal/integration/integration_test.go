@@ -59,7 +59,9 @@ func TestMain(m *testing.M) {
 
 func runSuite(m *testing.M) int {
 	ctx := context.Background()
-	ctr, err := tcpostgres.Run(ctx, "postgis/postgis:16-3.4",
+	// pgrouting/pgrouting bundles PostGIS 3.4 (same as postgis/postgis:16-3.4) plus
+	// pgRouting, which migration 0022_pgrouting requires (`create extension pgrouting`).
+	ctr, err := tcpostgres.Run(ctx, "pgrouting/pgrouting:16-3.4-3.6.1",
 		tcpostgres.WithDatabase("safecity"),
 		tcpostgres.WithUsername("postgres"),
 		tcpostgres.WithPassword("postgres"),

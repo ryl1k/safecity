@@ -12,6 +12,7 @@ import { api } from '@/lib/api';
 import { uploadPhotos } from '@/lib/storage';
 import { pointById } from '@/lib/points';
 import { geocodePlaces, type GeoPlace } from '@/lib/geocode';
+import { toast } from '@/lib/toast';
 
 const SEVERITY: { value: '1' | '2' | '3'; label: string }[] = [
   { value: '1', label: 'Незначна' },
@@ -96,6 +97,7 @@ function NewProblemInner() {
         ? { point_id: pointId, title, description, severity: Number(severity), photos: photoUrls }
         : { lat: loc!.lat, lng: loc!.lng, title, description, severity: Number(severity), photos: photoUrls };
       await api.post<{ id: string }>('/problems', body);
+      toast('Проблему надіслано. Дякуємо!', 'success');
       router.push('/map?reported=1');
     } catch (err: any) {
       setError(err?.message ?? 'Не вдалося надіслати');
@@ -111,7 +113,7 @@ function NewProblemInner() {
   return (
     <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
       <AppHeader active="problem" />
-      <main id="main-content" tabIndex={-1} style={{ flex: 1, width: '100%', maxWidth: 'min(100%, 560px)', margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
+      <main id="main-content" tabIndex={-1} className="sc-stagger" style={{ flex: 1, width: '100%', maxWidth: 'min(100%, 560px)', margin: '0 auto', padding: '1.6em 1.25em 4em' }}>
         <Link href={pointId ? `/point/${pointId}` : '/map'} className="sc-foc" style={{ color: 'var(--sc-primary)', fontWeight: 700, textDecoration: 'none', fontSize: '0.9em' }}>
           ‹ Назад
         </Link>

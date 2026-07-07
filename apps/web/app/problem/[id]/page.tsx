@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { AppHeader } from '@/components/AppHeader';
@@ -11,11 +11,13 @@ import { PhotoGallery } from '@/components/PhotoGallery';
 import { problemById, createPetition, type ProblemRow, type PetitionRow } from '@/lib/civic';
 import { api, ApiError } from '@/lib/api';
 import { supabase } from '@/lib/supabase';
+import { toast } from '@/lib/toast';
 
 const PETITION_GOAL = 250;
 const ESCALATE_AT = 5; // confirmations needed before we suggest a petition
 
-export default function ProblemPage({ params }: { params: { id: string } }) {
+export default function ProblemPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params);
   const router = useRouter();
   const [status, setStatus] = useState<'loading' | 'ready' | 'error' | 'notfound'>('loading');
   const [problem, setProblem] = useState<ProblemRow | null>(null);
@@ -31,7 +33,7 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
   async function load() {
     setStatus('loading');
     try {
-      const res = await problemById(params.id);
+      const res = await problemById(id);
       if (!res) {
         setStatus('notfound');
         return;
@@ -46,7 +48,7 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
       if (auth.session) {
         try {
           const me = await api.get<{ confirmed: boolean; signed: boolean }>(
-            `/problems/${params.id}/me`,
+            `/problems/${id}/me`,
             { auth: true },
           );
           setConfirmed(me.confirmed);
@@ -62,12 +64,12 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params.id]);
+  }, [id]);
 
   async function requireUser(): Promise<string | null> {
     const { data } = await supabase.auth.getUser();
     if (!data.user) {
-      router.push(`/auth?next=/problem/${params.id}`);
+      router.push(`/auth?next=/problem/${id}`);
       return null;
     }
     return data.user.id;
@@ -78,14 +80,19 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
     if (!uid) return;
     try {
       const res = await api.post<{ confirmations: number; status: string }>(
-        `/problems/${params.id}/confirm`,
+        `/problems/${id}/confirm`,
       );
       setConfirms(res.confirmations);
+      setConfirmed(true);
+      toast('Дякуємо! Ваше підтвердження додано.', 'success');
     } catch (e) {
       // 409 = already confirmed → treat as success; anything else is a genuine error.
-      if (!(e instanceof ApiError && e.status === 409)) return;
+      if (e instanceof ApiError && e.status === 409) {
+        setConfirmed(true);
+      } else {
+        toast('Не вдалося підтвердити. Спробуйте ще раз.', 'error');
+      }
     }
-    setConfirmed(true);
   }
 
   function openDraft() {
@@ -107,8 +114,10 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
       const pet = await createPetition(problem.id, draftTitle.trim() || `Петиція: ${problem.title}`, draftBody.trim());
       setPetition(pet);
       setDraftOpen(false);
+      toast('Петицію створено.', 'success');
     } catch {
       /* leave the draft open so the user can retry */
+      toast('Не вдалося створити петицію. Спробуйте ще раз.', 'error');
     } finally {
       setCreating(false);
     }
@@ -120,10 +129,15 @@ export default function ProblemPage({ params }: { params: { id: string } }) {
     if (!uid) return;
     try {
       await api.post(`/petitions/${petition.id}/sign`);
+      setSigned(true);
+      toast('Ви підписали петицію. Дякуємо!', 'success');
     } catch (e) {
-      if (!(e instanceof ApiError && e.status === 409)) return; // 409 = already signed
+      if (e instanceof ApiError && e.status === 409) {
+        setSigned(true); // already signed
+      } else {
+        toast('Не вдалося підписати. Спробуйте ще раз.', 'error');
+      }
     }
-    setSigned(true);
   }
 
   return (

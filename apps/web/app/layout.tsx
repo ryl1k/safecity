@@ -5,11 +5,14 @@ import './globals.css';
 import { ThemeProvider } from '@/theme/ThemeProvider';
 import { ProfileProvider } from '@/profile/ProfileProvider';
 import { A11yDevAudit } from '@/components/A11yDevAudit';
+import { Toaster } from '@/components/Toaster';
+import { BottomNav } from '@/components/BottomNav';
 
 const onest = Onest({
   subsets: ['latin', 'cyrillic'],
   weight: ['400', '500', '600', '700', '800', '900'],
   display: 'swap',
+  variable: '--font-onest',
 });
 
 export const metadata: Metadata = {
@@ -32,7 +35,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="uk"
       data-sc-root
       data-theme="standard"
-      className={onest.className}
+      className={`${onest.className} ${onest.variable}`}
       suppressHydrationWarning
     >
       <head>
@@ -42,7 +45,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <a href="#main-content" className="sc-skip">Перейти до вмісту</a>
         <ThemeProvider>
           <ProfileProvider>{children}</ProfileProvider>
+          <BottomNav />
         </ThemeProvider>
+        <Toaster />
         <A11yDevAudit />
       </body>
     </html>

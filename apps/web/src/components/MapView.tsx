@@ -49,20 +49,27 @@ export function MapView({
   center,
   onSelect,
   line,
+  userPos,
+  follow = false,
 }: {
   points: MapPointMarker[];
   center: [number, number];
   onSelect: (id: string) => void;
   line?: [number, number][];
+  userPos?: [number, number] | null; // live position dot (navigation)
+  follow?: boolean; // keep the map centred on userPos instead of fitting the route
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+  const userMarkerRef = useRef<any>(null);
   const observerRef = useRef<MutationObserver | null>(null);
   const onSelectRef = useRef(onSelect);
   const lineRef = useRef(line);
+  const followRef = useRef(follow);
   onSelectRef.current = onSelect;
   lineRef.current = line;
+  followRef.current = follow;
 
   // Draw/update the route line + fit it into view. Safe to call repeatedly.
   const applyLine = useCallback(() => {
@@ -77,6 +84,7 @@ export function MapView({
       map.addSource('route', { type: 'geojson', data });
       map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0d5b66', 'line-width': 5 } });
     }
+    if (followRef.current) return; // navigation owns the camera — don't fight the follow
     const lngs = coords.map((c) => c[0]);
     const lats = coords.map((c) => c[1]);
     map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 50, duration: 600 });
@@ -150,6 +158,33 @@ export function MapView({
     const map = mapRef.current;
     if (map && map.isStyleLoaded()) applyLine();
   }, [line, applyLine]);
+
+  // Live position dot + camera follow during navigation.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const maplibregl = (await import('maplibre-gl')).default;
+      const map = mapRef.current;
+      if (cancelled || !map) return;
+      if (!userPos) {
+        userMarkerRef.current?.remove();
+        userMarkerRef.current = null;
+        return;
+      }
+      if (!userMarkerRef.current) {
+        const el = document.createElement('div');
+        el.setAttribute('aria-label', 'Ваше місцезнаходження');
+        el.style.cssText =
+          'width:18px;height:18px;border-radius:50%;background:#2563eb;border:3px solid #fff;' +
+          'box-shadow:0 0 0 4px rgba(37,99,235,0.28), var(--sc-shadow-2);';
+        userMarkerRef.current = new maplibregl.Marker({ element: el }).setLngLat(userPos).addTo(map);
+      } else {
+        userMarkerRef.current.setLngLat(userPos);
+      }
+      if (follow) map.easeTo({ center: userPos, zoom: Math.max(map.getZoom(), 16.5), duration: 700 });
+    })();
+    return () => { cancelled = true; };
+  }, [userPos, follow]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%', minHeight: 360, borderRadius: '1em', overflow: 'hidden' }} />;
 }

@@ -9,13 +9,11 @@ export const messages = {
     appName: 'SafeCity',
     tagline: 'Інклюзивна мапа Львова',
     openMap: 'Відкрити мапу',
-    startOnboarding: 'Налаштувати під себе',
   },
   en: {
     appName: 'SafeCity',
     tagline: 'Inclusive map of Lviv',
     openMap: 'Open the map',
-    startOnboarding: 'Set up for me',
   },
 } as const;
 

@@ -3,7 +3,7 @@
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { useEffect, useRef } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import type { Category } from '@safecity/shared';
+import type { AccessLevel, Category } from '@safecity/shared';
 import { PLACE_META, placeKind, type PlaceKind } from '@/lib/placeKind';
 
 // Pre-render every place-kind's lucide icon to a white SVG string.
@@ -16,9 +16,18 @@ const ICON_INNER: Record<PlaceKind, string> = (Object.keys(PLACE_META) as PlaceK
   {} as Record<PlaceKind, string>,
 );
 
-// A teardrop map pin (category colour + white icon), as a data URL for map.addImage.
-function pinDataUrl(kind: PlaceKind): string {
-  const { color } = PLACE_META[kind];
+// Accessibility-level pin colours (the pin body IS the level highlight; the icon
+// glyph still says what kind of place it is).
+const LEVEL_HEX: Record<AccessLevel, string> = {
+  high: '#16a34a',
+  medium: '#d97706',
+  low: '#dc2626',
+  unknown: '#9ca3af',
+};
+
+// A teardrop map pin filled with the accessibility-level colour + white category
+// icon, as a data URL for map.addImage.
+function pinDataUrl(kind: PlaceKind, color: string): string {
   const svg =
     `<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52">` +
     `<path d="M20 50C12 38 3 30 3 18A17 17 0 1 1 37 18C37 30 28 38 20 50Z" fill="${color}" stroke="#fff" stroke-width="2.5"/>` +
@@ -33,7 +42,7 @@ export interface ExploreMarker {
   lng: number;
   lat: number;
   category: Category;
-  accessible: boolean; // mobility-accessible (full/partial) for the active profile
+  level: AccessLevel; // wheelchair accessibility level → coloured halo under the pin
 }
 
 export interface ExploreProblem {
@@ -105,7 +114,7 @@ function featureCollection(points: ExploreMarker[]): any {
     features: points.map((p) => ({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [p.lng, p.lat] },
-      properties: { id: p.id, name: p.name, icon: placeKind(p.category, p.name), accessible: p.accessible },
+      properties: { id: p.id, name: p.name, icon: `${placeKind(p.category, p.name)}::${p.level}` },
     })),
   };
 }
@@ -114,11 +123,15 @@ function featureCollection(points: ExploreMarker[]): any {
 function segmentCollection(segs: ExploreSegment[]): any {
   return {
     type: 'FeatureCollection',
-    features: segs.map((s) => ({
-      type: 'Feature',
-      geometry: JSON.parse(s.geojson),
-      properties: { id: s.id, street_name: s.streetName, rating: s.rating },
-    })),
+    // Don't draw streets we have no accessibility data for — an "unknown" grey
+    // line adds noise without telling the user anything.
+    features: segs
+      .filter((s) => s.rating !== 'unknown')
+      .map((s) => ({
+        type: 'Feature',
+        geometry: JSON.parse(s.geojson),
+        properties: { id: s.id, street_name: s.streetName, rating: s.rating },
+      })),
   };
 }
 
@@ -251,7 +264,7 @@ export function ExploreMap({
   onSelectProblem?: (id: string) => void;
   onSelectSegment?: (id: string) => void;
   onMoveEnd?: (b: Bbox) => void;
-  focus?: { lng: number; lat: number; nonce: number; zoom?: number } | null;
+  focus?: { lng: number; lat: number; nonce: number; zoom?: number; bounds?: [[number, number], [number, number]] } | null;
   pickMode?: boolean;
   onMapClick?: (lng: number, lat: number) => void;
   route?: RouteDisplay | null; // styled route lines + marker cues
@@ -320,16 +333,22 @@ export function ExploreMap({
       // (Re)register pin images + the clustered source & layers. Runs on first load
       // and again after every style swap (theme toggle wipes style-owned state).
       async function addPointLayers() {
+        const kinds = Object.keys(PLACE_META) as PlaceKind[];
+        const levels = Object.keys(LEVEL_HEX) as AccessLevel[];
+        // One pin image per (kind × level): teardrop tinted by level, glyph by kind.
         await Promise.all(
-          (Object.keys(PLACE_META) as PlaceKind[]).map(
-            (k) =>
-              new Promise<void>((resolve) => {
-                if (map.hasImage(k)) return resolve();
-                const img = new Image();
-                img.onload = () => { if (!map.hasImage(k)) map.addImage(k, img, { pixelRatio: 2 }); resolve(); };
-                img.onerror = () => resolve();
-                img.src = pinDataUrl(k);
-              }),
+          kinds.flatMap((k) =>
+            levels.map(
+              (lvl) =>
+                new Promise<void>((resolve) => {
+                  const id = `${k}::${lvl}`;
+                  if (map.hasImage(id)) return resolve();
+                  const img = new Image();
+                  img.onload = () => { if (!map.hasImage(id)) map.addImage(id, img, { pixelRatio: 2 }); resolve(); };
+                  img.onerror = () => resolve();
+                  img.src = pinDataUrl(k, LEVEL_HEX[lvl]);
+                }),
+            ),
           ),
         );
         if (!map.getSource('pts')) {
@@ -556,10 +575,18 @@ export function ExploreMap({
   }, [pickMode]);
 
   // Fly to a chosen search result / focus (explicit zoom for city switches).
+  // When `bounds` is present (city switch with loaded segments) we frame the
+  // accessibility data instead of a fixed civic-centre zoom — OSM sidewalks are
+  // scattered across the metro, so a tight centre view often lands on empty
+  // space even though the city is well seeded.
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !focus) return;
-    map.flyTo({ center: [focus.lng, focus.lat], zoom: focus.zoom ?? Math.max(map.getZoom(), 16), duration: 800 });
+    if (focus.bounds) {
+      map.fitBounds(focus.bounds, { padding: 48, maxZoom: 13, duration: 800 });
+    } else {
+      map.flyTo({ center: [focus.lng, focus.lat], zoom: focus.zoom ?? Math.max(map.getZoom(), 16), duration: 800 });
+    }
   }, [focus]);
 
   return <div ref={containerRef} style={{ width: '100%', height: '100%' }} />;

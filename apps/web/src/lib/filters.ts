@@ -2,13 +2,40 @@
 // Wheelchair-first: accessibility + feature filters are computed for the
 // wheelchair profile only. Feature chips are derived per-category from the
 // catalog, so a toilet/crossing/parking shows its own relevant features.
-import type { AccessibilityFeature, Category, PointSummary, Rating } from '@safecity/shared';
-import { computeRating } from '@safecity/shared';
+import type { AccessibilityFeature, AccessLevel, Category, PointSummary, Rating } from '@safecity/shared';
+import { accessLevel, computeRating } from '@safecity/shared';
 import { categoryLabel } from './format';
 
 const PROFILE = 'wheelchair' as const;
 
 export const CATEGORIES: Category[] = ['venue', 'transit', 'crossing', 'toilet', 'parking'];
+
+// Accessibility level → user-facing label + colour (the primary signal; no percentages).
+export const levelLabel: Record<AccessLevel, string> = {
+  high: 'Високий рівень',
+  medium: 'Середній рівень',
+  low: 'Низький рівень',
+  unknown: 'Немає даних',
+};
+// CSS variables for in-app badges (theme-aware).
+export const levelColor: Record<AccessLevel, string> = {
+  high: 'var(--sc-ok)',
+  medium: 'var(--sc-warn)',
+  low: 'var(--sc-bad)',
+  unknown: 'var(--sc-muted)',
+};
+// Fixed hex for MapLibre paint expressions (can't read CSS vars).
+export const levelPinColor: Record<AccessLevel, string> = {
+  high: '#16a34a',
+  medium: '#d97706',
+  low: '#dc2626',
+  unknown: '#9ca3af',
+};
+
+/** The point's accessibility level for the active (wheelchair) profile. */
+export function levelOf(p: PointSummary, catalog: AccessibilityFeature[]): AccessLevel {
+  return accessLevel(p.features, catalog, p.category, PROFILE);
+}
 
 // Category → distinct colour for map pins + chips/icons.
 export const categoryColor: Record<Category, string> = {
@@ -55,20 +82,22 @@ export function ratingOf(p: PointSummary, catalog: AccessibilityFeature[]): Rati
   return computeRating(p.features, catalog, p.category, PROFILE);
 }
 
+// Single source of truth with the level badge: "accessible" = High or Medium, so
+// the map filter and the level shown on a pin can never disagree.
 export function isAccessible(p: PointSummary, catalog: AccessibilityFeature[]): boolean {
-  const r = ratingOf(p, catalog);
-  return r === 'full' || r === 'partial';
+  const l = levelOf(p, catalog);
+  return l === 'high' || l === 'medium';
 }
 
 export interface FilterState {
   query: string;
   categories: Set<Category>;
   features: Set<string>; // catalog feature keys
-  showInaccessible: boolean;
+  levels: Set<AccessLevel>; // empty = all levels
 }
 
-/** Feature keys act as the accessibility filter when present; otherwise the
- *  default hides non-accessible points unless "show inaccessible" is on. */
+/** Feature chips require every chosen amenity; the level chips keep only the chosen
+ *  inclusiveness levels. Both combine; empty sets = show everything. */
 export function filterPoints(
   points: PointSummary[],
   catalog: AccessibilityFeature[],
@@ -79,8 +108,8 @@ export function filterPoints(
   return points.filter((p) => {
     if (st.categories.size && !st.categories.has(p.category)) return false;
     if (q && !`${p.name} ${p.address ?? ''}`.toLowerCase().includes(q)) return false;
-    if (keys.length) return keys.every((k) => p.features[k] === 'yes');
-    if (!st.showInaccessible) return isAccessible(p, catalog);
+    if (keys.length && !keys.every((k) => p.features[k] === 'yes')) return false;
+    if (st.levels.size > 0 && !st.levels.has(levelOf(p, catalog))) return false;
     return true;
   });
 }

@@ -58,6 +58,16 @@ export default function SettingsPage() {
           )}
         </section>
 
+        {email && (
+          <section style={card}>
+            <h2 style={title}>Мої точки</h2>
+            <p style={{ margin: '0 0 0.8em', color: 'var(--sc-muted)', fontSize: '0.85em' }}>
+              Керуйте доданими точками та бізнес-акаунтом (необмежені точки, пріоритет у пошуку).
+            </p>
+            <Link href="/business" style={{ textDecoration: 'none' }}><Button>Мої точки</Button></Link>
+          </section>
+        )}
+
         {isModerator && (
           <section style={card}>
             <h2 style={title}>Модерація</h2>

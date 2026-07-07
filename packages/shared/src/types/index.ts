@@ -3,6 +3,8 @@
 export type Profile = 'wheelchair' | 'blind';
 export type Category = 'venue' | 'transit' | 'crossing' | 'toilet' | 'parking';
 export type Rating = 'full' | 'partial' | 'none' | 'unknown';
+/** User-facing accessibility level (replaces the old percentage display). */
+export type AccessLevel = 'high' | 'medium' | 'low' | 'unknown';
 export type FeatureValue = 'yes' | 'no' | 'unknown';
 export type VerifyStatus = 'unverified' | 'verified' | 'official';
 export type PointSource = 'imported' | 'crowdsourced' | 'official';
@@ -35,6 +37,15 @@ export interface PointSummary {
   verifyStatus: VerifyStatus;
   distanceM?: number;
   features: PointFeatureMap;
+  isBusiness?: boolean;
+  verifiedPaid?: boolean;
+  subscriptionActive?: boolean;
+  // "Мапа безбар'єрності" monitoring fields (imported points; migration 0024).
+  govRating?: number | null; // 0..1 official barrier-free score
+  ratingAuthority?: string | null;
+  kind?: string | null; // specific gov subtype (Аптеки, Медицина, Вокзали, …)
+  sourceUrl?: string | null;
+  checkedOn?: string | null; // ISO date
 }
 
 /** Per-profile ratings computed for a point. */
