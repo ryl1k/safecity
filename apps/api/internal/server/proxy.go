@@ -141,16 +141,17 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 		}
 		return n
 	}
-	// crossesRedBy: impassable ("none") segments the FINAL route still runs along
-	// (some are the only connection — honest signal when avoidance can't help).
+	// crossesRedBy: impassable ("none") segments the FINAL route runs ALONG — not
+	// just directly on top of, but parallel-and-close for a meaningful stretch.
+	// This catches the road-vs-sidewalk case: ORS routes on the road centerline
+	// while our red data is the sidewalk ~10 m aside, so an honest "you're being
+	// sent down an inaccessible street" needs a wider, length-aware test. A segment
+	// counts when ≥30% of its length runs within alongMeters of the route.
 	crossesRedBy := func(route [][]float64) int {
 		n := 0
 		for _, sa := range noneSegs {
-			for _, v := range sa.Line {
-				if distPointToPathMeters([2]float64{v[0], v[1]}, route) <= crossMeters {
-					n++
-					break
-				}
+			if fractionOfLineNearRoute(sa.Line, route, alongMeters) >= 0.3 {
+				n++
 			}
 		}
 		return n
@@ -273,7 +274,7 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 const (
 	corridorMeters = 110.0 // barrier must be within this of the direct line to count
 	clearMeters    = 25.0  // route must be at least this far from a barrier to "avoid" it
-	crossMeters    = 10.0  // route within this of a "none" segment = still runs along it
+	alongMeters    = 15.0  // route within this of a "none" segment = running alongside it
 	maxAvoidPolys  = 100   // ORS can fail with too many avoid polygons
 )
 
@@ -294,6 +295,34 @@ func distPointToPathMeters(p [2]float64, path [][]float64) float64 {
 		}
 	}
 	return best
+}
+
+// fractionOfLineNearRoute densifies `line` (samples every ~5 m along it) and
+// returns the fraction of its length whose samples fall within `dist` of the
+// route polyline — i.e. how much of the segment the route runs alongside.
+func fractionOfLineNearRoute(line [][2]float64, route [][]float64, dist float64) float64 {
+	if len(line) < 2 || len(route) < 2 {
+		return 0
+	}
+	const stepM = 5.0
+	total, near := 0, 0
+	for i := 0; i+1 < len(line); i++ {
+		a, b := line[i], line[i+1]
+		segLen := metersBetween(a, b)
+		steps := int(segLen/stepM) + 1
+		for s := 0; s <= steps; s++ {
+			t := float64(s) / float64(steps)
+			p := [2]float64{a[0] + (b[0]-a[0])*t, a[1] + (b[1]-a[1])*t}
+			total++
+			if distPointToPathMeters(p, route) <= dist {
+				near++
+			}
+		}
+	}
+	if total == 0 {
+		return 0
+	}
+	return float64(near) / float64(total)
 }
 
 // distPointToSegMeters is the distance from p to segment a–b, using a local
