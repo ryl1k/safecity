@@ -81,6 +81,10 @@ type fakeStore struct {
 	sign      store.SignResult
 	signErr   error
 
+	// RouteAlternatives
+	altRoutes   []store.RouteAlternative
+	altRoutesErr error
+
 	// BarriersInBBox
 	barriers    []store.LngLat
 	barriersErr error
@@ -271,6 +275,10 @@ func (f *fakeStore) AddSegment(_ context.Context, _ string, _ store.NewSegment) 
 
 func (f *fakeStore) RouteAccessible(_ context.Context, _, _, _, _ float64) (*store.AccessibleRoute, error) {
 	return nil, nil
+}
+
+func (f *fakeStore) RouteAlternatives(_ context.Context, _, _, _, _ float64) ([]store.RouteAlternative, error) {
+	return f.altRoutes, f.altRoutesErr
 }
 
 func (f *fakeStore) SegmentAvoidsInBBox(_ context.Context, _, _, _, _ float64, _ []string, _ int) ([]store.SegmentAvoid, error) {

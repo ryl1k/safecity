@@ -91,6 +91,7 @@ type Summary struct {
 // RouteResult is the shaped response (matches the web's /api/route).
 type RouteResult struct {
 	Profile     string      `json:"profile"`
+	Source      string      `json:"source"`     // "pgrouting" | "ors" | "ors-fallback"
 	Fallback    bool        `json:"fallback"`
 	Avoided     int         `json:"avoided"`
 	CrossesRed  int         `json:"crossesRed"` // inaccessible segments the final route still runs along
@@ -134,8 +135,13 @@ func (c *Client) Route(ctx context.Context, in RouteInput) (RouteResult, error) 
 	if err := json.Unmarshal(body, &gj); err != nil {
 		return RouteResult{}, fmt.Errorf("decode ors response: %w", err)
 	}
+	orsSource := "ors"
+	if used != wanted {
+		orsSource = "ors-fallback"
+	}
 	res := RouteResult{
 		Profile:     used,
+		Source:      orsSource,
 		Fallback:    used != wanted,
 		Avoided:     len(in.Avoid),
 		Coordinates: [][]float64{},

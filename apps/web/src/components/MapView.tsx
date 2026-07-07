@@ -27,6 +27,25 @@ function shapeCss(category: Category): string {
   }
 }
 
+// Quadratic bezier from a → b. bowSign +1 = CCW perp, -1 = CW perp.
+function bezierConnector(a: [number, number], b: [number, number], bowSign = 1, steps = 24): [number, number][] {
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len === 0) return [a, b];
+  const bow = len * 0.35;
+  const ctrl: [number, number] = [
+    (a[0] + b[0]) / 2 - bowSign * (dy / len) * bow,
+    (a[1] + b[1]) / 2 + bowSign * (dx / len) * bow,
+  ];
+  const pts: [number, number][] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const u = 1 - t;
+    pts.push([u * u * a[0] + 2 * u * t * ctrl[0] + t * t * b[0], u * u * a[1] + 2 * u * t * ctrl[1] + t * t * b[1]]);
+  }
+  return pts;
+}
+
 // Clean, muted CARTO basemap (Positron / Dark Matter) — matches the minimal design.
 function basemapStyle(dark: boolean) {
   const variant = dark ? 'dark_all' : 'light_all';
@@ -49,6 +68,8 @@ export function MapView({
   center,
   onSelect,
   line,
+  connectors,
+  routeEndpoints,
   userPos,
   follow = false,
 }: {
@@ -56,8 +77,10 @@ export function MapView({
   center: [number, number];
   onSelect: (id: string) => void;
   line?: [number, number][];
-  userPos?: [number, number] | null; // live position dot (navigation)
-  follow?: boolean; // keep the map centred on userPos instead of fitting the route
+  connectors?: [[number, number], [number, number]][]; // dashed "walk to route" lines
+  routeEndpoints?: { start?: [number, number]; end?: [number, number] };
+  userPos?: [number, number] | null;
+  follow?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<any>(null);
@@ -66,9 +89,13 @@ export function MapView({
   const observerRef = useRef<MutationObserver | null>(null);
   const onSelectRef = useRef(onSelect);
   const lineRef = useRef(line);
+  const connectorsRef = useRef(connectors);
+  const routeEndpointsRef = useRef(routeEndpoints);
   const followRef = useRef(follow);
   onSelectRef.current = onSelect;
   lineRef.current = line;
+  connectorsRef.current = connectors;
+  routeEndpointsRef.current = routeEndpoints;
   followRef.current = follow;
 
   // Draw/update the route line + fit it into view. Safe to call repeatedly.
@@ -84,9 +111,73 @@ export function MapView({
       map.addSource('route', { type: 'geojson', data });
       map.addLayer({ id: 'route', type: 'line', source: 'route', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#0d5b66', 'line-width': 5 } });
     }
+    // Route perpendicular direction — used to bow each connector AWAY from the road.
+    const routeFirst = coords[0];
+    const routeLast = coords[coords.length - 1];
+    const rdx = (routeLast?.[0] ?? 0) - (routeFirst?.[0] ?? 0);
+    const rdy = (routeLast?.[1] ?? 0) - (routeFirst?.[1] ?? 0);
+    const rlen = Math.sqrt(rdx * rdx + rdy * rdy);
+    const perpX = rlen > 0 ? -rdy / rlen : 0;
+    const perpY = rlen > 0 ? rdx / rlen : 0;
+
+    // Connector dotted curves (tapped point → route start, route end → destination).
+    const connData = {
+      type: 'FeatureCollection' as const,
+      features: (connectorsRef.current ?? []).map(([a, b]) => {
+        // Identify which endpoint is off-road by checking proximity to route endpoints.
+        const eps = 1e-5;
+        const aOnRoute =
+          (routeFirst && Math.abs(a[0] - routeFirst[0]) < eps && Math.abs(a[1] - routeFirst[1]) < eps) ||
+          (routeLast  && Math.abs(a[0] - routeLast[0])  < eps && Math.abs(a[1] - routeLast[1])  < eps);
+        const offRoad = aOnRoute ? b : a;
+        const onRoad  = aOnRoute ? a : b;
+        // bow toward the side where the off-road point sits relative to the route
+        const dot = (offRoad[0] - onRoad[0]) * perpX + (offRoad[1] - onRoad[1]) * perpY;
+        const bowSign = dot >= 0 ? 1 : -1;
+        return {
+          type: 'Feature' as const, properties: {},
+          geometry: { type: 'LineString' as const, coordinates: bezierConnector(a, b, bowSign) },
+        };
+      }),
+    };
+    const connSrc = map.getSource('route-connectors');
+    if (connSrc) {
+      connSrc.setData(connData);
+    } else {
+      map.addSource('route-connectors', { type: 'geojson', data: connData });
+      map.addLayer({ id: 'route-connectors', type: 'line', source: 'route-connectors',
+        layout: { 'line-cap': 'round', 'line-join': 'round' },
+        // [0, N] dasharray with round caps = evenly-spaced circular dots
+        paint: { 'line-color': '#7cb9f0', 'line-width': 7, 'line-opacity': 0.85, 'line-dasharray': [0, 1.8] },
+      }, 'route');
+    }
+
+    // Start / finish dot markers.
+    const ep = routeEndpointsRef.current;
+    const epFeatures = [
+      ep?.start ? { type: 'Feature' as const, properties: { kind: 'start' }, geometry: { type: 'Point' as const, coordinates: ep.start } } : null,
+      ep?.end   ? { type: 'Feature' as const, properties: { kind: 'end'   }, geometry: { type: 'Point' as const, coordinates: ep.end   } } : null,
+    ].filter(Boolean);
+    const epData = { type: 'FeatureCollection' as const, features: epFeatures as any[] };
+    const epSrc = map.getSource('route-endpoints');
+    if (epSrc) {
+      epSrc.setData(epData);
+    } else {
+      map.addSource('route-endpoints', { type: 'geojson', data: epData });
+      map.addLayer({ id: 'route-endpoints', type: 'circle', source: 'route-endpoints',
+        paint: {
+          'circle-radius': ['match', ['get', 'kind'], 'end', 9, 8],
+          'circle-color': ['match', ['get', 'kind'], 'start', '#ffffff', '#1d4ed8'],
+          'circle-stroke-color': ['match', ['get', 'kind'], 'start', '#1d4ed8', '#ffffff'],
+          'circle-stroke-width': 2.5,
+        },
+      });
+    }
+
     if (followRef.current) return; // navigation owns the camera — don't fight the follow
-    const lngs = coords.map((c) => c[0]);
-    const lats = coords.map((c) => c[1]);
+    const allCoords = [...coords, ...(connectorsRef.current ?? []).flat()];
+    const lngs = allCoords.map((c) => c[0]);
+    const lats = allCoords.map((c) => c[1]);
     map.fitBounds([[Math.min(...lngs), Math.min(...lats)], [Math.max(...lngs), Math.max(...lats)]], { padding: 50, duration: 600 });
   }, []);
 

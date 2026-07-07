@@ -387,7 +387,7 @@ export default function MapPage() {
               else dropAt(lng, lat);
             }}
             route={routeDisplay}
-            marker={dropped ? { lng: dropped.lng, lat: dropped.lat } : null}
+            marker={dropped && !routeDisplay ? { lng: dropped.lng, lat: dropped.lat } : null}
             onMarkerMove={dropAt}
           />
         )}
