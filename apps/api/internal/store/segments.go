@@ -127,7 +127,7 @@ select
   ST_X(ST_LineInterpolatePoint(geom, 0.5)) as mid_lng,
   ST_Y(ST_LineInterpolatePoint(geom, 0.5)) as mid_lat,
   ST_AsGeoJSON(geom) as line,
-  -- ~10 m buffer as a low-vertex polygon (2 segments/quarter, then simplified).
+  -- ~10 m buffer around the segment itself (does not cover adjacent road lanes).
   ST_AsGeoJSON(ST_SimplifyPreserveTopology(ST_Buffer(geom::geography, 10, 2)::geometry, 0.00002)) as poly
 from street_segments
 where geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)

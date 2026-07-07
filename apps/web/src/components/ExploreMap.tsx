@@ -123,10 +123,7 @@ function featureCollection(points: ExploreMarker[]): any {
 function segmentCollection(segs: ExploreSegment[]): any {
   return {
     type: 'FeatureCollection',
-    // Don't draw streets we have no accessibility data for — an "unknown" grey
-    // line adds noise without telling the user anything.
     features: segs
-      .filter((s) => s.rating !== 'unknown')
       .map((s) => ({
         type: 'Feature',
         geometry: JSON.parse(s.geojson),
@@ -137,6 +134,30 @@ function segmentCollection(segs: ExploreSegment[]): any {
 
 // (Re)creates the segment source/layer and pushes the current data into it.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+// Lviv historic-center coverage zone — adjust RADIUS_KM to resize.
+const COVERAGE_CENTER = { lng: 24.0318, lat: 49.8419 };
+const COVERAGE_RADIUS_KM = 1.5;
+
+function makeCirclePolygon(lng: number, lat: number, radiusKm: number, steps = 64) {
+  const coords: [number, number][] = [];
+  for (let i = 0; i <= steps; i++) {
+    const angle = (i / steps) * 2 * Math.PI;
+    const dLng = (radiusKm / (111.32 * Math.cos((lat * Math.PI) / 180))) * Math.cos(angle);
+    const dLat = (radiusKm / 110.574) * Math.sin(angle);
+    coords.push([lng + dLng, lat + dLat]);
+  }
+  return { type: 'Feature' as const, properties: {}, geometry: { type: 'Polygon' as const, coordinates: [coords] } };
+}
+
+function syncCoverageCircle(map: any) {
+  const data = { type: 'FeatureCollection' as const, features: [makeCirclePolygon(COVERAGE_CENTER.lng, COVERAGE_CENTER.lat, COVERAGE_RADIUS_KM)] };
+  if (!map.getSource('sc-coverage')) {
+    map.addSource('sc-coverage', { type: 'geojson', data });
+    map.addLayer({ id: 'sc-coverage-fill', type: 'fill', source: 'sc-coverage', paint: { 'fill-color': '#38bdf8', 'fill-opacity': 0.15 } });
+    map.addLayer({ id: 'sc-coverage-border', type: 'line', source: 'sc-coverage', paint: { 'line-color': '#0ea5e9', 'line-width': 2, 'line-dasharray': [4, 3] } });
+  }
+}
+
 function syncSegments(map: any, segs: ExploreSegment[]) {
   const data = segmentCollection(segs);
   try {
@@ -147,7 +168,7 @@ function syncSegments(map: any, segs: ExploreSegment[]) {
           id: 'sc-segs', type: 'line', source: 'sc-segs',
           layout: { 'line-join': 'round', 'line-cap': 'round' },
           paint: {
-            'line-width': 5,
+            'line-width': ['interpolate', ['linear'], ['zoom'], 12, 2, 15, 4, 17, 6],
             'line-opacity': 0.85,
             'line-color': ['match', ['get', 'rating'],
               'full',    '#22c55e',
@@ -409,6 +430,7 @@ export function ExploreMap({
 
       map.on('load', async () => {
         await addPointLayers();
+        syncCoverageCircle(map);
         syncSegments(map, segmentsRef.current);
         emit();
         try { geolocate.trigger(); } catch { /* denied — stay at center */ }
@@ -418,6 +440,7 @@ export function ExploreMap({
       // Re-add style-owned layers after a theme swap.
       map.on('style.load', () => {
         void addPointLayers().then(() => {
+          syncCoverageCircle(map);
           syncRoute(map, routeRef.current);
           syncSegments(map, segmentsRef.current);
         });
