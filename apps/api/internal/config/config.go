@@ -14,7 +14,7 @@ type Config struct {
 	Port     string
 	LogLevel string // debug | info | warn | error
 
-	DatabaseURL       string // Supabase Postgres (session pooler URI)
+	DatabaseURL       string // Supabase Postgres (TRANSACTION pooler URI, port 6543)
 	SupabaseURL       string // project URL, e.g. https://<ref>.supabase.co
 	JWKSURL           string // derived: SupabaseURL + /auth/v1/.well-known/jwks.json
 	JWTIssuer         string // derived: SupabaseURL + /auth/v1 (expected `iss` claim)
