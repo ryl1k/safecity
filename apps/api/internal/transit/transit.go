@@ -79,11 +79,16 @@ func Covered(from, to [2]float64) bool {
 	return in(from) && in(to)
 }
 
+// WalkRouterFunc routes a single walk leg accessibly. It returns [lng,lat] pairs
+// or an error; on error the caller falls back to MOTIS geometry.
+type WalkRouterFunc func(fromLng, fromLat, toLng, toLat float64) ([][2]float64, error)
+
 // Client talks to the Transitous MOTIS API.
 type Client struct {
-	http *http.Client
-	base string
-	now  func() time.Time // injectable for tests
+	http       *http.Client
+	base       string
+	now        func() time.Time // injectable for tests
+	walkRouter WalkRouterFunc   // nil = use MOTIS walk geometry
 }
 
 // New builds a Client. timeout bounds each upstream call.
@@ -93,6 +98,14 @@ func New(base string, timeout time.Duration) *Client {
 		base: strings.TrimRight(base, "/"),
 		now:  time.Now,
 	}
+}
+
+// WithWalkRouter attaches an accessible walk router. When set, every WALK leg
+// inside Lviv coverage is re-routed via the accessible street graph; MOTIS
+// geometry is kept as fallback if the router fails.
+func (c *Client) WithWalkRouter(fn WalkRouterFunc) *Client {
+	c.walkRouter = fn
+	return c
 }
 
 // Plan requests journeys from → to (both [lng,lat]) departing now, and returns
@@ -132,7 +145,7 @@ func (c *Client) Plan(ctx context.Context, from, to [2]float64) (Result, error) 
 
 	its := make([]Itinerary, 0, len(raw.Itineraries))
 	for _, it := range raw.Itineraries {
-		its = append(its, mapItinerary(it))
+		its = append(its, mapItinerary(it, c.walkRouter))
 	}
 	rankItineraries(its)
 	if len(its) > 6 {
@@ -176,10 +189,10 @@ type motisPlace struct {
 	Name string `json:"name"`
 }
 
-func mapItinerary(it motisItinerary) Itinerary {
+func mapItinerary(it motisItinerary, wr WalkRouterFunc) Itinerary {
 	legs := make([]Leg, 0, len(it.Legs))
 	for _, l := range it.Legs {
-		legs = append(legs, mapLeg(l))
+		legs = append(legs, mapLeg(l, wr))
 	}
 
 	access := AccessUnknown
@@ -218,7 +231,7 @@ func mapItinerary(it motisItinerary) Itinerary {
 	}
 }
 
-func mapLeg(l motisLeg) Leg {
+func mapLeg(l motisLeg, wr WalkRouterFunc) Leg {
 	route := l.RouteShortName
 	access := AccessUnknown
 	if l.Mode != "WALK" {
@@ -228,6 +241,16 @@ func mapLeg(l motisLeg) Leg {
 	if l.LegGeometry.Precision != nil {
 		precision = *l.LegGeometry.Precision
 	}
+	coords := decodePolyline(l.LegGeometry.Points, precision)
+
+	// Replace WALK geometry with accessible routing when possible.
+	if l.Mode == "WALK" && wr != nil && len(coords) >= 2 {
+		from, to := coords[0], coords[len(coords)-1]
+		if routed, err := wr(from[0], from[1], to[0], to[1]); err == nil && len(routed) >= 2 {
+			coords = routed
+		}
+	}
+
 	leg := Leg{
 		Mode:      l.Mode,
 		Route:     route,
@@ -236,7 +259,7 @@ func mapLeg(l motisLeg) Leg {
 		StartTime: l.StartTime,
 		EndTime:   l.EndTime,
 		Access:    access,
-		Coords:    decodePolyline(l.LegGeometry.Points, precision),
+		Coords:    coords,
 	}
 	leg.Category = category(leg)
 	leg.Label = label(leg)

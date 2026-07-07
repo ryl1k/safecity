@@ -14,6 +14,9 @@ const nextConfig = {
   outputFileTracingRoot: path.join(__dirname, '../../'),
   // Workspace packages ship raw TS/CSS — let Next transpile them.
   transpilePackages: ['@safecity/shared', '@safecity/design-tokens'],
+  turbopack: {
+    root: __dirname,
+  },
 };
 
 export default nextConfig;

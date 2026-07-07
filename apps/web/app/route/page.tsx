@@ -27,6 +27,18 @@ const MapView = dynamic(() => import('@/components/MapView').then((m) => m.MapVi
 
 interface Step { instruction: string; distance: number }
 interface Nearby { id: string; name: string; category: PointSummary['category'] }
+interface RatingSummary { full_m: number; partial_m: number; none_m: number; unknown_m: number }
+interface RouteAlternative {
+  mode: 'strict' | 'moderate' | 'flat';
+  label: string;
+  description: string;
+  coordinates: [number, number][];
+  distance_m: number;
+  rating_summary: RatingSummary;
+  available: boolean;
+  avoided: number;
+  crossesRed: number;
+}
 
 // Rough metres between two lng/lat pairs (equirectangular — fine at city scale).
 function metersBetween(a: [number, number], b: [number, number]): number {
@@ -140,7 +152,8 @@ function RouteInner() {
   const [prefs, setPrefs] = useState<RoutePrefs>(() => loadRoutePrefs());
   const prefsRef = useRef<RoutePrefs>(prefs);
   prefsRef.current = prefs;
-  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'picking' | 'ready' | 'error'>('idle');
+  const [alternatives, setAlternatives] = useState<RouteAlternative[]>([]);
   const [dest, setDest] = useState<PointSummary | null>(null);
   const [line, setLine] = useState<[number, number][]>([]);
   const [steps, setSteps] = useState<Step[]>([]);
@@ -148,6 +161,7 @@ function RouteInner() {
   const [fallback, setFallback] = useState(false);
   const [avoided, setAvoided] = useState(0);
   const [crossesRed, setCrossesRed] = useState(0);
+  const [routeSource, setRouteSource] = useState<string | null>(null);
   const [nearby, setNearby] = useState<Nearby[]>([]);
   const [speaking, setSpeaking] = useState(false);
   const stepsRef = useRef<Step[]>([]);
@@ -212,20 +226,26 @@ function RouteInner() {
         setStatus('error');
         return;
       }
-      const coords: [number, number][] = data.coordinates ?? [];
-      setLine(coords);
-      setSteps(data.steps);
-      setSummary(data.summary);
-      setFallback(Boolean(data.fallback));
-      setAvoided(data.avoided ?? 0);
-      setCrossesRed(data.crossesRed ?? 0);
-      setStatus('ready');
-
-      // Along-route accessible-points callouts (best-effort, after the route renders).
-      void computeNearby(coords, point.id).then(setNearby).catch(() => setNearby([]));
+      setRouteSource(data.source ?? null);
+      const alts: RouteAlternative[] = (data.alternatives ?? []).filter((a: RouteAlternative) => a.available);
+      if (alts.length === 0) { setStatus('error'); return; }
+      setAlternatives(alts);
+      setStatus('picking');
     } catch {
       setStatus('error');
     }
+  }
+
+  function pickAlternative(alt: RouteAlternative) {
+    const coords = alt.coordinates as [number, number][];
+    setLine(coords);
+    setSteps([]);
+    setSummary({ distance: alt.distance_m, duration: alt.distance_m / 1.1 });
+    setFallback(false);
+    setAvoided(alt.avoided ?? 0);
+    setCrossesRed(alt.crossesRed ?? 0);
+    setStatus('ready');
+    void computeNearby(coords, dest?.id ?? '').then(setNearby).catch(() => setNearby([]));
   }
 
   async function computeNearby(coords: [number, number][], destId: string): Promise<Nearby[]> {
@@ -362,9 +382,58 @@ function RouteInner() {
             {status === 'loading' && <LoadingState label="Прокладання маршруту" />}
             {status === 'error' && <ErrorState title="Не вдалося прокласти маршрут" onRetry={() => void plan(fromCoords)} />}
 
+            {status === 'picking' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75em' }}>
+                <p style={{ margin: '0 0 0.25em', fontWeight: 700, fontSize: '1.05em' }}>Оберіть маршрут</p>
+                {alternatives.map((alt) => {
+                  const s = alt.rating_summary;
+                  const total = (s.full_m ?? 0) + (s.partial_m ?? 0) + (s.none_m ?? 0) + (s.unknown_m ?? 0);
+                  const pct = (v: number) => total > 0 ? Math.round(v / total * 100) : 0;
+                  const icon = alt.mode === 'strict' ? '🟢' : alt.mode === 'moderate' ? '🟡' : '⚪';
+                  return (
+                    <button
+                      key={alt.mode}
+                      onClick={() => pickAlternative(alt)}
+                      style={{
+                        display: 'flex', flexDirection: 'column', gap: '0.5em',
+                        width: '100%', textAlign: 'left', cursor: 'pointer',
+                        background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)',
+                        borderRadius: '0.9em', padding: '1em 1.1em',
+                        fontFamily: 'inherit', fontSize: 'inherit',
+                      }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                        <span style={{ fontWeight: 800, fontSize: '1.05em' }}>{icon} {alt.label}</span>
+                        <span style={{ color: 'var(--sc-muted)', fontSize: '0.88em' }}>{Math.round(alt.distance_m)} м</span>
+                      </div>
+                      <span style={{ color: 'var(--sc-muted)', fontSize: '0.83em' }}>{alt.description}</span>
+                      <div style={{ display: 'flex', height: 6, borderRadius: 4, overflow: 'hidden', gap: 1 }}>
+                        {pct(s.full_m) > 0    && <div style={{ flex: pct(s.full_m),    background: 'var(--sc-ok)' }} />}
+                        {pct(s.partial_m) > 0 && <div style={{ flex: pct(s.partial_m), background: 'var(--sc-warn)' }} />}
+                        {pct(s.unknown_m) > 0 && <div style={{ flex: pct(s.unknown_m), background: 'var(--sc-border-strong)' }} />}
+                        {pct(s.none_m) > 0    && <div style={{ flex: pct(s.none_m),    background: 'var(--sc-bad)' }} />}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.8em', fontSize: '0.78em', color: 'var(--sc-muted)' }}>
+                        {pct(s.full_m) > 0    && <span style={{ color: 'var(--sc-ok)' }}>● {pct(s.full_m)}% доступно</span>}
+                        {pct(s.partial_m) > 0 && <span style={{ color: 'var(--sc-warn)' }}>● {pct(s.partial_m)}% часткове</span>}
+                        {pct(s.none_m) > 0    && <span style={{ color: 'var(--sc-bad)' }}>● {pct(s.none_m)}% недоступно</span>}
+                        {pct(s.unknown_m) > 0 && <span>● {pct(s.unknown_m)}% невідомо</span>}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+
             {status === 'ready' && fallback && (
               <p role="status" style={{ margin: '0 0 1em', padding: '0.7em 1em', borderRadius: '0.7em', background: 'var(--sc-warn-bg)', color: 'var(--sc-warn)', border: 'var(--sc-bw) solid var(--sc-warn-line)', fontSize: '0.85em', fontWeight: 700 }}>
                 Пішохідний маршрут — детальних даних для крісла колісного на цьому відрізку бракує.
+              </p>
+            )}
+
+            {status === 'ready' && routeSource && (
+              <p style={{ margin: '0 0 1em', padding: '0.4em 0.8em', borderRadius: '0.5em', background: '#f1f5f9', color: '#475569', fontSize: '0.78em', fontFamily: 'monospace', fontWeight: 700 }}>
+                🛠 source: {routeSource}
               </p>
             )}
 
@@ -405,7 +474,22 @@ function RouteInner() {
                 )}
 
                 <div style={{ width: '100%', height: navigating ? 'min(60vh, 520px)' : 'min(50vh, 420px)', minHeight: 280 }}>
-                  <MapView points={[]} center={userPos ?? (dest ? [dest.lng, dest.lat] : [loadCity().lng, loadCity().lat])} onSelect={() => {}} line={line} userPos={userPos} follow={navigating} />
+                  <MapView
+                    points={[]}
+                    center={userPos ?? (dest ? [dest.lng, dest.lat] : [loadCity().lng, loadCity().lat])}
+                    onSelect={() => {}}
+                    line={line}
+                    connectors={line.length >= 2 ? [
+                      ...(fromCoords ? [[fromCoords, line[0] as [number,number]]] as [[number,number],[number,number]][] : []),
+                      ...(dest ? [[line[line.length - 1] as [number,number], [dest.lng, dest.lat] as [number,number]]] as [[number,number],[number,number]][] : []),
+                    ] : []}
+                    routeEndpoints={{
+                      start: fromCoords ?? undefined,
+                      end: dest ? [dest.lng, dest.lat] : undefined,
+                    }}
+                    userPos={userPos}
+                    follow={navigating}
+                  />
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>
