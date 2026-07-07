@@ -283,6 +283,25 @@ func metersBetween(a, b [2]float64) float64 {
 	return math.Hypot(dx, dy)
 }
 
+// handleRouteSteps: POST /route/steps — fetch ORS turn-by-turn steps for an
+// existing coordinate path (pgRouting result). Coordinates are thinned to ≤50
+// waypoints before being sent to ORS foot-walking, returning English instructions.
+func (s *Server) handleRouteSteps(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Coordinates [][2]float64 `json:"coordinates" validate:"required,min=2"`
+	}
+	if !httpx.Decode(w, r, &req) {
+		return
+	}
+	steps, err := s.geo.StepsForCoords(r.Context(), req.Coordinates)
+	if err != nil {
+		s.log.Warn("route/steps ors call failed", "err", err)
+		httpx.Error(w, http.StatusBadGateway, "steps_error", "could not fetch turn instructions")
+		return
+	}
+	httpx.JSON(w, http.StatusOK, map[string]any{"steps": steps})
+}
+
 // handleGeocode: GET /geocode?q=&limit= — public address search.
 func (s *Server) handleGeocode(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")

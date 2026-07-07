@@ -289,6 +289,66 @@ func uaInstruction(t int, name string) string {
 	}
 }
 
+// StepsForCoords sends the coordinate path to ORS (foot-walking profile) and
+// returns English turn-by-turn steps. The path is thinned to ≤50 waypoints so
+// we stay within ORS's default limit; step instructions come from ORS directly
+// (English by default) without the uaInstruction translation layer.
+func (c *Client) StepsForCoords(ctx context.Context, coords [][2]float64) ([]Step, error) {
+	if c.orsKey == "" {
+		return nil, ErrUnavailable
+	}
+	if len(coords) < 2 {
+		return nil, fmt.Errorf("need at least 2 coordinates")
+	}
+	thinned := thinCoords(coords, 48) // 48 mid-points + from + to = 50 total
+	in := RouteInput{
+		From:    thinned[0],
+		To:      thinned[len(thinned)-1],
+		Via:     thinned[1 : len(thinned)-1],
+		Profile: "foot-walking",
+	}
+	body, status, err := c.orsCall(ctx, "foot-walking", in)
+	if err != nil {
+		return nil, fmt.Errorf("ors steps call: %w", err)
+	}
+	if status != http.StatusOK {
+		return nil, fmt.Errorf("ors steps: status %d", status)
+	}
+	var gj orsGeoJSON
+	if err := json.Unmarshal(body, &gj); err != nil || len(gj.Features) == 0 {
+		return nil, fmt.Errorf("ors steps: decode failed")
+	}
+	var steps []Step
+	if segs := gj.Features[0].Properties.Segments; len(segs) > 0 {
+		for _, s := range segs[0].Steps {
+			steps = append(steps, Step{Instruction: s.Instruction, Distance: s.Distance})
+		}
+	}
+	return steps, nil
+}
+
+// thinCoords reduces coords to at most maxMid+2 points (from + mid + to),
+// keeping evenly-spaced samples across the path.
+func thinCoords(coords [][2]float64, maxMid int) [][2]float64 {
+	if len(coords) <= maxMid+2 {
+		return coords
+	}
+	out := make([][2]float64, 0, maxMid+2)
+	out = append(out, coords[0])
+	for i := 1; i <= maxMid; i++ {
+		idx := int(float64(i)*float64(len(coords)-2)/float64(maxMid) + 0.5)
+		if idx < 1 {
+			idx = 1
+		}
+		if idx >= len(coords)-1 {
+			idx = len(coords) - 2
+		}
+		out = append(out, coords[idx])
+	}
+	out = append(out, coords[len(coords)-1])
+	return out
+}
+
 // AvoidSquares turns barrier points into ~30 m square avoidance polygons (a
 // GeoJSON MultiPolygon coordinate set), matching the web's avoidSquare.
 func AvoidSquares(points [][2]float64) [][][][]float64 {
