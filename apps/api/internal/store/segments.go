@@ -41,6 +41,81 @@ func (s *Store) RouteAccessible(ctx context.Context, startLng, startLat, endLng,
 	return &ar, nil
 }
 
+// RouteAlternative is one option returned by RouteAlternatives.
+type RouteAlternative struct {
+	Mode          string             `json:"mode"`          // strict | moderate | flat
+	Label         string             `json:"label"`         // Ukrainian display name
+	Description   string             `json:"description"`   // one-line explanation
+	Coordinates   [][]float64        `json:"coordinates"`
+	DistanceM     float64            `json:"distance_m"`
+	RatingSummary map[string]float64 `json:"rating_summary"`
+	Available     bool               `json:"available"`
+}
+
+// RouteAlternatives runs strict / moderate / flat routing concurrently and
+// returns all three options. At least one is guaranteed to have Available=true
+// if any path exists between the two points.
+func (s *Store) RouteAlternatives(ctx context.Context, startLng, startLat, endLng, endLat float64) ([]RouteAlternative, error) {
+	type modeSpec struct {
+		mode        string
+		label       string
+		description string
+	}
+	specs := []modeSpec{
+		{"strict", "Безпечний", "Уникає всіх недоступних ділянок"},
+		{"moderate", "Збалансований", "Червоні ділянки коштують у 5 разів більше"},
+		{"flat", "Найкоротший", "Ігнорує доступність, лише відстань"},
+	}
+
+	type result struct {
+		idx int
+		ar  *AccessibleRoute
+		err error
+	}
+	ch := make(chan result, len(specs))
+
+	for i, sp := range specs {
+		go func(idx int, mode string) {
+			var raw []byte
+			err := s.db.WithAnon(ctx, func(tx pgx.Tx) error {
+				return tx.QueryRow(ctx,
+					`select route_accessible_v($1, $2, $3, $4, $5)`,
+					startLng, startLat, endLng, endLat, mode,
+				).Scan(&raw)
+			})
+			if err != nil {
+				ch <- result{idx: idx, err: err}
+				return
+			}
+			var ar AccessibleRoute
+			if err := json.Unmarshal(raw, &ar); err != nil || ar.Error != "" {
+				ch <- result{idx: idx, err: fmt.Errorf("%s", ar.Error)}
+				return
+			}
+			ch <- result{idx: idx, ar: &ar}
+		}(i, sp.mode)
+	}
+
+	alts := make([]RouteAlternative, len(specs))
+	for range specs {
+		r := <-ch
+		sp := specs[r.idx]
+		alt := RouteAlternative{
+			Mode:        sp.mode,
+			Label:       sp.label,
+			Description: sp.description,
+		}
+		if r.err == nil && r.ar != nil {
+			alt.Available = true
+			alt.Coordinates = r.ar.Coordinates
+			alt.DistanceM = r.ar.DistanceM
+			alt.RatingSummary = r.ar.RatingSummary
+		}
+		alts[r.idx] = alt
+	}
+	return alts, nil
+}
+
 // StreetSegment is one surveyed walking path with accessibility attributes.
 type StreetSegment struct {
 	ID               string   `json:"id"`

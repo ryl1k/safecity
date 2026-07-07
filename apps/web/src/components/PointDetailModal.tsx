@@ -19,6 +19,18 @@ import { loadRoutePrefs, saveRoutePrefs, routePrefsPayload, type RoutePrefs } fr
 const FOCUSABLE = 'a[href],button:not([disabled]),textarea,input,select,[tabindex]:not([tabindex="-1"])';
 
 interface Step { instruction: string; distance: number }
+interface RatingSummary { full_m: number; partial_m: number; none_m: number; unknown_m: number }
+interface RouteAlternative {
+  mode: 'strict' | 'moderate' | 'flat';
+  label: string;
+  description: string;
+  coordinates: [number, number][];
+  distance_m: number;
+  rating_summary: RatingSummary;
+  available: boolean;
+  avoided: number;
+  crossesRed: number;
+}
 
 const trunc = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
@@ -219,7 +231,9 @@ export function RouteTabContent({
   const [dragOverIdx, setDragOverIdx] = useState<number | null>(null);
 
   // Route result
-  const [status, setStatus] = useState<'idle' | 'loading' | 'ready' | 'error'>('idle');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'picking' | 'ready' | 'error'>('idle');
+  const [alternatives, setAlternatives] = useState<RouteAlternative[]>([]);
+  const [selectedAltMode, setSelectedAltMode] = useState<string | null>(null);
   const [steps, setSteps] = useState<Step[]>([]);
   const [summary, setSummary] = useState<{ distance: number; duration: number } | null>(null);
   const [fallback, setFallback] = useState(false);
@@ -276,6 +290,23 @@ export function RouteTabContent({
 
   // Clear the route display on unmount.
   useEffect(() => () => { onRouteDisplay?.(null); }, [onRouteDisplay]);
+
+  // While the picker is open, draw all available alternatives on the map.
+  // Selected one is bright and on top; others are dimmed.
+  useEffect(() => {
+    if (status !== 'picking' || alternatives.length === 0) return;
+    const lines: RouteDisplay['lines'] = [];
+    for (const alt of [...alternatives].sort((a) => (a.mode === selectedAltMode ? 1 : -1))) {
+      if (!alt.available || !alt.coordinates?.length) continue;
+      const active = alt.mode === selectedAltMode;
+      lines.push({ coords: alt.coordinates as [number, number][], color: active ? '#1d4ed8' : '#93c5fd', width: active ? 6 : 3, opacity: active ? 0.92 : 0.65, sort: active ? 2 : 1 });
+    }
+    const markers: RouteDisplay['markers'] = [];
+    if (fromCoords) markers.push({ lng: fromCoords[0], lat: fromCoords[1], kind: 'start', label: 'Старт' });
+    if (toCoords) markers.push({ lng: toCoords[0], lat: toCoords[1], kind: 'end', label: 'Фініш' });
+    onRouteDisplay?.({ lines, markers });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status, alternatives, selectedAltMode]);
 
   // Auto-route when all waypoints are ready (from + all stops filled + to).
   // Dedupe by the actual waypoint set so re-renders can't fire a storm of
@@ -381,17 +412,26 @@ export function RouteTabContent({
     }
 
     try {
-      // Barrier avoidance polygons are built server-side from confirmed problems.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = await api.post('/route', { from: start, to: end, via, profile: primary, ...routePrefsPayload(prefsRef.current) }, { auth: false });
-      onRouteDisplay?.(walkDisplay(data.coordinates ?? [], start, end));
-      setSteps(data.steps ?? []);
-      setSummary(data.summary ?? null);
-      setFallback(Boolean(data.fallback));
-      setAvoided(data.avoided ?? 0);
-      setCrossesRed(data.crossesRed ?? 0);
-      setStatus('ready');
+      const alts: RouteAlternative[] = data.alternatives ?? [];
+      const firstAvailable = alts.find((a) => a.available);
+      if (!firstAvailable) { setStatus('error'); return; }
+      setAlternatives(alts);
+      setSelectedAltMode(firstAvailable.mode);
+      setStatus('picking');
     } catch { setStatus('error'); }
+  }
+
+  function pickAlternative(alt: RouteAlternative, start: [number, number], end: [number, number]) {
+    const coords = alt.coordinates as [number, number][];
+    onRouteDisplay?.(walkDisplay(coords, start, end));
+    setSteps([]);
+    setSummary(alt.distance_m > 0 ? { distance: alt.distance_m, duration: alt.distance_m / 1.1 } : null);
+    setFallback(false);
+    setAvoided(alt.avoided ?? 0);
+    setCrossesRed(alt.crossesRed ?? 0);
+    setStatus('ready');
   }
 
   function toggleSpeak() {
@@ -513,6 +553,71 @@ export function RouteTabContent({
           onRetry={() => { lastPlanKey.current = ''; void plan([fromCoords, ...stops.map((s) => s.coords!), toCoords]); }}
         />
       )}
+
+      {status === 'picking' && travelMode === 'walk' && fromCoords && toCoords && (() => {
+        const sel = alternatives.find((a) => a.mode === selectedAltMode) ?? null;
+        return (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75em' }}>
+            <p style={{ margin: '0 0 0.25em', fontWeight: 700, fontSize: '1.05em' }}>Оберіть маршрут</p>
+            {alternatives.map((alt) => {
+              const s = alt.rating_summary ?? { full_m: 0, partial_m: 0, none_m: 0, unknown_m: 0 };
+              const total = (s.full_m ?? 0) + (s.partial_m ?? 0) + (s.none_m ?? 0) + (s.unknown_m ?? 0);
+              const pct = (v: number) => total > 0 ? Math.round(v / total * 100) : 0;
+              const icon = alt.mode === 'strict' ? '🟢' : alt.mode === 'moderate' ? '🟡' : '⚪';
+              const active = alt.mode === selectedAltMode;
+              return (
+                <button
+                  key={alt.mode}
+                  type="button"
+                  disabled={!alt.available}
+                  onClick={() => setSelectedAltMode(alt.mode)}
+                  style={{
+                    display: 'flex', flexDirection: 'column', gap: '0.5em',
+                    width: '100%', textAlign: 'left', cursor: alt.available ? 'pointer' : 'not-allowed',
+                    opacity: alt.available ? 1 : 0.45,
+                    background: active ? 'var(--sc-primary-tint)' : 'var(--sc-surface)',
+                    border: `${active ? '2px' : 'var(--sc-bw)'} solid ${active ? 'var(--sc-primary)' : 'var(--sc-border)'}`,
+                    borderRadius: '0.9em', padding: '1em 1.1em',
+                    fontFamily: 'inherit', fontSize: 'inherit',
+                    boxShadow: active ? '0 0 0 2px color-mix(in srgb, var(--sc-primary) 18%, transparent)' : 'none',
+                    transition: 'border-color 0.15s, background 0.15s, box-shadow 0.15s',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+                    <span style={{ fontWeight: 800, fontSize: '1.05em', color: active ? 'var(--sc-primary)' : 'inherit' }}>{icon} {alt.label}</span>
+                    <span style={{ color: 'var(--sc-muted)', fontSize: '0.88em' }}>{alt.available ? `${Math.round(alt.distance_m)} м` : 'недоступно'}</span>
+                  </div>
+                  <span style={{ color: 'var(--sc-muted)', fontSize: '0.83em' }}>{alt.description}</span>
+                  {alt.available && (
+                    <>
+                      <div style={{ display: 'flex', height: 6, borderRadius: 4, overflow: 'hidden', gap: 1 }}>
+                        {pct(s.full_m) > 0    && <div style={{ flex: pct(s.full_m),    background: 'var(--sc-ok)' }} />}
+                        {pct(s.partial_m) > 0 && <div style={{ flex: pct(s.partial_m), background: 'var(--sc-warn)' }} />}
+                        {pct(s.unknown_m) > 0 && <div style={{ flex: pct(s.unknown_m), background: 'var(--sc-border-strong)' }} />}
+                        {pct(s.none_m) > 0    && <div style={{ flex: pct(s.none_m),    background: 'var(--sc-bad)' }} />}
+                      </div>
+                      <div style={{ display: 'flex', gap: '0.8em', fontSize: '0.78em', color: 'var(--sc-muted)' }}>
+                        {pct(s.full_m) > 0    && <span style={{ color: 'var(--sc-ok)' }}>● {pct(s.full_m)}% доступно</span>}
+                        {pct(s.partial_m) > 0 && <span style={{ color: 'var(--sc-warn)' }}>● {pct(s.partial_m)}% часткове</span>}
+                        {pct(s.none_m) > 0    && <span style={{ color: 'var(--sc-bad)' }}>● {pct(s.none_m)}% недоступно</span>}
+                        {pct(s.unknown_m) > 0 && <span>● {pct(s.unknown_m)}% невідомо</span>}
+                      </div>
+                    </>
+                  )}
+                </button>
+              );
+            })}
+            <Button
+              variant="accent"
+              disabled={!sel}
+              onClick={() => sel && pickAlternative(sel, fromCoords, toCoords)}
+              style={{ marginTop: '0.25em', minHeight: '2.8em', fontWeight: 800, fontSize: '1em' }}
+            >
+              Прокласти маршрут
+            </Button>
+          </div>
+        );
+      })()}
 
       {status === 'ready' && travelMode === 'transit' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6em' }}>

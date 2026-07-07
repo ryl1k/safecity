@@ -155,38 +155,51 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 		return n
 	}
 
-	pgResult := func(ar *store.AccessibleRoute) geo.RouteResult {
-		return geo.RouteResult{
-			Profile:     "wheelchair",
-			Source:      "pgrouting",
-			Coordinates: ar.Coordinates,
-			Steps:       []geo.Step{},
-			Summary:     &geo.Summary{Distance: ar.DistanceM, Duration: ar.DistanceM / walkingSpeedMps},
-		}
-	}
-
-	// For wheelchair profile, try pgRouting first — our segment graph with
-	// accessibility-weighted costs. BUT its "none" penalty is soft (100×, not
-	// infinite): when red is the only connected path it routes straight through,
-	// and it never sees the ORS avoid buffers. So we only take a pgRouting route
-	// outright when it's red-free; a red-crossing one is held and compared against
-	// ORS below (ORS usually detours around red via the buffer polygons).
-	// ── pgRouting only (ORS temporarily disabled) ────────────────────────────
-	var res geo.RouteResult
-	if wanted == "wheelchair" && s.store != nil && len(req.Via) == 0 {
-		ar, err := s.store.RouteAccessible(r.Context(), from[0], from[1], to[0], to[1])
-		if err != nil || ar == nil || len(ar.Coordinates) < 2 {
-			httpx.Error(w, http.StatusNotFound, "no_route", "не вдалося прокласти маршрут між цими точками")
-			return
-		}
-		res = pgResult(ar)
-	} else {
+	if wanted != "wheelchair" || s.store == nil || len(req.Via) > 0 {
 		httpx.Error(w, http.StatusNotFound, "no_route", "не вдалося прокласти маршрут між цими точками")
 		return
 	}
-	res.Avoided = avoidedBy(res.Coordinates)
-	res.CrossesRed = crossesRedBy(res.Coordinates)
-	httpx.JSON(w, http.StatusOK, res)
+
+	alts, err := s.store.RouteAlternatives(r.Context(), from[0], from[1], to[0], to[1])
+	if err != nil {
+		httpx.Error(w, http.StatusInternalServerError, "routing_error", "помилка маршрутизації")
+		return
+	}
+
+	// Check at least one alternative is available.
+	anyOK := false
+	for _, a := range alts {
+		if a.Available {
+			anyOK = true
+			break
+		}
+	}
+	if !anyOK {
+		httpx.Error(w, http.StatusNotFound, "no_route", "не вдалося прокласти маршрут між цими точками")
+		return
+	}
+
+	// Build per-alternative summary stats and annotate barrier/red metrics.
+	type altResponse struct {
+		store.RouteAlternative
+		Avoided    int  `json:"avoided"`
+		CrossesRed int  `json:"crossesRed"`
+	}
+	out := make([]altResponse, len(alts))
+	for i, a := range alts {
+		ar := altResponse{RouteAlternative: a}
+		if a.Available {
+			ar.Avoided = avoidedBy(a.Coordinates)
+			ar.CrossesRed = crossesRedBy(a.Coordinates)
+		}
+		out[i] = ar
+	}
+
+	httpx.JSON(w, http.StatusOK, map[string]any{
+		"profile":      "wheelchair",
+		"source":       "pgrouting",
+		"alternatives": out,
+	})
 }
 
 // Corridor + clearance thresholds for barrier avoidance/counting, and the cap on
