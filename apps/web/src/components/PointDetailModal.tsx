@@ -115,7 +115,7 @@ function computeSteps(coords: [number, number][]): Step[] {
   const steps: Step[] = [{ instruction: 'Start walking', distance: 0 }];
   for (let i = 1; i < legs.length; i++) {
     const diff = ((legs[i]!.bearing - legs[i - 1]!.bearing + 540) % 360) - 180;
-    steps[steps.length - 1] = { ...steps[steps.length - 1], distance: legs[i - 1]!.len };
+    steps[steps.length - 1] = { instruction: steps[steps.length - 1]!.instruction, distance: legs[i - 1]!.len };
     if (Math.abs(diff) >= THRESHOLD) {
       const sharp = Math.abs(diff) > 120 ? 'sharply ' : '';
       const dir = diff < 0 ? 'left' : 'right';
@@ -124,7 +124,7 @@ function computeSteps(coords: [number, number][]): Step[] {
       steps.push({ instruction: 'Continue straight', distance: 0 });
     }
   }
-  steps[steps.length - 1] = { ...steps[steps.length - 1], distance: legs[legs.length - 1]!.len };
+  steps[steps.length - 1] = { instruction: steps[steps.length - 1]!.instruction, distance: legs[legs.length - 1]!.len };
   steps.push({ instruction: 'You have arrived at your destination', distance: 0 });
   return steps;
 }
