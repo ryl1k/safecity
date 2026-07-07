@@ -339,7 +339,8 @@ func PruneOSMSidewalks(ctx context.Context, pool *pgxpool.Pool) (flipped, delete
 	tag, err = pool.Exec(ctx,
 		`delete from street_segments
 		 where osm_way_id is not null
-		   and segment_rating(surface_type, smoothness, sidewalk_width_m, incline_percent, is_step_free) = 'unknown'`)
+		   and segment_rating(surface_type, smoothness, sidewalk_width_m, incline_percent, is_step_free,
+		                      lit, has_curb_cuts, has_tactile_paving, is_obstacle_free) = 'unknown'`)
 	if err != nil {
 		return flipped, 0, fmt.Errorf("delete unknown-rated: %w", err)
 	}
