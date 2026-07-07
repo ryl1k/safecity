@@ -365,6 +365,10 @@ type fakeGeo struct {
 	revErr    error
 }
 
+func (f *fakeGeo) StepsForCoords(_ context.Context, _ [][2]float64) ([]geo.Step, error) {
+	return nil, nil
+}
+
 func (f *fakeGeo) Route(_ context.Context, in geo.RouteInput) (geo.RouteResult, error) {
 	f.gotRoute = in
 	return f.route, f.routeErr

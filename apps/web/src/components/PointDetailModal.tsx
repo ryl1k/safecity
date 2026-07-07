@@ -52,6 +52,83 @@ function bezierPts(a: [number, number], b: [number, number], bowSign = 1, steps 
   return pts;
 }
 
+// Derive turn-by-turn steps from a pgRouting coordinate array.
+// pgRouting stitches edges together by repeating junction nodes: the last point
+// of edge N equals the first point of edge N+1. We split on those duplicates to
+// get one segment per DB edge, compute each edge's overall bearing (start→end),
+// then emit a turn instruction wherever consecutive edges diverge ≥ THRESHOLD°.
+function computeSteps(coords: [number, number][]): Step[] {
+  if (coords.length < 2) return [];
+
+  function bearingDeg(a: [number, number], b: [number, number]): number {
+    const dLng = (b[0] - a[0]) * Math.PI / 180;
+    const φ1 = a[1] * Math.PI / 180, φ2 = b[1] * Math.PI / 180;
+    return Math.atan2(Math.sin(dLng) * Math.cos(φ2),
+      Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dLng)) * 180 / Math.PI;
+  }
+  function distM(a: [number, number], b: [number, number]): number {
+    const R = 6371000, lat = (a[1] + b[1]) / 2 * Math.PI / 180;
+    const dy = (b[1] - a[1]) * Math.PI / 180 * R;
+    const dx = (b[0] - a[0]) * Math.PI / 180 * R * Math.cos(lat);
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  // Split into edge segments at duplicate junction nodes.
+  const edges: [number, number][][] = [];
+  let cur: [number, number][] = [coords[0]!];
+  for (let i = 1; i < coords.length; i++) {
+    if (distM(coords[i - 1]!, coords[i]!) < 0.5) {
+      edges.push(cur);
+      cur = [coords[i]!];
+    } else {
+      cur.push(coords[i]!);
+    }
+  }
+  edges.push(cur);
+
+  // Compute each edge's length and overall bearing (first → last point).
+  const segs = edges
+    .filter(e => e.length >= 2)
+    .map(e => {
+      let len = 0;
+      for (let i = 1; i < e.length; i++) len += distM(e[i - 1]!, e[i]!);
+      return { bearing: bearingDeg(e[0]!, e[e.length - 1]!), len };
+    });
+
+  if (segs.length === 0) return [];
+
+  // Merge consecutive segments whose bearings differ < MERGE° into one leg.
+  const MERGE = 25;
+  const legs: { bearing: number; len: number }[] = [segs[0]!];
+  for (let i = 1; i < segs.length; i++) {
+    const prev = legs[legs.length - 1]!;
+    const diff = ((segs[i]!.bearing - prev.bearing + 540) % 360) - 180;
+    if (Math.abs(diff) < MERGE) {
+      prev.len += segs[i]!.len; // straight continuation — accumulate distance
+    } else {
+      legs.push({ ...segs[i]! });
+    }
+  }
+
+  // Build step list from merged legs.
+  const THRESHOLD = 30;
+  const steps: Step[] = [{ instruction: 'Start walking', distance: 0 }];
+  for (let i = 1; i < legs.length; i++) {
+    const diff = ((legs[i]!.bearing - legs[i - 1]!.bearing + 540) % 360) - 180;
+    steps[steps.length - 1] = { instruction: steps[steps.length - 1]!.instruction, distance: legs[i - 1]!.len };
+    if (Math.abs(diff) >= THRESHOLD) {
+      const sharp = Math.abs(diff) > 120 ? 'sharply ' : '';
+      const dir = diff < 0 ? 'left' : 'right';
+      steps.push({ instruction: `Turn ${sharp}${dir}`, distance: 0 });
+    } else {
+      steps.push({ instruction: 'Continue straight', distance: 0 });
+    }
+  }
+  steps[steps.length - 1] = { instruction: steps[steps.length - 1]!.instruction, distance: legs[legs.length - 1]!.len };
+  steps.push({ instruction: 'You have arrived at your destination', distance: 0 });
+  return steps;
+}
+
 // Walking route: solid edge line + dotted bezier connectors from actual clicked points.
 // actualStart/actualEnd are the user-picked coordinates; coords is the on-graph geometry.
 function walkDisplay(coords: [number, number][], actualStart?: [number, number], actualEnd?: [number, number]): RouteDisplay {
@@ -298,8 +375,14 @@ export function RouteTabContent({
     const lines: RouteDisplay['lines'] = [];
     for (const alt of [...alternatives].sort((a) => (a.mode === selectedAltMode ? 1 : -1))) {
       if (!alt.available || !alt.coordinates?.length) continue;
+      let coords = alt.coordinates as [number, number][];
+      if (fromCoords && coords.length >= 2) {
+        const d0 = Math.hypot(coords[0]![0] - fromCoords[0], coords[0]![1] - fromCoords[1]);
+        const dN = Math.hypot(coords[coords.length - 1]![0] - fromCoords[0], coords[coords.length - 1]![1] - fromCoords[1]);
+        if (dN < d0) coords = [...coords].reverse();
+      }
       const active = alt.mode === selectedAltMode;
-      lines.push({ coords: alt.coordinates as [number, number][], color: active ? '#1d4ed8' : '#93c5fd', width: active ? 6 : 3, opacity: active ? 0.92 : 0.65, sort: active ? 2 : 1 });
+      lines.push({ coords, color: active ? '#1d4ed8' : '#93c5fd', width: active ? 6 : 3, opacity: active ? 0.92 : 0.65, sort: active ? 2 : 1 });
     }
     const markers: RouteDisplay['markers'] = [];
     if (fromCoords) markers.push({ lng: fromCoords[0], lat: fromCoords[1], kind: 'start', label: 'Старт' });
@@ -424,9 +507,15 @@ export function RouteTabContent({
   }
 
   function pickAlternative(alt: RouteAlternative, start: [number, number], end: [number, number]) {
-    const coords = alt.coordinates as [number, number][];
+    let coords = alt.coordinates as [number, number][];
+    // pgRouting may return coords in either direction — orient them start→end.
+    if (coords.length >= 2) {
+      const d0 = Math.hypot(coords[0]![0] - start[0], coords[0]![1] - start[1]);
+      const dN = Math.hypot(coords[coords.length - 1]![0] - start[0], coords[coords.length - 1]![1] - start[1]);
+      if (dN < d0) coords = [...coords].reverse();
+    }
     onRouteDisplay?.(walkDisplay(coords, start, end));
-    setSteps([]);
+    setSteps(computeSteps(coords));
     setSummary(alt.distance_m > 0 ? { distance: alt.distance_m, duration: alt.distance_m / 1.1 } : null);
     setFallback(false);
     setAvoided(alt.avoided ?? 0);

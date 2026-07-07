@@ -85,6 +85,7 @@ type GeoService interface {
 	Route(ctx context.Context, in geo.RouteInput) (geo.RouteResult, error)
 	Geocode(ctx context.Context, query string, limit int) ([]geo.Place, error)
 	Reverse(ctx context.Context, lng, lat float64) (*geo.Place, error)
+	StepsForCoords(ctx context.Context, coords [][2]float64) ([]geo.Step, error)
 }
 
 // TransitService plans public-transport journeys (Transitous/MOTIS).
@@ -208,6 +209,7 @@ func (s *Server) routes() {
 		s.router.Group(func(r chi.Router) {
 			s.limited(r)
 			r.Post("/route", s.handleRoute)
+			r.Post("/route/steps", s.handleRouteSteps)
 			r.Get("/geocode", s.handleGeocode)
 			r.Get("/geocode/reverse", s.handleReverseGeocode)
 		})
