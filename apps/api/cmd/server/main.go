@@ -59,7 +59,21 @@ func main() {
 	limiter.StartJanitor(stopJanitor)
 
 	geoClient := geo.New(cfg.ORSAPIKey, cfg.ORSBaseURL, cfg.NominatimURL, 15*time.Second)
-	transitClient := transit.New(cfg.TransitousURL, 20*time.Second)
+	st := store.New(database)
+	transitClient := transit.New(cfg.TransitousURL, 20*time.Second).
+		WithWalkRouter(func(fromLng, fromLat, toLng, toLat float64) ([][2]float64, error) {
+			ar, err := st.RouteAccessible(ctx, fromLng, fromLat, toLng, toLat)
+			if err != nil || ar == nil {
+				return nil, err
+			}
+			coords := make([][2]float64, len(ar.Coordinates))
+			for i, c := range ar.Coordinates {
+				if len(c) >= 2 {
+					coords[i] = [2]float64{c[0], c[1]}
+				}
+			}
+			return coords, nil
+		})
 
 	// Server-side signup needs the service key; without it the route is disabled.
 	var accountsClient server.AccountService
@@ -88,7 +102,7 @@ func main() {
 		Verifier:    verifier,
 		Roles:       database.Role,
 		Limiter:     limiter,
-		Store:       store.New(database),
+		Store:       st,
 		Geo:         geoClient,
 		Transit:     transitClient,
 		Accounts:    accountsClient,

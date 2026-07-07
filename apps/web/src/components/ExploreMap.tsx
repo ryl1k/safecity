@@ -136,7 +136,7 @@ function segmentCollection(segs: ExploreSegment[]): any {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 // Lviv historic-center coverage zone — adjust RADIUS_KM to resize.
 const COVERAGE_CENTER = { lng: 24.0318, lat: 49.8419 };
-const COVERAGE_RADIUS_KM = 1.5;
+const COVERAGE_RADIUS_KM = 2.2;
 
 function makeCirclePolygon(lng: number, lat: number, radiusKm: number, steps = 64) {
   const coords: [number, number][] = [];
@@ -223,7 +223,7 @@ function syncRoute(map: any, route: RouteDisplay | null) {
         id: 'sc-route-dash', type: 'line', source: 'sc-route',
         filter: ['==', ['get', 'dash'], 1],
         layout: { 'line-join': 'round', 'line-cap': 'round', 'line-sort-key': ['get', 'sort'] },
-        paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'], 'line-opacity': ['get', 'opacity'], 'line-dasharray': [0.8, 1.6] },
+        paint: { 'line-color': ['get', 'color'], 'line-width': ['get', 'width'], 'line-opacity': ['get', 'opacity'], 'line-dasharray': [0, 1.8] },
       });
       // Marker cues: start/end + board/alight stops.
       map.addLayer({
@@ -461,20 +461,24 @@ export function ExploreMap({
       // Point click → open detail.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       map.on('click', 'pt', (e: any) => {
+        if (pickModeRef.current) return; // pick mode → use raw coords, ignore POI hit
         const f = e.features?.[0];
         if (f) onSelectRef.current(f.properties.id);
       });
       // Segment click → open segment panel.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       map.on('click', 'sc-segs', (e: any) => {
+        if (pickModeRef.current) return; // pick mode → use raw coords, ignore segment hit
         const f = e.features?.[0];
         if (f) onSelectSegmentRef.current?.(f.properties.id);
       });
-      // Empty-map click → drop/route pick (skip when a feature was hit).
+      // Empty-map click → drop/route pick. In pick mode always fires (features skipped above).
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       map.on('click', (e: any) => {
-        const hits = map.queryRenderedFeatures(e.point, { layers: ['clusters', 'pt', 'sc-segs'] });
-        if (hits.length) return;
+        if (!pickModeRef.current) {
+          const hits = map.queryRenderedFeatures(e.point, { layers: ['clusters', 'pt', 'sc-segs'] });
+          if (hits.length) return;
+        }
         onMapClickRef.current?.(e.lngLat.lng, e.lngLat.lat);
       });
       for (const layer of ['clusters', 'pt', 'sc-segs']) {

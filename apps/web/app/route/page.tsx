@@ -148,6 +148,7 @@ function RouteInner() {
   const [fallback, setFallback] = useState(false);
   const [avoided, setAvoided] = useState(0);
   const [crossesRed, setCrossesRed] = useState(0);
+  const [routeSource, setRouteSource] = useState<string | null>(null);
   const [nearby, setNearby] = useState<Nearby[]>([]);
   const [speaking, setSpeaking] = useState(false);
   const stepsRef = useRef<Step[]>([]);
@@ -219,6 +220,7 @@ function RouteInner() {
       setFallback(Boolean(data.fallback));
       setAvoided(data.avoided ?? 0);
       setCrossesRed(data.crossesRed ?? 0);
+      setRouteSource(data.source ?? null);
       setStatus('ready');
 
       // Along-route accessible-points callouts (best-effort, after the route renders).
@@ -368,6 +370,12 @@ function RouteInner() {
               </p>
             )}
 
+            {status === 'ready' && routeSource && (
+              <p style={{ margin: '0 0 1em', padding: '0.4em 0.8em', borderRadius: '0.5em', background: '#f1f5f9', color: '#475569', fontSize: '0.78em', fontFamily: 'monospace', fontWeight: 700 }}>
+                🛠 source: {routeSource}
+              </p>
+            )}
+
             {status === 'ready' && avoided > 0 && (
               <p role="status" style={{ margin: '0 0 1em', padding: '0.7em 1em', borderRadius: '0.7em', background: 'var(--sc-primary-tint)', color: 'var(--sc-primary)', border: 'var(--sc-bw) solid var(--sc-primary)', fontSize: '0.85em', fontWeight: 700 }}>
                 Маршрут оминає {avoided} перешкод(и) поблизу.
@@ -405,7 +413,22 @@ function RouteInner() {
                 )}
 
                 <div style={{ width: '100%', height: navigating ? 'min(60vh, 520px)' : 'min(50vh, 420px)', minHeight: 280 }}>
-                  <MapView points={[]} center={userPos ?? (dest ? [dest.lng, dest.lat] : [loadCity().lng, loadCity().lat])} onSelect={() => {}} line={line} userPos={userPos} follow={navigating} />
+                  <MapView
+                    points={[]}
+                    center={userPos ?? (dest ? [dest.lng, dest.lat] : [loadCity().lng, loadCity().lat])}
+                    onSelect={() => {}}
+                    line={line}
+                    connectors={line.length >= 2 ? [
+                      ...(fromCoords ? [[fromCoords, line[0] as [number,number]]] as [[number,number],[number,number]][] : []),
+                      ...(dest ? [[line[line.length - 1] as [number,number], [dest.lng, dest.lat] as [number,number]]] as [[number,number],[number,number]][] : []),
+                    ] : []}
+                    routeEndpoints={{
+                      start: fromCoords ?? undefined,
+                      end: dest ? [dest.lng, dest.lat] : undefined,
+                    }}
+                    userPos={userPos}
+                    follow={navigating}
+                  />
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.8em', flexWrap: 'wrap' }}>

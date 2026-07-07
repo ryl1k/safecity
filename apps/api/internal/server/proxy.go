@@ -1,10 +1,8 @@
 package server
 
 import (
-	"errors"
 	"math"
 	"net/http"
-	"sort"
 	"strconv"
 
 	"github.com/safecity/api/internal/geo"
@@ -160,6 +158,7 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 	pgResult := func(ar *store.AccessibleRoute) geo.RouteResult {
 		return geo.RouteResult{
 			Profile:     "wheelchair",
+			Source:      "pgrouting",
 			Coordinates: ar.Coordinates,
 			Steps:       []geo.Step{},
 			Summary:     &geo.Summary{Distance: ar.DistanceM, Duration: ar.DistanceM / walkingSpeedMps},
@@ -172,99 +171,20 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 	// and it never sees the ORS avoid buffers. So we only take a pgRouting route
 	// outright when it's red-free; a red-crossing one is held and compared against
 	// ORS below (ORS usually detours around red via the buffer polygons).
-	var pgRoute *store.AccessibleRoute
-	if wanted == "wheelchair" && s.store != nil && len(req.Via) == 0 {
-		if ar, err := s.store.RouteAccessible(r.Context(), from[0], from[1], to[0], to[1]); err == nil && ar != nil && len(ar.Coordinates) > 1 {
-			if crossesRedBy(ar.Coordinates) == 0 {
-				res := pgResult(ar)
-				res.Avoided = avoidedBy(ar.Coordinates)
-				httpx.JSON(w, http.StatusOK, res)
-				return
-			}
-			pgRoute = ar // crosses red — see if ORS does better
-		}
-	}
-
-	// Build an ORS avoid MultiPolygon from problem squares + segment buffer polygons,
-	// capping segments nearest the direct line so we stay under ORS's polygon budget.
-	segBudget := maxAvoidPolys - len(problems)
-	if segBudget < 0 {
-		segBudget = 0
-	}
-	capSegs := func(segs []store.SegmentAvoid) []store.SegmentAvoid {
-		segs = append([]store.SegmentAvoid{}, segs...)
-		if len(segs) > segBudget {
-			sort.Slice(segs, func(i, j int) bool {
-				return distPointToSegMeters(mid(segs[i]), from, to) < distPointToSegMeters(mid(segs[j]), from, to)
-			})
-			s.log.Warn("route avoid set capped", "have", len(segs), "cap", segBudget)
-			segs = segs[:segBudget]
-		}
-		return segs
-	}
-	mkAvoid := func(segs []store.SegmentAvoid) [][][][]float64 {
-		out := geo.AvoidSquares(problems)
-		for _, sa := range capSegs(segs) {
-			if len(sa.Poly) >= 4 {
-				ring := make([][]float64, len(sa.Poly))
-				for i, c := range sa.Poly {
-					ring[i] = []float64{c[0], c[1]}
-				}
-				out = append(out, [][][]float64{ring})
-			}
-		}
-		return out
-	}
-
-	// Relax ladder: strict(none+partial) → none → no avoidance. Over-constrained
-	// requests (ErrNoRoute) drop a tier so the user always gets a best-effort route.
-	var ladder [][][][][]float64
-	if req.Strict && len(partialSegs) > 0 {
-		ladder = append(ladder, mkAvoid(append(append([]store.SegmentAvoid{}, noneSegs...), partialSegs...)))
-	}
-	ladder = append(ladder, mkAvoid(noneSegs))
-	ladder = append(ladder, nil) // last resort: no avoidance at all
-
+	// ── pgRouting only (ORS temporarily disabled) ────────────────────────────
 	var res geo.RouteResult
-	var err error
-	for i, avoid := range ladder {
-		res, err = s.geo.Route(r.Context(), geo.RouteInput{
-			From:         from,
-			To:           to,
-			Via:          req.Via,
-			Profile:      wanted,
-			Restrictions: rest,
-			Avoid:        avoid,
-		})
-		if err == nil {
-			break
-		}
-		if errors.Is(err, geo.ErrNoRoute) && i < len(ladder)-1 {
-			s.log.Info("route over-constrained, relaxing avoidance", "attempt", i)
-			continue
-		}
-		break
-	}
-	if err != nil {
-		if errors.Is(err, geo.ErrUnavailable) {
-			httpx.Error(w, http.StatusServiceUnavailable, "unavailable", "routing is not configured")
-			return
-		}
-		if pgRoute != nil {
-			res = pgResult(pgRoute) // ORS failed but pgRouting has a route — use it
-		} else if errors.Is(err, geo.ErrNoRoute) {
+	if wanted == "wheelchair" && s.store != nil && len(req.Via) == 0 {
+		ar, err := s.store.RouteAccessible(r.Context(), from[0], from[1], to[0], to[1])
+		if err != nil || ar == nil || len(ar.Coordinates) < 2 {
 			httpx.Error(w, http.StatusNotFound, "no_route", "не вдалося прокласти маршрут між цими точками")
 			return
-		} else {
-			s.log.Error("route", "err", err)
-			httpx.Error(w, http.StatusBadGateway, "upstream_error", "routing failed")
-			return
 		}
-	} else if pgRoute != nil && crossesRedBy(pgRoute.Coordinates) < crossesRedBy(res.Coordinates) {
-		// Both engines produced a route; keep the one that crosses fewer red segments.
-		res = pgResult(pgRoute)
+		res = pgResult(ar)
+	} else {
+		httpx.Error(w, http.StatusNotFound, "no_route", "не вдалося прокласти маршрут між цими точками")
+		return
 	}
-	res.Avoided = avoidedBy(res.Coordinates) // authoritative, replaces geo's polygon count
+	res.Avoided = avoidedBy(res.Coordinates)
 	res.CrossesRed = crossesRedBy(res.Coordinates)
 	httpx.JSON(w, http.StatusOK, res)
 }

@@ -22,15 +22,53 @@ interface Step { instruction: string; distance: number }
 
 const trunc = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 
-// Walking route: one solid line + start/finish cues.
-function walkDisplay(coords: [number, number][]): RouteDisplay {
+// bowSign: +1 = CCW perp, -1 = CW perp. Determined by caller based on route geometry.
+function bezierPts(a: [number, number], b: [number, number], bowSign = 1, steps = 24): [number, number][] {
+  const dx = b[0] - a[0], dy = b[1] - a[1];
+  const len = Math.sqrt(dx * dx + dy * dy);
+  if (len === 0) return [a, b];
+  const bow = len * 0.35;
+  const ctrl: [number, number] = [
+    (a[0] + b[0]) / 2 - bowSign * (dy / len) * bow,
+    (a[1] + b[1]) / 2 + bowSign * (dx / len) * bow,
+  ];
+  const pts: [number, number][] = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps, u = 1 - t;
+    pts.push([u * u * a[0] + 2 * u * t * ctrl[0] + t * t * b[0], u * u * a[1] + 2 * u * t * ctrl[1] + t * t * b[1]]);
+  }
+  return pts;
+}
+
+// Walking route: solid edge line + dotted bezier connectors from actual clicked points.
+// actualStart/actualEnd are the user-picked coordinates; coords is the on-graph geometry.
+function walkDisplay(coords: [number, number][], actualStart?: [number, number], actualEnd?: [number, number]): RouteDisplay {
   if (coords.length < 2) return { lines: [], markers: [] };
-  const first = coords[0]!, last = coords[coords.length - 1]!;
+  const edgeFirst = coords[0]!, edgeLast = coords[coords.length - 1]!;
+  const start = actualStart ?? edgeFirst;
+  const end = actualEnd ?? edgeLast;
+  const lines: RouteDisplay['lines'] = [
+    { coords, color: '#1d4ed8', width: 5, opacity: 0.9, sort: 2 },
+  ];
+  // Route perpendicular direction (CCW of route vector).
+  // Use this to determine which side of the road each off-road endpoint is on,
+  // so the bezier always bows AWAY from the route toward the clicked point.
+  const rdx = edgeLast[0] - edgeFirst[0], rdy = edgeLast[1] - edgeFirst[1];
+  const rlen = Math.sqrt(rdx * rdx + rdy * rdy);
+  const perpX = rlen > 0 ? -rdy / rlen : 0, perpY = rlen > 0 ? rdx / rlen : 0;
+  if (actualStart) {
+    const dot = (actualStart[0] - edgeFirst[0]) * perpX + (actualStart[1] - edgeFirst[1]) * perpY;
+    lines.push({ coords: bezierPts(start, edgeFirst, dot >= 0 ? 1 : -1), color: '#7cb9f0', width: 7, opacity: 0.85, sort: 1, dash: true });
+  }
+  if (actualEnd) {
+    const dot = (actualEnd[0] - edgeLast[0]) * perpX + (actualEnd[1] - edgeLast[1]) * perpY;
+    lines.push({ coords: bezierPts(edgeLast, end, dot >= 0 ? 1 : -1), color: '#7cb9f0', width: 7, opacity: 0.85, sort: 1, dash: true });
+  }
   return {
-    lines: [{ coords, color: '#1d4ed8', width: 5, opacity: 0.9, sort: 2 }],
+    lines,
     markers: [
-      { lng: first[0], lat: first[1], kind: 'start', label: 'Старт' },
-      { lng: last[0], lat: last[1], kind: 'end', label: 'Фініш' },
+      { lng: start[0], lat: start[1], kind: 'start', label: 'Старт' },
+      { lng: end[0],   lat: end[1],   kind: 'end',   label: 'Фініш' },
     ],
   };
 }
@@ -346,7 +384,7 @@ export function RouteTabContent({
       // Barrier avoidance polygons are built server-side from confirmed problems.
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const data: any = await api.post('/route', { from: start, to: end, via, profile: primary, ...routePrefsPayload(prefsRef.current) }, { auth: false });
-      onRouteDisplay?.(walkDisplay(data.coordinates ?? []));
+      onRouteDisplay?.(walkDisplay(data.coordinates ?? [], start, end));
       setSteps(data.steps ?? []);
       setSummary(data.summary ?? null);
       setFallback(Boolean(data.fallback));
