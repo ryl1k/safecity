@@ -3,14 +3,29 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "dev": "echo \"(scaffold) next dev\"",
-    "lint": "echo \"(scaffold) lint web\"",
-    "type-check": "tsc --noEmit",
-    "test": "echo \"(scaffold) test web\"",
-    "build": "echo \"(scaffold) next build\""
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@safecity/design-tokens": "workspace:*",
     "@safecity/shared": "workspace:*",
-    "@safecity/design-tokens": "workspace:*"
+    "@supabase/supabase-js": "^2.109.0",
+    "lucide-react": "^1.22.0",
+    "maplibre-gl": "^5.24.0",
+    "next": "^16.2.9",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.2",
+    "@types/node": "^26.0.1",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "postcss": "^8.5.16",
+    "tailwindcss": "^4.3.2",
+    "typescript": "^6.0.3"
   }
 }

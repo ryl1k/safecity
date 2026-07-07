@@ -1,0 +1,83 @@
+/* SafeCity design tokens — extracted from Claude Design output (tmp/safecity-design).
+ * Themes switch via data attributes on the root: data-theme="standard|contrast|dark"
+ * and data-big="0|1" (200% text). Screens consume var(--sc-*) so the design ports 1:1.
+ * Source of truth for color/space/radius/elevation/focus across web (and mirrored in tokens.ts for RN).
+ */
+
+:root,
+[data-theme="standard"] {
+  --sc-scale: 1;
+  --sc-bw: 1px;
+  --sc-bg: #eef1f2;
+  --sc-surface: #fff;
+  --sc-surface-2: #f4f6f7;
+  --sc-text: #16242b;
+  --sc-muted: #586469; /* ≥4.5:1 on --sc-bg and --sc-surface (WCAG AA) */
+  --sc-border: #e3e8ea;
+  --sc-border-strong: #cdd5d9;
+  --sc-primary: #0d5b66;
+  --sc-primary-strong: #093f47;
+  --sc-primary-tint: #e6eff1;
+  --sc-on-primary: #fff;
+  --sc-accent: #b5512a;
+  --sc-accent-strong: #8d3d1d;
+  --sc-ok: #1f7a44;  --sc-ok-bg: #e8f2ec;  --sc-ok-line: #9ccbae;
+  --sc-warn: #8a5a00; --sc-warn-bg: #f7eed8; --sc-warn-line: #dcc081;
+  --sc-bad: #b3261e;  --sc-bad-bg: #f8e7e5;  --sc-bad-line: #e3a8a2;
+  --sc-unk: #586469;  --sc-unk-bg: #eef1f2;  --sc-unk-line: #c2cbcf;
+  --sc-focus: #0a66ff;
+  --sc-shadow-1: 0 1px 2px rgba(15, 30, 36, .06);
+  --sc-shadow-2: 0 6px 16px rgba(15, 30, 36, .09);
+}
+
+[data-theme="contrast"] {
+  --sc-scale: 1.14;
+  --sc-bw: 2px;
+  --sc-bg: #fff;
+  --sc-surface: #fff;
+  --sc-surface-2: #fff;
+  --sc-text: #000;
+  --sc-muted: #1a1f22;
+  --sc-border: #000;
+  --sc-border-strong: #000;
+  --sc-primary: #00343c;
+  --sc-primary-strong: #00222a;
+  --sc-primary-tint: #dbeaec;
+  --sc-accent: #7e2c0c;
+  --sc-ok: #0d5b2c;  --sc-ok-bg: #d7eede;  --sc-ok-line: #0d5b2c;
+  --sc-warn: #6e4600; --sc-warn-bg: #fbe9c4; --sc-warn-line: #6e4600;
+  --sc-bad: #8c0f0a;  --sc-bad-bg: #fbdcd9;  --sc-bad-line: #8c0f0a;
+  --sc-unk: #2a3034;  --sc-unk-bg: #e6e9eb;  --sc-unk-line: #2a3034;
+  --sc-shadow-1: 0 0 0 1px #000;
+  --sc-shadow-2: 0 0 0 2px #000;
+}
+
+[data-theme="dark"] {
+  --sc-bg: #0d1417;
+  --sc-surface: #16242a;
+  --sc-surface-2: #1c2e35;
+  --sc-text: #eef4f5;
+  --sc-muted: #a6b6bc;
+  --sc-border: #26373d;
+  --sc-border-strong: #3c525a;
+  --sc-primary: #4fb6c2;
+  --sc-primary-strong: #71c8d2;
+  --sc-primary-tint: #14323a;
+  --sc-on-primary: #04222a;
+  --sc-accent: #e58a5f;
+  --sc-ok: #67d08c;  --sc-ok-bg: #143126; --sc-ok-line: #2f6b48;
+  --sc-warn: #e3b65a; --sc-warn-bg: #34290f; --sc-warn-line: #6e561f;
+  --sc-bad: #f3938b; --sc-bad-bg: #371b19; --sc-bad-line: #7a3a35;
+  --sc-unk: #9fadb3; --sc-unk-bg: #1e2b31; --sc-unk-line: #3c525a;
+  --sc-shadow-1: 0 1px 2px rgba(0, 0, 0, .4);
+  --sc-shadow-2: 0 6px 18px rgba(0, 0, 0, .5);
+}
+
+/* Base text scale = per-theme scale × the user's font-size slider (--sc-user-scale). */
+[data-sc-root] { font-size: calc(16px * var(--sc-scale, 1) * var(--sc-user-scale, 1)); }
+
+/* Visible focus ring — never remove. */
+.sc-foc:focus-visible { outline: 3px solid var(--sc-focus); outline-offset: 2px; border-radius: 4px; }
+
+@keyframes sc-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@keyframes sc-spin { to { transform: rotate(360deg); } }

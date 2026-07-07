@@ -1,0 +1,43 @@
+# Render Blueprint — deploys the Go API (apps/api) as a Docker web service.
+# Setup: Render → New → Blueprint → pick this repo. Render reads this file.
+# The Dockerfile's build context is the repo root (it COPYs apps/api/*), so
+# dockerContext must be "." — not apps/api.
+services:
+  - type: web
+    name: safecity-api
+    runtime: docker
+    branch: main
+    dockerfilePath: apps/api/Dockerfile
+    dockerContext: .
+    healthCheckPath: /healthz          # API exposes GET /healthz → 200
+    autoDeploy: true                   # redeploy on push to main
+    plan: starter
+    # Only rebuild when the API (or shared tooling) changes — keeps web-only
+    # commits from redeploying the API.
+    buildFilter:
+      paths:
+        - apps/api/**
+        - render.yaml
+    envVars:
+      - key: API_ENV
+        value: production
+      # Render injects PORT automatically; the server reads it (do NOT hardcode).
+      #
+      # Secrets — set these in the Render dashboard (sync:false keeps them out of git).
+      # Required (server fail-fasts on boot without them):
+      - key: DATABASE_URL              # Supabase Postgres — use the SESSION POOLER URI
+        sync: false
+      - key: SUPABASE_URL              # https://<ref>.supabase.co
+        sync: false
+      # Recommended:
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY       # service key — server-side only, never in the web
+        sync: false
+      - key: ORS_API_KEY               # OpenRouteService key (routing)
+        sync: false
+      # Browser origins allowed to call the API. Comma-separated. Include your
+      # Vercel production domain AND a wildcard for preview deploys, e.g.:
+      #   https://safecity.vercel.app,https://*.vercel.app
+      - key: CORS_ORIGINS
+        sync: false

@@ -1,0 +1,12 @@
+version: v2
+modules:
+  - path: .
+lint:
+  use:
+    - STANDARD
+  except:
+    # Flat single-file module — the package name doesn't mirror a directory tree.
+    - PACKAGE_DIRECTORY_MATCH
+breaking:
+  use:
+    - FILE

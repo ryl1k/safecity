@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "description": "SafeCity — inclusive accessibility map for Lviv (mobile + web)",
-  "packageManager": "pnpm@9.0.0",
+  "packageManager": "pnpm@9.15.9",
   "engines": {
     "node": ">=20"
   },
@@ -12,10 +12,19 @@
     "dev": "turbo run dev",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
-    "test": "turbo run test"
+    "test": "turbo run test",
+    "db:migrate": "node --env-file=.env scripts/migrate.mjs",
+    "db:seed": "node --env-file=.env scripts/seed.mjs",
+    "db:make-admin": "node --env-file=.env scripts/make-admin.mjs",
+    "db:seed-users": "node --env-file=.env apps/web/scripts/seed-users.mjs",
+    "db:import-osm": "node --env-file=.env tooling/importers/osm-overpass.mjs",
+    "db:import-mymaps": "node --env-file=.env tooling/importers/mymaps-kml.mjs",
+    "db:import-bezbar": "node --env-file=.env tooling/importers/bezbarrier.mjs",
+    "db:dedupe": "node --env-file=.env tooling/importers/dedupe.mjs"
   },
   "devDependencies": {
-    "turbo": "^2.0.0",
-    "typescript": "^5.4.0"
+    "postgres": "^3.4.9",
+    "turbo": "^2.10.1",
+    "typescript": "^6.0.3"
   }
 }

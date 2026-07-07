@@ -1,5 +1,4 @@
-// @safecity/design-tokens (scaffold). Replace placeholders when Claude Design output lands.
-// export * from "./color";
-// export * from "./typography";
-// export * from "./themes";
-export {};
+// @safecity/design-tokens — extracted from Claude Design (tmp/safecity-design).
+// CSS themes: import "@safecity/design-tokens/src/themes.css" in the web root.
+// Tailwind: presets: [require("@safecity/design-tokens/tailwind-preset.cjs")].
+export * from './tokens';

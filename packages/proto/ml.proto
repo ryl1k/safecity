@@ -1,0 +1,65 @@
+syntax = "proto3";
+
+// Shared contract for SafeCity's server-side AI tier (apps/ml), called by the Go
+// API (apps/api) over gRPC. NOTE: the real-time blind-walk CV stays on-device in
+// apps/mobile — this service only handles photo moderation, OCR/scene
+// description, and accessibility-feature inference from photos.
+package safecity.ml.v1;
+
+option go_package = "github.com/safecity/api/internal/mlpb;mlpb";
+
+// ImageSource carries an image either inline or by URL (Supabase Storage).
+message ImageSource {
+  oneof source {
+    bytes image = 1;       // raw image bytes
+    string image_url = 2;  // URL the service fetches
+  }
+  string content_type = 3; // e.g. image/jpeg (optional hint)
+}
+
+service MLService {
+  // ModeratePhoto decides whether an uploaded photo is safe to publish.
+  rpc ModeratePhoto(ModeratePhotoRequest) returns (ModeratePhotoResponse);
+  // DescribeScene returns OCR text + a scene description (accessibility fallback).
+  rpc DescribeScene(DescribeSceneRequest) returns (DescribeSceneResponse);
+  // InferFeatures predicts accessibility feature values from a point photo.
+  rpc InferFeatures(InferFeaturesRequest) returns (InferFeaturesResponse);
+}
+
+message ModeratePhotoRequest {
+  ImageSource image = 1;
+}
+
+message ModeratePhotoResponse {
+  bool approved = 1;            // safe to publish
+  double nsfw_score = 2;        // 0..1
+  repeated string labels = 3;   // detected categories
+  string reason = 4;            // human-readable rejection reason, if any
+}
+
+message DescribeSceneRequest {
+  ImageSource image = 1;
+  string language = 2; // BCP-47, e.g. "uk"
+}
+
+message DescribeSceneResponse {
+  string description = 1;
+  string ocr_text = 2;
+  double confidence = 3; // 0..1
+}
+
+message InferFeaturesRequest {
+  ImageSource image = 1;
+  string category = 2; // point_category hint (venue/transit/...)
+}
+
+// FeaturePrediction maps a feature catalog key to a predicted value.
+message FeaturePrediction {
+  string key = 1;        // accessibility_features.key
+  string value = 2;      // yes | no | unknown
+  double confidence = 3; // 0..1
+}
+
+message InferFeaturesResponse {
+  repeated FeaturePrediction features = 1;
+}

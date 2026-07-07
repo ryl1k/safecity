@@ -1,0 +1,48 @@
+# Brings up the SafeCity services we run ourselves: Go API, Python ML, Next.js web.
+# Supabase (Postgres/PostGIS, Auth, Storage) is MANAGED — put its URL/keys in .env;
+# it is not started here. ORS/Nominatim are external too.
+#
+#   docker compose up --build           # build + run all three
+#   docker compose up --build api ml    # just the backend
+#
+# Web → http://localhost:3000 · API → http://localhost:8080 · ML gRPC → localhost:50051
+services:
+  ml:
+    build:
+      context: .
+      dockerfile: apps/ml/Dockerfile
+    env_file: .env
+    ports:
+      - "50051:50051"
+    restart: unless-stopped
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file: .env # DATABASE_URL, SUPABASE_URL, ORS_API_KEY, etc.
+    environment:
+      PORT: "8080"
+      ML_GRPC_URL: "ml:50051" # reach the ML service over the compose network
+      CORS_ORIGINS: "http://localhost:3000"
+    ports:
+      - "8080:8080"
+    depends_on:
+      - ml
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Baked into the client bundle. The browser reaches the API on the host port.
+        NEXT_PUBLIC_API_URL: "http://localhost:8080"
+        NEXT_PUBLIC_SUPABASE_URL: "${NEXT_PUBLIC_SUPABASE_URL}"
+        NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "${NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:-${NEXT_PUBLIC_SUPABASE_ANON_KEY}}"
+    env_file: .env # server-side vars for the Next API routes (e.g. ORS_API_KEY)
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: unless-stopped

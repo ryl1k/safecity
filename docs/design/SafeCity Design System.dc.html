@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .sc-root {
+    font-family: "Onest", system-ui, "Segoe UI", sans-serif;
+    font-size: calc(16px * var(--sc-scale, 1));
+    --sc-scale:1; --sc-bw:1px;
+    --sc-bg:#eef1f2; --sc-surface:#fff; --sc-surface-2:#f4f6f7; --sc-text:#16242b; --sc-muted:#6a787f;
+    --sc-border:#e3e8ea; --sc-border-strong:#cdd5d9; --sc-primary:#0d5b66; --sc-primary-strong:#093f47;
+    --sc-primary-tint:#e6eff1; --sc-on-primary:#fff; --sc-accent:#b5512a; --sc-accent-strong:#8d3d1d;
+    --sc-ok:#1f7a44; --sc-ok-bg:#e8f2ec; --sc-ok-line:#9ccbae;
+    --sc-warn:#8a5a00; --sc-warn-bg:#f7eed8; --sc-warn-line:#dcc081;
+    --sc-bad:#b3261e; --sc-bad-bg:#f8e7e5; --sc-bad-line:#e3a8a2;
+    --sc-unk:#6a787f; --sc-unk-bg:#eef1f2; --sc-unk-line:#c2cbcf;
+    --sc-focus:#0a66ff;
+    --sc-shadow-1:0 1px 2px rgba(15,30,36,.06); --sc-shadow-2:0 6px 16px rgba(15,30,36,.09);
+    color:var(--sc-text); background:var(--sc-bg); -webkit-font-smoothing:antialiased;
+  }
+  .sc-root[data-theme="contrast"] {
+    --sc-scale:1.14; --sc-bw:2px;
+    --sc-bg:#fff; --sc-surface:#fff; --sc-surface-2:#fff; --sc-text:#000; --sc-muted:#1a1f22;
+    --sc-border:#000; --sc-border-strong:#000; --sc-primary:#00343c; --sc-primary-strong:#00222a; --sc-primary-tint:#dbeaec;
+    --sc-accent:#7e2c0c;
+    --sc-ok:#0d5b2c; --sc-ok-bg:#d7eede; --sc-ok-line:#0d5b2c;
+    --sc-warn:#6e4600; --sc-warn-bg:#fbe9c4; --sc-warn-line:#6e4600;
+    --sc-bad:#8c0f0a; --sc-bad-bg:#fbdcd9; --sc-bad-line:#8c0f0a;
+    --sc-unk:#2a3034; --sc-unk-bg:#e6e9eb; --sc-unk-line:#2a3034;
+    --sc-shadow-1:0 0 0 1px #000; --sc-shadow-2:0 0 0 2px #000;
+  }
+  .sc-root[data-theme="dark"] {
+    --sc-bg:#0d1417; --sc-surface:#16242a; --sc-surface-2:#1c2e35; --sc-text:#eef4f5; --sc-muted:#a6b6bc;
+    --sc-border:#26373d; --sc-border-strong:#3c525a; --sc-primary:#4fb6c2; --sc-primary-strong:#71c8d2; --sc-primary-tint:#14323a; --sc-on-primary:#04222a;
+    --sc-accent:#e58a5f;
+    --sc-ok:#67d08c; --sc-ok-bg:#143126; --sc-ok-line:#2f6b48;
+    --sc-warn:#e3b65a; --sc-warn-bg:#34290f; --sc-warn-line:#6e561f;
+    --sc-bad:#f3938b; --sc-bad-bg:#371b19; --sc-bad-line:#7a3a35;
+    --sc-unk:#9fadb3; --sc-unk-bg:#1e2b31; --sc-unk-line:#3c525a;
+    --sc-shadow-1:0 1px 2px rgba(0,0,0,.4); --sc-shadow-2:0 6px 18px rgba(0,0,0,.5);
+  }
+  .sc-root[data-big="1"] { font-size: calc(16px * var(--sc-scale, 1) * 2); }
+  .sc-foc:focus-visible { outline:3px solid var(--sc-focus); outline-offset:2px; border-radius:4px; }
+  @keyframes sc-shimmer { 0%{background-position:-200% 0} 100%{background-position:200% 0} }
+  @keyframes sc-spin { to { transform: rotate(360deg); } }
+</style>
+</helmet>
+
+<div class="sc-root" data-theme="{{ theme }}" data-big="{{ big }}">
+
+  <header style="position:sticky; top:0; z-index:20; background:var(--sc-surface); border-bottom:var(--sc-bw) solid var(--sc-border);">
+    <div style="max-width:1080px; margin:0 auto; padding:.7em 1.25em; display:flex; align-items:center; gap:1em; flex-wrap:wrap;">
+      <div style="display:flex; align-items:center; gap:.55em; margin-right:auto;">
+        <div style="width:2.1em; height:2.1em; border-radius:.55em; background:var(--sc-primary); color:var(--sc-on-primary); display:grid; place-items:center; font-weight:800; font-size:1.1em;">◍</div>
+        <div style="line-height:1.1;"><div style="font-weight:800; font-size:1.02em;">SafeCity</div><div style="font-size:.72em; color:var(--sc-muted); font-weight:600;">Дизайн-система</div></div>
+      </div>
+      <div role="radiogroup" aria-label="Тема" style="display:inline-flex; background:var(--sc-surface-2); border:var(--sc-bw) solid var(--sc-border); border-radius:.65em; padding:.2em;">
+        <button class="sc-foc" role="radio" aria-checked="{{ isStandard }}" onClick="{{ setStandard }}" style="{{ tabStandard }}">Стандарт</button>
+        <button class="sc-foc" role="radio" aria-checked="{{ isContrast }}" onClick="{{ setContrast }}" style="{{ tabContrast }}">Контраст</button>
+        <button class="sc-foc" role="radio" aria-checked="{{ isDark }}" onClick="{{ setDark }}" style="{{ tabDark }}">Темна</button>
+      </div>
+      <button class="sc-foc" aria-pressed="{{ bigPressed }}" onClick="{{ toggleBig }}" style="{{ bigBtnStyle }}">200% тексту</button>
+    </div>
+    <nav aria-label="Розділи" style="max-width:1080px; margin:0 auto; padding:0 1.25em .6em; display:flex; gap:.4em; flex-wrap:wrap;">
+      <a class="sc-foc" href="#tokens" style="font-size:.78em; font-weight:600; color:var(--sc-muted); text-decoration:none; padding:.25em .6em; border-radius:.5em; background:var(--sc-surface-2);">Токени</a>
+      <a class="sc-foc" href="#buttons" style="font-size:.78em; font-weight:600; color:var(--sc-muted); text-decoration:none; padding:.25em .6em; border-radius:.5em; background:var(--sc-surface-2);">Кнопки</a>
+      <a class="sc-foc" href="#forms" style="font-size:.78em; font-weight:600; color:var(--sc-muted); text-decoration:none; padding:.25em .6em; border-radius:.5em; background:var(--sc-surface-2);">Форми</a>
+      <a class="sc-foc" href="#controls" style="font-size:.78em; font-weight:600; color:var(--sc-muted); text-decoration:none; padding:.25em .6em; border-radius:.5em; background:var(--sc-surface-2);">Контроли</a>
+      <a class="sc-foc" href="#rating" style="font-size:.78em; font-weight:600; color:var(--sc-muted); text-decoration:none; padding:.25em .6em; border-radius:.5em; background:var(--sc-surface-2);">Рейтинг</a>
+      <a class="sc-foc" href="#pins" style="font-size:.78em; font-weight:600; color:var(--sc-muted); text-decoration:none; padding:.25em .6em; border-radius:.5em; background:var(--sc-surface-2);">Пін-и</a>
+      <a class="sc-foc" href="#rows" style="font-size:.78em; font-weight:600; color:var(--sc-muted); text-decoration:none; padding:.25em .6em; border-radius:.5em; background:var(--sc-surface-2);">Рядки</a>
+      <a class="sc-foc" href="#states" style="font-size:.78em; font-weight:600; color:var(--sc-muted); text-decoration:none; padding:.25em .6em; border-radius:.5em; background:var(--sc-surface-2);">Стани</a>
+    </nav>
+  </header>
+
+  <main style="max-width:1080px; margin:0 auto; padding:1.6em 1.25em 5em;">
+
+    <div style="margin-bottom:2.2em;">
+      <div style="font-size:.72em; font-weight:700; letter-spacing:.12em; text-transform:uppercase; color:var(--sc-primary);">Доступність — це продукт</div>
+      <h1 style="margin:.3em 0 .3em; font-size:1.9em; line-height:1.12; letter-spacing:-.025em; font-weight:800;">Один застосунок, що адаптується під вас</h1>
+      <p style="margin:0; color:var(--sc-muted); font-size:.97em; line-height:1.55; max-width:62ch;">Кожен токен, компонент і екран відповідає WCAG 2.2 AA як мінімуму. Статус ніколи не залежить лише від кольору — колір завжди разом з іконкою, формою та підписом. Перемкніть три теми та 200% тексту вгорі: система тримається.</p>
+    </div>
+
+    <!-- TOKENS -->
+    <section id="tokens" style="scroll-margin-top:8em; margin-bottom:2.4em;">
+      <div style="display:flex; align-items:baseline; gap:.6em; margin-bottom:.9em;"><h2 style="margin:0; font-size:1.3em; letter-spacing:-.01em; font-weight:800;">Токени</h2><span style="color:var(--sc-muted); font-size:.85em;">колір · шрифт · відступи · радіуси · фокус</span></div>
+
+      <div style="background:var(--sc-surface); border:var(--sc-bw) solid var(--sc-border); border-radius:1em; padding:1.2em; margin-bottom:.9em;">
+        <div style="font-weight:700; font-size:.8em; text-transform:uppercase; letter-spacing:.06em; color:var(--sc-muted); margin-bottom:.8em;">Основна палітра</div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:.7em;">
+          <div><div style="height:3.2em; border-radius:.6em; background:var(--sc-primary); border:var(--sc-bw) solid var(--sc-border);"></div><div style="font-weight:700; font-size:.82em; margin-top:.35em;">Primary</div><div style="font-size:.72em; color:var(--sc-muted);">бірюзовий · довіра</div></div>
+          <div><div style="height:3.2em; border-radius:.6em; background:var(--sc-primary-strong); border:var(--sc-bw) solid var(--sc-border);"></div><div style="font-weight:700; font-size:.82em; margin-top:.35em;">Primary strong</div><div style="font-size:.72em; color:var(--sc-muted);">натиснуто</div></div>
+          <div><div style="height:3.2em; border-radius:.6em; background:var(--sc-accent); border:var(--sc-bw) solid var(--sc-border);"></div><div style="font-weight:700; font-size:.82em; margin-top:.35em;">Accent</div><div style="font-size:.72em; color:var(--sc-muted);">теплий · дія</div></div>
+          <div><div style="height:3.2em; border-radius:.6em; background:var(--sc-text); border:var(--sc-bw) solid var(--sc-border);"></div><div style="font-weight:700; font-size:.82em; margin-top:.35em;">Текст</div><div style="font-size:.72em; color:var(--sc-muted);">≥14:1</div></div>
+          <div><div style="height:3.2em; border-radius:.6em; background:var(--sc-muted); border:var(--sc-bw) solid var(--sc-border);"></div><div style="font-weight:700; font-size:.82em; margin-top:.35em;">Приглушений</div><div style="font-size:.72em; color:var(--sc-muted);">≥4.5:1</div></div>
+          <div><div style="height:3.2em; border-radius:.6em; background:var(--sc-surface-2); border:var(--sc-bw) solid var(--sc-border);"></div><div style="font-weight:700; font-size:.82em; margin-top:.35em;">Поверхня-2</div><div style="font-size:.72em; color:var(--sc-muted);">заливка</div></div>
+        </div>
+      </div>
+
+      <div style="background:var(--sc-surface); border:var(--sc-bw) solid var(--sc-border); border-radius:1em; padding:1.2em; margin-bottom:.9em;">
+        <div style="font-weight:700; font-size:.8em; text-transform:uppercase; letter-spacing:.06em; color:var(--sc-muted); margin-bottom:.8em;">Семантика рейтингу — колір завжди з іконкою та підписом</div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(160px,1fr)); gap:.7em;">
+          <div style="border:var(--sc-bw) solid var(--sc-ok-line); background:var(--sc-ok-bg); border-radius:.7em; padding:.7em .8em;"><div style="display:flex; align-items:center; gap:.45em;"><span aria-hidden="true" style="width:1.5em; height:1.5em; border-radius:50%; background:var(--sc-ok); color:#fff; display:grid; place-items:center; font-weight:800; font-size:.85em;">✓</span><span style="font-weight:800; color:var(--sc-ok);">Доступно</span></div><div style="font-size:.74em; color:var(--sc-muted); margin-top:.35em;">повний доступ</div></div>
+          <div style="border:var(--sc-bw) solid var(--sc-warn-line); background:var(--sc-warn-bg); border-radius:.7em; padding:.7em .8em;"><div style="display:flex; align-items:center; gap:.45em;"><span aria-hidden="true" style="width:1.5em; height:1.5em; border-radius:50%; background:var(--sc-warn); color:#fff; display:grid; place-items:center; font-weight:800; font-size:.85em;">◑</span><span style="font-weight:800; color:var(--sc-warn);">Частково</span></div><div style="font-size:.74em; color:var(--sc-muted); margin-top:.35em;">частковий доступ</div></div>
+          <div style="border:var(--sc-bw) solid var(--sc-bad-line); background:var(--sc-bad-bg); border-radius:.7em; padding:.7em .8em;"><div style="display:flex; align-items:center; gap:.45em;"><span aria-hidden="true" style="width:1.5em; height:1.5em; border-radius:50%; background:var(--sc-bad); color:#fff; display:grid; place-items:center; font-weight:800; font-size:.85em;">✕</span><span style="font-weight:800; color:var(--sc-bad);">Недоступно</span></div><div style="font-size:.74em; color:var(--sc-muted); margin-top:.35em;">перекрито</div></div>
+          <div style="border:var(--sc-bw) solid var(--sc-unk-line); background:var(--sc-unk-bg); border-radius:.7em; padding:.7em .8em;"><div style="display:flex; align-items:center; gap:.45em;"><span aria-hidden="true" style="width:1.5em; height:1.5em; border-radius:50%; background:var(--sc-unk); color:#fff; display:grid; place-items:center; font-weight:800; font-size:.85em;">?</span><span style="font-weight:800; color:var(--sc-unk);">Невідомо</span></div><div style="font-size:.74em; color:var(--sc-muted); margin-top:.35em;">немає даних</div></div>
+        </div>
+      </div>
+
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:.9em;">
+        <div style="background:var(--sc-surface); border:var(--sc-bw) solid var(--sc-border); border-radius:1em; padding:1.2em;">
+          <div style="font-weight:700; font-size:.8em; text-transform:uppercase; letter-spacing:.06em; color:var(--sc-muted); margin-bottom:.7em;">Шкала шрифту — Onest</div>
+          <div style="display:flex; flex-direction:column; gap:.45em;">
+            <div style="display:flex; align-items:baseline; gap:.7em;"><span style="font-size:.7em; color:var(--sc-muted); width:4em;">34/800</span><span style="font-size:2.1em; font-weight:800; line-height:1; letter-spacing:-.02em;">Дисплей</span></div>
+            <div style="display:flex; align-items:baseline; gap:.7em;"><span style="font-size:.7em; color:var(--sc-muted); width:4em;">24/700</span><span style="font-size:1.5em; font-weight:700;">Заголовок</span></div>
+            <div style="display:flex; align-items:baseline; gap:.7em;"><span style="font-size:.7em; color:var(--sc-muted); width:4em;">16/400</span><span style="font-size:1em;">Основний текст</span></div>
+            <div style="display:flex; align-items:baseline; gap:.7em;"><span style="font-size:.7em; color:var(--sc-muted); width:4em;">14/600</span><span style="font-size:.875em; font-weight:600; color:var(--sc-muted);">Підпис</span></div>
+          </div>
+        </div>
+        <div style="background:var(--sc-surface); border:var(--sc-bw) solid var(--sc-border); border-radius:1em; padding:1.2em; display:flex; flex-direction:column; gap:1em;">
+          <div>
+            <div style="font-weight:700; font-size:.8em; text-transform:uppercase; letter-spacing:.06em; color:var(--sc-muted); margin-bottom:.6em;">Відступи · крок 4</div>
+            <div style="display:flex; align-items:flex-end; gap:.5em;"><div style="width:.25em; height:.25em; background:var(--sc-primary);"></div><div style="width:.5em; height:.5em; background:var(--sc-primary);"></div><div style="width:.75em; height:.75em; background:var(--sc-primary);"></div><div style="width:1em; height:1em; background:var(--sc-primary);"></div><div style="width:1.5em; height:1.5em; background:var(--sc-primary);"></div><div style="width:2em; height:2em; background:var(--sc-primary);"></div></div>
+          </div>
+          <div>
+            <div style="font-weight:700; font-size:.8em; text-transform:uppercase; letter-spacing:.06em; color:var(--sc-muted); margin-bottom:.6em;">Радіуси й тінь</div>
+            <div style="display:flex; gap:.6em; align-items:center;"><div style="width:2.4em; height:2.4em; background:var(--sc-surface-2); border:var(--sc-bw) solid var(--sc-border); border-radius:.5em;"></div><div style="width:2.4em; height:2.4em; background:var(--sc-surface-2); border:var(--sc-bw) solid var(--sc-border); border-radius:.85em;"></div><div style="width:2.4em; height:2.4em; background:var(--sc-surface); border-radius:.7em; box-shadow:var(--sc-shadow-1);"></div><div style="width:2.4em; height:2.4em; background:var(--sc-surface); border-radius:.7em; box-shadow:var(--sc-shadow-2);"></div></div>
+          </div>
+          <div>
+            <div style="font-weight:700; font-size:.8em; text-transform:uppercase; letter-spacing:.06em; color:var(--sc-muted); margin-bottom:.6em;">Кільце фокуса</div>
+            <button class="sc-foc" style="min-height:2.4em; padding:0 1em; border-radius:.6em; border:var(--sc-bw) solid var(--sc-border-strong); background:var(--sc-surface-2); color:var(--sc-text); font-weight:600; font-family:inherit; outline:3px solid var(--sc-focus); outline-offset:2px;">3px · відступ 2px</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- BUTTONS -->
+    <section id="buttons" style="scroll-margin-top:8em; margin-bottom:2.4em;">
+      <div style="display:flex; align-items:baseline; gap:.6em; margin-bottom:.9em;"><h2 style="margin:0; font-size:1.3em; font-weight:800;">Кнопки</h2><span style="color:var(--sc-muted); font-size:.85em;">усі ≥44pt заввишки</span></div>
+      <div style="background:var(--sc-surface); border:var(--sc-bw) solid var(--sc-border); border-radius:1em; padding:1.3em; display:grid; grid-template-columns:repeat(auto-fit, minmax(180px,1fr)); gap:1.1em;">
+        <div><div style="font-weight:600; font-size:.8em; color:var(--sc-muted); margin-bottom:.6em;">Головна</div><div style="display:flex; flex-direction:column; gap:.5em; align-items:flex-start;">
+          <button class="sc-foc" style="min-height:2.75em; padding:0 1.3em; border:none; border-radius:.7em; background:var(--sc-primary); color:var(--sc-on-primary); font-weight:700; font-family:inherit; font-size:1em; cursor:pointer;">Маршрут</button>
+          <button class="sc-foc" style="min-height:2.75em; padding:0 1.3em; border:none; border-radius:.7em; background:var(--sc-primary-strong); color:var(--sc-on-primary); font-weight:700; font-family:inherit; font-size:1em; outline:3px solid var(--sc-focus); outline-offset:2px;">Фокус</button>
+          <button disabled style="min-height:2.75em; padding:0 1.3em; border:none; border-radius:.7em; background:var(--sc-surface-2); color:var(--sc-muted); font-weight:700; font-family:inherit; font-size:1em; opacity:.7; cursor:not-allowed;">Неактивна</button>
+        </div></div>
+        <div><div style="font-weight:600; font-size:.8em; color:var(--sc-muted); margin-bottom:.6em;">Акцент</div><div style="display:flex; flex-direction:column; gap:.5em; align-items:flex-start;">
+          <button class="sc-foc" style="min-height:2.75em; padding:0 1.3em; border:none; border-radius:.7em; background:var(--sc-accent); color:#fff; font-weight:700; font-family:inherit; font-size:1em; cursor:pointer;">Режим ходьби</button>
+          <button class="sc-foc" style="min-height:2.75em; padding:0 1.3em; border:none; border-radius:.7em; background:var(--sc-accent-strong); color:#fff; font-weight:700; font-family:inherit; font-size:1em; outline:3px solid var(--sc-focus); outline-offset:2px;">Фокус</button>
+        </div></div>
+        <div><div style="font-weight:600; font-size:.8em; color:var(--sc-muted); margin-bottom:.6em;">Другорядна</div><div style="display:flex; flex-direction:column; gap:.5em; align-items:flex-start;">
+          <button class="sc-foc" style="min-height:2.75em; padding:0 1.3em; border:var(--sc-bw) solid var(--sc-primary); border-radius:.7em; background:var(--sc-surface); color:var(--sc-primary); font-weight:700; font-family:inherit; font-size:1em; cursor:pointer;">Зберегти</button>
+          <button disabled style="min-height:2.75em; padding:0 1.3em; border:var(--sc-bw) solid var(--sc-border); border-radius:.7em; background:var(--sc-surface); color:var(--sc-muted); font-weight:700; font-family:inherit; font-size:1em; opacity:.6; cursor:not-allowed;">Неактивна</button>
+        </div></div>
+        <div><div style="font-weight:600; font-size:.8em; color:var(--sc-muted); margin-bottom:.6em;">Прозора й застереження</div><div style="display:flex; flex-direction:column; gap:.5em; align-items:flex-start;">
+          <button class="sc-foc" style="min-height:2.75em; padding:0 1.3em; border:none; border-radius:.7em; background:transparent; color:var(--sc-primary); font-weight:700; font-family:inherit; font-size:1em; cursor:pointer;">Пропустити</button>
+          <button class="sc-foc" style="min-height:2.75em; padding:0 1.3em; border:var(--sc-bw) solid var(--sc-bad); border-radius:.7em; background:var(--sc-surface); color:var(--sc-bad); font-weight:700; font-family:inherit; font-size:1em; cursor:pointer;">Повідомити</button>
+        </div></div>
+      </div>
+    </section>
+
+    <!-- FORMS -->
+    <section id="forms" style="scroll-margin-top:8em; margin-bottom:2.4em;">
+      <div style="display:flex; align-items:baseline; gap:.6em; margin-bottom:.9em;"><h2 style="margin:0; font-size:1.3em; font-weight:800;">Поля й форми</h2><span style="color:var(--sc-muted); font-size:.85em;">підписи завжди видимі · помилки прив'язані до поля</span></div>
+      <div style="background:var(--sc-surface); border:var(--sc-bw) solid var(--sc-border); border-radius:1em; padding:1.3em; display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:1.2em;">
+        <div>
+          <label for="f1" style="display:block; font-weight:600; font-size:.9em; margin-bottom:.4em;">Пошта</label>
+          <input id="f1" class="sc-foc" type="email" placeholder="you@city.ua" style="width:100%; min-height:2.75em; padding:0 .9em; border:var(--sc-bw) solid var(--sc-border-strong); border-radius:.7em; background:var(--sc-surface); color:var(--sc-text); font-family:inherit; font-size:1em;">
+          <div style="font-size:.78em; color:var(--sc-muted); margin-top:.35em;">Потрібно лише для внеску.</div>
+        </div>
+        <div>
+          <label for="f2" style="display:block; font-weight:600; font-size:.9em; margin-bottom:.4em;">У фокусі</label>
+          <input id="f2" class="sc-foc" value="вул. Ринок, 1" style="width:100%; min-height:2.75em; padding:0 .9em; border:var(--sc-bw) solid var(--sc-primary); border-radius:.7em; background:var(--sc-surface); color:var(--sc-text); font-family:inherit; font-size:1em; outline:3px solid var(--sc-focus); outline-offset:2px;">
+          <div style="font-size:.78em; color:var(--sc-muted); margin-top:.35em;">Допоміжний текст.</div>
+        </div>
+        <div>
+          <label for="f3" style="display:block; font-weight:600; font-size:.9em; margin-bottom:.4em;">Пароль</label>
+          <input id="f3" class="sc-foc" type="password" value="123" aria-invalid="true" aria-describedby="f3err" style="width:100%; min-height:2.75em; padding:0 .9em; border:2px solid var(--sc-bad); border-radius:.7em; background:var(--sc-bad-bg); color:var(--sc-text); font-family:inherit; font-size:1em;">
+          <div id="f3err" role="alert" style="display:flex; align-items:center; gap:.35em; font-size:.8em; color:var(--sc-bad); font-weight:700; margin-top:.35em;"><span aria-hidden="true">✕</span> Щонайменше 8 символів</div>
+        </div>
+        <div>
+          <label for="f4" style="display:block; font-weight:600; font-size:.9em; margin-bottom:.4em; color:var(--sc-muted);">Неактивне</label>
+          <input id="f4" disabled value="Заблоковано" style="width:100%; min-height:2.75em; padding:0 .9em; border:var(--sc-bw) solid var(--sc-border); border-radius:.7em; background:var(--sc-surface-2); color:var(--sc-muted); font-family:inherit; font-size:1em; opacity:.8;">
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTROLS -->
+    <section id="controls" style="scroll-margin-top:8em; margin-bottom:2.4em;">
+      <div style="display:flex; align-items:baseline; gap:.6em; margin-bottom:.9em;"><h2 style="margin:0; font-size:1.3em; font-weight:800;">Контроли</h2><span style="color:var(--sc-muted); font-size:.85em;">чипи · сегменти · пошук</span></div>
+      <div style="background:var(--sc-surface); border:var(--sc-bw) solid var(--sc-border); border-radius:1em; padding:1.3em; display:flex; flex-direction:column; gap:1.3em;">
+        <div>
+          <div style="font-weight:600; font-size:.8em; color:var(--sc-muted); margin-bottom:.55em;">Пошук</div>
+          <div style="display:flex; align-items:center; gap:.6em; background:var(--sc-surface-2); border:var(--sc-bw) solid var(--sc-border-strong); border-radius:.85em; padding:.1em .9em; min-height:2.9em;">
+            <span aria-hidden="true" style="font-size:1.1em; color:var(--sc-muted);">⌕</span>
+            <input class="sc-foc" placeholder="Пошук місць, транспорту, переходів" aria-label="Пошук місць" style="flex:1; border:none; background:transparent; font-family:inherit; font-size:1em; color:var(--sc-text); outline:none; min-height:2.6em;">
+            <button class="sc-foc" style="border:none; background:none; color:var(--sc-primary); font-weight:700; font-family:inherit; font-size:.85em; cursor:pointer;">Голос</button>
+          </div>
+        </div>
+        <div>
+          <div style="font-weight:600; font-size:.8em; color:var(--sc-muted); margin-bottom:.55em;">Чипи фільтрів <span style="font-weight:400;">(перемкніть)</span></div>
+          <div role="group" aria-label="Фільтри" style="display:flex; flex-wrap:wrap; gap:.55em;">
+            <button class="sc-foc" aria-pressed="{{ chipAccOn }}" onClick="{{ toggleAcc }}" style="{{ chipAcc }}"><span aria-hidden="true">✓</span> Лише доступні</button>
+            <button class="sc-foc" aria-pressed="{{ chipWcOn }}" onClick="{{ toggleWc }}" style="{{ chipWc }}">Доступний туалет</button>
+            <button class="sc-foc" aria-pressed="{{ chipTactileOn }}" onClick="{{ toggleTactile }}" style="{{ chipTactile }}">Тактильна плитка</button>
+            <button class="sc-foc" aria-pressed="{{ chipRampOn }}" onClick="{{ toggleRamp }}" style="{{ chipRamp }}">Без сходів / пандус</button>
+          </div>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1.2em;">
+          <div>
+            <div style="font-weight:600; font-size:.8em; color:var(--sc-muted); margin-bottom:.55em;">Сегментний контрол</div>
+            <div role="radiogroup" aria-label="Режим" style="display:inline-flex; background:var(--sc-surface-2); border:var(--sc-bw) solid var(--sc-border); border-radius:.8em; padding:.25em; width:100%;">
+              <button class="sc-foc" role="radio" aria-checked="{{ segMapOn }}" onClick="{{ segMap }}" style="{{ segMapStyle }}">Мапа</button>
+              <button class="sc-foc" role="radio" aria-checked="{{ segListOn }}" onClick="{{ segList }}" style="{{ segListStyle }}">Список</button>
+            </div>
+          </div>
+          <div>
+            <div style="font-weight:600; font-size:.8em; color:var(--sc-muted); margin-bottom:.55em;">Перемикач</div>
+            <button class="sc-foc" role="switch" aria-checked="{{ voiceOn }}" onClick="{{ toggleVoice }}" style="display:flex; align-items:center; gap:.7em; width:100%; min-height:2.9em; padding:0 1em; border:var(--sc-bw) solid var(--sc-border-strong); border-radius:.8em; background:var(--sc-surface); color:var(--sc-text); font-family:inherit; font-weight:600; cursor:pointer;">
+              <span aria-hidden="true" style="{{ switchTrack }}"><span style="{{ switchThumb }}"></span></span>
+              <span style="font-size:.95em;">Голос і вібрація</span>
+              <span aria-hidden="true" style="margin-left:auto; font-weight:700; color:{{ voiceColor }};">{{ voiceLabel }}</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- RATING -->
+    <section id="rating" style="scroll-margin-top:8em; margin-bottom:2.4em;">
+      <div style="display:flex; align-items:baseline; gap:.6em; margin-bottom:.9em;"><h2 style="margin:0; font-size:1.3em; font-weight:800;">Бейдж рейтингу</h2><span style="color:var(--sc-muted); font-size:.85em;">колір × іконка × підпис — ніколи лише колір</span></div>
+      <div style="background:var(--sc-surface); border:var(--sc-bw) solid var(--sc-border); border-radius:1em; padding:1.3em; display:flex; flex-wrap:wrap; gap:1.4em; align-items:flex-start;">
+        <div style="display:flex; flex-direction:column; gap:.7em;">
+          <div style="font-weight:600; font-size:.8em; color:var(--sc-muted);">Пігулка</div>
+          <span role="img" aria-label="Доступно, повний доступ" style="display:inline-flex; align-items:center; gap:.4em; background:var(--sc-ok-bg); color:var(--sc-ok); border:var(--sc-bw) solid var(--sc-ok-line); border-radius:2em; padding:.35em .8em; font-weight:800; font-size:.9em;"><span aria-hidden="true">✓</span> Доступно</span>
+          <span role="img" aria-label="Частково доступно" style="display:inline-flex; align-items:center; gap:.4em; background:var(--sc-warn-bg); color:var(--sc-warn); border:var(--sc-bw) solid var(--sc-warn-line); border-radius:2em; padding:.35em .8em; font-weight:800; font-size:.9em;"><span aria-hidden="true">◑</span> Частково</span>
+          <span role="img" aria-label="Недоступно" style="display:inline-flex; align-items:center; gap:.4em; background:var(--sc-bad-bg); color:var(--sc-bad); border:var(--sc-bw) solid var(--sc-bad-line); border-radius:2em; padding:.35em .8em; font-weight:800; font-size:.9em;"><span aria-hidden="true">✕</span> Недоступно</span>
+          <span role="img" aria-label="Доступність невідома" style="display:inline-flex; align-items:center; gap:.4em; background:var(--sc-unk-bg); color:var(--sc-unk); border:var(--sc-bw) solid var(--sc-unk-line); border-radius:2em; padding:.35em .8em; font-weight:800; font-size:.9em;"><span aria-hidden="true">?</span> Невідомо</span>
+        </div>
+        <div style="display:flex; flex-direction:column; gap:.7em;">
+          <div style="font-weight:600; font-size:.8em; color:var(--sc-muted);">Кружок</div>
+          <div style="display:flex; gap:.7em;">
+            <span aria-hidden="true" style="width:2em; height:2em; border-radius:50%; background:var(--sc-ok); color:#fff; display:grid; place-items:center; font-weight:800;">✓</span>
+            <span aria-hidden="true" style="width:2em; height:2em; border-radius:50%; background:var(--sc-warn); color:#fff; display:grid; place-items:center; font-weight:800;">◑</span>
+            <span aria-hidden="true" style="width:2em; height:2em; border-radius:50%; background:var(--sc-bad); color:#fff; display:grid; place-items:center; font-weight:800;">✕</span>
+            <span aria-hidden="true" style="width:2em; height:2em; border-radius:50%; background:var(--sc-unk); color:#fff; display:grid; place-items:center; font-weight:800;">?</span>
+          </div>
+        </div>
+        <div style="flex:1; min-width:200px; background:var(--sc-surface-2); border-radius:.8em; padding:1em; font-size:.8em; color:var(--sc-muted); line-height:1.6;">role="img", aria-label — повна фраза, напр. «Доступно — повний доступ». Рейтинг показується для кожного профілю окремо, ніколи як одна усереднена оцінка.</div>
+      </div>
+    </section>
+
+    <!-- PINS -->
+    <section id="pins" style="scroll-margin-top:8em; margin-bottom:2.4em;">
+      <div style="display:flex; align-items:baseline; gap:.6em; margin-bottom:.9em;"><h2 style="margin:0; font-size:1.3em; font-weight:800;">Пін-и мапи й легенда</h2><span style="color:var(--sc-muted); font-size:.85em;">рейтинг = колір + іконка · категорія = форма</span></div>
+      <div style="background:var(--sc-surface); border:var(--sc-bw) solid var(--sc-border); border-radius:1em; padding:1.3em; display:grid; grid-template-columns:1.1fr 1fr; gap:1.4em;">
+        <div>
+          <div style="font-weight:600; font-size:.8em; color:var(--sc-muted); margin-bottom:.8em;">Категорія = форма</div>
+          <div style="display:flex; flex-wrap:wrap; gap:1.1em;">
+            <div style="display:flex; flex-direction:column; align-items:center; gap:.4em; width:4em;"><span aria-hidden="true" style="width:2.4em; height:2.4em; border-radius:50%; background:var(--sc-ok); color:#fff; display:grid; place-items:center; font-weight:800; border:2px solid #fff; box-shadow:var(--sc-shadow-2);">✓</span><span style="font-size:.72em; font-weight:600; text-align:center;">Заклад</span></div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:.4em; width:4em;"><span aria-hidden="true" style="width:2.4em; height:2.4em; border-radius:.45em; background:var(--sc-primary); color:#fff; display:grid; place-items:center; font-weight:800; border:2px solid #fff; box-shadow:var(--sc-shadow-2);">✓</span><span style="font-size:.72em; font-weight:600; text-align:center;">Транспорт</span></div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:.4em; width:4em;"><span aria-hidden="true" style="width:2.4em; height:2.4em; background:var(--sc-warn); color:#fff; display:grid; place-items:center; font-weight:800; border:2px solid #fff; box-shadow:var(--sc-shadow-2); transform:rotate(45deg);"><span style="transform:rotate(-45deg);">◑</span></span><span style="font-size:.72em; font-weight:600; text-align:center;">Перехід</span></div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:.4em; width:4em;"><span aria-hidden="true" style="width:2.4em; height:2.4em; background:var(--sc-ok); color:#fff; display:grid; place-items:center; font-weight:800; border:2px solid #fff; box-shadow:var(--sc-shadow-2); clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%);">✓</span><span style="font-size:.72em; font-weight:600; text-align:center;">Туалет</span></div>
+            <div style="display:flex; flex-direction:column; align-items:center; gap:.4em; width:4em;"><span aria-hidden="true" style="width:2.4em; height:2.4em; background:var(--sc-bad); color:#fff; display:grid; place-items:center; font-weight:800; border:2px solid #fff; box-shadow:var(--sc-shadow-2); clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);">✕</span><span style="font-size:.72em; font-weight:600; text-align:center;">Паркування</span></div>
+          </div>
+          <div style="font-size:.7em; color:var(--sc-muted); margin-top:1em; line-height:1.5;">коло=заклад · квадрат=транспорт · ромб=перехід · п'ятикутник=туалет · шестикутник=паркування</div>
+        </div>
+        <div style="border-left:var(--sc-bw) solid var(--sc-border); padding-left:1.4em;">
+          <div style="font-weight:600; font-size:.8em; color:var(--sc-muted); margin-bottom:.8em;">Рейтинг = колір + іконка</div>
+          <div style="display:flex; flex-direction:column; gap:.6em;">
+            <div style="display:flex; align-items:center; gap:.6em;"><span aria-hidden="true" style="width:1.8em; height:1.8em; border-radius:50%; background:var(--sc-ok); color:#fff; display:grid; place-items:center; font-weight:800; font-size:.85em;">✓</span><span style="font-weight:600; font-size:.9em;">Доступно</span></div>
+            <div style="display:flex; align-items:center; gap:.6em;"><span aria-hidden="true" style="width:1.8em; height:1.8em; border-radius:50%; background:var(--sc-warn); color:#fff; display:grid; place-items:center; font-weight:800; font-size:.85em;">◑</span><span style="font-weight:600; font-size:.9em;">Частково</span></div>
+            <div style="display:flex; align-items:center; gap:.6em;"><span aria-hidden="true" style="width:1.8em; height:1.8em; border-radius:50%; background:var(--sc-bad); color:#fff; display:grid; place-items:center; font-weight:800; font-size:.85em;">✕</span><span style="font-weight:600; font-size:.9em;">Недоступно</span></div>
+            <div style="display:flex; align-items:center; gap:.6em;"><span aria-hidden="true" style="width:1.8em; height:1.8em; border-radius:50%; background:var(--sc-unk); color:#fff; display:grid; place-items:center; font-weight:800; font-size:.85em;">?</span><span style="font-weight:600; font-size:.9em;">Невідомо</span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ROWS -->
+    <section id="rows" style="scroll-margin-top:8em; margin-bottom:2.4em;">
+      <div style="display:flex; align-items:baseline; gap:.6em; margin-bottom:.9em;"><h2 style="margin:0; font-size:1.3em; font-weight:800;">Рядки · чек-лист · відгук</h2><span style="color:var(--sc-muted); font-size:.85em;">з докладним описом для зчитувача екрана</span></div>
+      <div style="background:var(--sc-surface); border:var(--sc-bw) solid var(--sc-border); border-radius:1em; padding:.4em; margin-bottom:.9em;">
+        <button class="sc-foc" aria-label="Кафе Aroma Kava, 40 метрів, на 2 годині, доступно — без сходів і доступний туалет" style="display:flex; width:100%; text-align:left; gap:.9em; align-items:center; padding:.9em; background:transparent; border:none; border-radius:.8em; cursor:pointer; font-family:inherit; color:var(--sc-text);">
+          <span aria-hidden="true" style="width:2.6em; height:2.6em; border-radius:50%; background:var(--sc-ok); color:#fff; display:grid; place-items:center; font-weight:800; flex-shrink:0;">✓</span>
+          <span style="flex:1; min-width:0;"><span style="display:flex; align-items:center; gap:.5em; flex-wrap:wrap;"><span style="font-weight:800; font-size:1.02em;">Aroma Kava</span><span style="font-size:.78em; font-weight:800; color:var(--sc-ok);">Доступно</span></span><span style="display:block; color:var(--sc-muted); font-size:.85em; margin-top:.15em;">Кафе · 40 м · на 2 годині · без сходів, туалет</span></span>
+          <span aria-hidden="true" style="color:var(--sc-muted); font-size:1.3em;">›</span>
+        </button>
+        <div style="border-top:var(--sc-bw) solid var(--sc-border); margin:0 .9em;"></div>
+        <button class="sc-foc" aria-label="Аптека Галицька, 120 метрів, на 10 годині, частково доступно — вузький вхід" style="display:flex; width:100%; text-align:left; gap:.9em; align-items:center; padding:.9em; background:transparent; border:none; border-radius:.8em; cursor:pointer; font-family:inherit; color:var(--sc-text);">
+          <span aria-hidden="true" style="width:2.6em; height:2.6em; border-radius:50%; background:var(--sc-warn); color:#fff; display:grid; place-items:center; font-weight:800; flex-shrink:0;">◑</span>
+          <span style="flex:1; min-width:0;"><span style="display:flex; align-items:center; gap:.5em; flex-wrap:wrap;"><span style="font-weight:800; font-size:1.02em;">Аптека Галицька</span><span style="font-size:.78em; font-weight:800; color:var(--sc-warn);">Частково</span></span><span style="display:block; color:var(--sc-muted); font-size:.85em; margin-top:.15em;">Аптека · 120 м · на 10 годині · вузькі двері</span></span>
+          <span aria-hidden="true" style="color:var(--sc-muted); font-size:1.3em;">›</span>
+        </button>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:.9em;">
+        <div style="background:var(--sc-surface); border:var(--sc-bw) solid var(--sc-border); border-radius:1em; padding:1.2em;">
+          <div style="font-weight:600; font-size:.8em; color:var(--sc-muted); margin-bottom:.8em;">Рядок чек-листа</div>
+          <div style="display:flex; align-items:center; gap:.7em; padding:.6em 0; border-bottom:var(--sc-bw) solid var(--sc-border);"><span aria-hidden="true" style="width:1.7em; height:1.7em; border-radius:.4em; background:var(--sc-ok); color:#fff; display:grid; place-items:center; font-weight:800; font-size:.8em;">✓</span><span style="flex:1; font-weight:600; font-size:.92em;">Без сходів при вході</span><span style="font-size:.78em; color:var(--sc-ok); font-weight:800;">Так</span></div>
+          <div style="display:flex; align-items:center; gap:.7em; padding:.6em 0; border-bottom:var(--sc-bw) solid var(--sc-border);"><span aria-hidden="true" style="width:1.7em; height:1.7em; border-radius:.4em; background:var(--sc-bad); color:#fff; display:grid; place-items:center; font-weight:800; font-size:.8em;">✕</span><span style="flex:1; font-weight:600; font-size:.92em;">Доступний туалет</span><span style="font-size:.78em; color:var(--sc-bad); font-weight:800;">Ні</span></div>
+          <div style="display:flex; align-items:center; gap:.7em; padding:.6em 0;"><span aria-hidden="true" style="width:1.7em; height:1.7em; border-radius:.4em; background:var(--sc-unk); color:#fff; display:grid; place-items:center; font-weight:800; font-size:.8em;">?</span><span style="flex:1; font-weight:600; font-size:.92em;">Тактильна плитка</span><span style="font-size:.78em; color:var(--sc-unk); font-weight:800;">Невідомо</span></div>
+        </div>
+        <div style="background:var(--sc-surface); border:var(--sc-bw) solid var(--sc-border); border-radius:1em; padding:1.2em;">
+          <div style="font-weight:600; font-size:.8em; color:var(--sc-muted); margin-bottom:.8em;">Відгук</div>
+          <div style="display:flex; gap:.7em;">
+            <span aria-hidden="true" style="width:2.4em; height:2.4em; border-radius:50%; background:var(--sc-primary-tint); color:var(--sc-primary); display:grid; place-items:center; font-weight:700; flex-shrink:0;">О</span>
+            <div style="flex:1;">
+              <div style="display:flex; align-items:center; gap:.5em; flex-wrap:wrap;"><span style="font-weight:800; font-size:.92em;">Олена</span><span style="font-size:.72em; font-weight:800; color:var(--sc-ok); background:var(--sc-ok-bg); border-radius:1em; padding:.1em .55em;">користувачка крісла</span><span style="font-size:.74em; color:var(--sc-muted); margin-left:auto;">2 дні тому</span></div>
+              <p style="margin:.4em 0 0; font-size:.88em; line-height:1.45;">Пандус біля бічного входу пологий, персонал відчинив двері. Двері туалету трохи вузькі.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STATES -->
+    <section id="states" style="scroll-margin-top:8em;">
+      <div style="display:flex; align-items:baseline; gap:.6em; margin-bottom:.9em;"><h2 style="margin:0; font-size:1.3em; font-weight:800;">Порожньо · завантаження · помилка</h2><span style="color:var(--sc-muted); font-size:.85em;">завжди з шляхом далі</span></div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:.9em;">
+        <div style="background:var(--sc-surface); border:var(--sc-bw) solid var(--sc-border); border-radius:1em; padding:1.4em; text-align:center;">
+          <div style="font-weight:800; margin-top:.2em;">Поки немає місць</div>
+          <p style="font-size:.84em; color:var(--sc-muted); margin:.3em 0 .8em;">Станьте першим, хто додасть цей район.</p>
+          <button class="sc-foc" style="min-height:2.6em; padding:0 1.1em; border:none; border-radius:.6em; background:var(--sc-primary); color:var(--sc-on-primary); font-weight:700; font-family:inherit; cursor:pointer;">Додати місце</button>
+        </div>
+        <div style="background:var(--sc-surface); border:var(--sc-bw) solid var(--sc-border); border-radius:1em; padding:1.4em;" aria-busy="true" aria-label="Завантаження місць">
+          <div style="height:1em; width:60%; border-radius:.4em; background:linear-gradient(90deg,var(--sc-surface-2) 25%, var(--sc-border) 37%, var(--sc-surface-2) 63%); background-size:200% 100%; animation:sc-shimmer 1.4s infinite;"></div>
+          <div style="height:1em; width:90%; border-radius:.4em; margin-top:.6em; background:linear-gradient(90deg,var(--sc-surface-2) 25%, var(--sc-border) 37%, var(--sc-surface-2) 63%); background-size:200% 100%; animation:sc-shimmer 1.4s infinite;"></div>
+          <div style="height:1em; width:75%; border-radius:.4em; margin-top:.6em; background:linear-gradient(90deg,var(--sc-surface-2) 25%, var(--sc-border) 37%, var(--sc-surface-2) 63%); background-size:200% 100%; animation:sc-shimmer 1.4s infinite;"></div>
+          <div style="display:flex; align-items:center; gap:.5em; margin-top:1em; color:var(--sc-muted); font-size:.84em; font-weight:700;"><span aria-hidden="true" style="width:1.1em; height:1.1em; border:2px solid var(--sc-border); border-top-color:var(--sc-primary); border-radius:50%; display:inline-block; animation:sc-spin .8s linear infinite;"></span> Завантаження…</div>
+        </div>
+        <div style="background:var(--sc-surface); border:var(--sc-bw) solid var(--sc-bad-line); border-radius:1em; padding:1.4em; text-align:center;">
+          <div aria-hidden="true" style="width:2.4em; height:2.4em; margin:0 auto; border-radius:50%; background:var(--sc-bad-bg); color:var(--sc-bad); display:grid; place-items:center; font-weight:800; font-size:1.2em;">✕</div>
+          <div style="font-weight:800; margin-top:.4em;">Не вдалося завантажити</div>
+          <p style="font-size:.84em; color:var(--sc-muted); margin:.3em 0 .8em;">Перевірте з'єднання й спробуйте ще раз.</p>
+          <button class="sc-foc" style="min-height:2.6em; padding:0 1.1em; border:var(--sc-bw) solid var(--sc-border-strong); border-radius:.6em; background:var(--sc-surface); color:var(--sc-text); font-weight:700; font-family:inherit; cursor:pointer;">Повторити</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1140,&quot;height&quot;:900}}">
+class Component extends DCLogic {
+  state = { theme: "standard", big: "0", chips: { acc: true, wc: false, tactile: false, ramp: false }, seg: "map", voice: true };
+
+  renderVals() {
+    const t = this.state.theme;
+    const tab = (active) => active
+      ? "min-height:2.4em; padding:0 .85em; border:none; border-radius:.5em; background:var(--sc-primary); color:var(--sc-on-primary); font-weight:700; font-family:inherit; font-size:.82em; cursor:pointer;"
+      : "min-height:2.4em; padding:0 .85em; border:none; border-radius:.5em; background:transparent; color:var(--sc-muted); font-weight:600; font-family:inherit; font-size:.82em; cursor:pointer;";
+    const chip = (on) => on
+      ? "display:inline-flex; align-items:center; gap:.4em; min-height:2.6em; padding:0 1em; border:var(--sc-bw) solid var(--sc-primary); border-radius:2em; background:var(--sc-primary); color:var(--sc-on-primary); font-weight:700; font-family:inherit; font-size:.9em; cursor:pointer;"
+      : "display:inline-flex; align-items:center; gap:.4em; min-height:2.6em; padding:0 1em; border:var(--sc-bw) solid var(--sc-border-strong); border-radius:2em; background:var(--sc-surface); color:var(--sc-text); font-weight:600; font-family:inherit; font-size:.9em; cursor:pointer;";
+    const segS = (on) => on
+      ? "flex:1; min-height:2.5em; border:none; border-radius:.6em; background:var(--sc-surface); color:var(--sc-primary); font-weight:700; font-family:inherit; cursor:pointer; box-shadow:var(--sc-shadow-1);"
+      : "flex:1; min-height:2.5em; border:none; border-radius:.6em; background:transparent; color:var(--sc-muted); font-weight:600; font-family:inherit; cursor:pointer;";
+    const v = this.state.voice;
+
+    return {
+      theme: t, big: this.state.big,
+      isStandard: t === "standard", isContrast: t === "contrast", isDark: t === "dark",
+      setStandard: () => this.setState({ theme: "standard" }), setContrast: () => this.setState({ theme: "contrast" }), setDark: () => this.setState({ theme: "dark" }),
+      tabStandard: tab(t === "standard"), tabContrast: tab(t === "contrast"), tabDark: tab(t === "dark"),
+      bigPressed: this.state.big === "1" ? "true" : "false",
+      toggleBig: () => this.setState(s => ({ big: s.big === "1" ? "0" : "1" })),
+      bigBtnStyle: "min-height:2.4em; padding:0 .9em; border:var(--sc-bw) solid var(--sc-border-strong); border-radius:.6em; background:" + (this.state.big === "1" ? "var(--sc-primary-tint)" : "var(--sc-surface)") + "; color:var(--sc-text); font-family:inherit; font-weight:600; font-size:.82em; cursor:pointer;",
+      chipAccOn: this.state.chips.acc, chipAcc: chip(this.state.chips.acc), toggleAcc: () => this._chip("acc"),
+      chipWcOn: this.state.chips.wc, chipWc: chip(this.state.chips.wc), toggleWc: () => this._chip("wc"),
+      chipTactileOn: this.state.chips.tactile, chipTactile: chip(this.state.chips.tactile), toggleTactile: () => this._chip("tactile"),
+      chipRampOn: this.state.chips.ramp, chipRamp: chip(this.state.chips.ramp), toggleRamp: () => this._chip("ramp"),
+      segMapOn: this.state.seg === "map", segListOn: this.state.seg === "list",
+      segMap: () => this.setState({ seg: "map" }), segList: () => this.setState({ seg: "list" }),
+      segMapStyle: segS(this.state.seg === "map"), segListStyle: segS(this.state.seg === "list"),
+      voiceOn: v, toggleVoice: () => this.setState(s => ({ voice: !s.voice })),
+      switchTrack: "position:relative; width:2.6em; height:1.5em; border-radius:1em; transition:background .15s; background:" + (v ? "var(--sc-primary)" : "var(--sc-border-strong)") + "; display:inline-block; flex-shrink:0;",
+      switchThumb: "position:absolute; top:.15em; left:" + (v ? "1.25em" : ".15em") + "; width:1.2em; height:1.2em; border-radius:50%; background:#fff; transition:left .15s; box-shadow:0 1px 2px rgba(0,0,0,.3);",
+      voiceColor: v ? "var(--sc-ok)" : "var(--sc-muted)",
+      voiceLabel: v ? "Увімк." : "Вимк.",
+    };
+  }
+  _chip(key) { this.setState(s => ({ chips: { ...s.chips, [key]: !s.chips[key] } })); }
+}
+</script>
+</body>
+</html>

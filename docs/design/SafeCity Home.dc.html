@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .scstage {
+    font-family: "Onest", system-ui, "Segoe UI", sans-serif;
+    --sc-bg:#f7f8f9; --sc-surface:#fff; --sc-surface-2:#f1f4f5; --sc-text:#16242b; --sc-muted:#6a787f;
+    --sc-border:#e9edef; --sc-border-strong:#d2d9dc; --sc-primary:#0d5b66; --sc-primary-strong:#093f47;
+    --sc-primary-tint:#e6eff1; --sc-accent:#b5512a; --sc-ok:#1f7a44; --sc-warn:#8a5a00; --sc-bad:#b3261e; --sc-unk:#6a787f;
+    --sc-focus:#0a66ff; --sc-shadow-1:0 1px 2px rgba(15,30,36,.06); --sc-shadow-2:0 6px 18px rgba(15,30,36,.10); --sc-shadow-3:0 18px 44px rgba(15,30,36,.2);
+    min-height:100vh; background:radial-gradient(120% 80% at 50% 0%, #dfe7e9 0%, #cdd8db 100%);
+    display:flex; align-items:flex-start; justify-content:center; gap:40px; padding:48px 24px; flex-wrap:wrap;
+  }
+  .sc-foc:focus-visible { outline:3px solid var(--sc-focus); outline-offset:2px; border-radius:4px; }
+  .phone { width:390px; height:844px; background:var(--sc-bg); border-radius:46px; box-shadow:var(--sc-shadow-3), 0 0 0 12px #0c1417, 0 0 0 13px #2b3d44; position:relative; overflow:hidden; display:flex; flex-direction:column; flex-shrink:0; }
+  .statusbar { height:50px; flex-shrink:0; display:flex; align-items:flex-end; justify-content:space-between; padding:0 28px 6px; font-size:13px; font-weight:600; }
+  .cap { display:flex; align-items:center; gap:8px; font-weight:700; color:#3a4a51; font-size:12.5px; letter-spacing:.04em; }
+  .eq { display:flex; gap:3px; align-items:flex-end; height:16px; }
+  .eq span { width:3px; background:currentColor; border-radius:2px; }
+</style>
+</helmet>
+
+<div class="scstage">
+
+  <!-- ===================== WHEELCHAIR / VISUAL MAP ===================== -->
+  <div style="display:flex; flex-direction:column; align-items:center; gap:14px;">
+    <div class="cap">Крісло колісне · візуальна мапа</div>
+    <div class="phone">
+      <div class="statusbar" style="color:#14242b;"><span>9:41</span><span aria-hidden="true">5G</span></div>
+
+      <!-- search + profile -->
+      <div style="flex-shrink:0; padding:4px 16px 12px; display:flex; gap:10px; align-items:center;">
+        <div style="flex:1; display:flex; align-items:center; gap:10px; background:var(--sc-surface); border:1px solid var(--sc-border-strong); border-radius:13px; padding:0 14px; min-height:48px;">
+          <span aria-hidden="true" style="font-size:17px; color:var(--sc-muted);">⌕</span>
+          <span style="flex:1; color:var(--sc-muted); font-size:15px;">Пошук місць</span>
+          <button class="sc-foc" aria-label="Голосовий пошук" style="border:none; background:none; color:var(--sc-primary); font-weight:700; font-size:13px; font-family:inherit; cursor:pointer;">Голос</button>
+        </div>
+        <button class="sc-foc" aria-label="Ваш профіль" style="width:48px; height:48px; border-radius:50%; border:1px solid var(--sc-border); background:var(--sc-primary-tint); color:var(--sc-primary); font-weight:700; font-size:17px; cursor:pointer; font-family:inherit;">О</button>
+      </div>
+
+      <!-- chips -->
+      <div style="flex-shrink:0; padding:0 16px 12px; display:flex; gap:8px; overflow-x:auto;">
+        <button class="sc-foc" aria-pressed="true" style="display:inline-flex; align-items:center; gap:6px; white-space:nowrap; min-height:40px; padding:0 14px; border:1px solid var(--sc-primary); border-radius:20px; background:var(--sc-primary); color:#fff; font-weight:700; font-size:13.5px; font-family:inherit; cursor:pointer;"><span aria-hidden="true">✓</span> Доступно</button>
+        <button class="sc-foc" aria-pressed="false" style="white-space:nowrap; min-height:40px; padding:0 14px; border:1px solid var(--sc-border-strong); border-radius:20px; background:var(--sc-surface); color:var(--sc-text); font-weight:600; font-size:13.5px; font-family:inherit; cursor:pointer;">Без сходів</button>
+        <button class="sc-foc" aria-pressed="false" style="white-space:nowrap; min-height:40px; padding:0 14px; border:1px solid var(--sc-border-strong); border-radius:20px; background:var(--sc-surface); color:var(--sc-text); font-weight:600; font-size:13.5px; font-family:inherit; cursor:pointer;">Туалет</button>
+        <button class="sc-foc" aria-pressed="false" style="white-space:nowrap; min-height:40px; padding:0 14px; border:1px solid var(--sc-border-strong); border-radius:20px; background:var(--sc-surface); color:var(--sc-text); font-weight:600; font-size:13.5px; font-family:inherit; cursor:pointer;">Тактильна плитка</button>
+      </div>
+
+      <!-- map -->
+      <div style="flex:1; position:relative; overflow:hidden; background:var(--sc-surface-2);">
+        <div aria-hidden="true" style="position:absolute; inset:0; background-image:linear-gradient(var(--sc-border) 1px, transparent 1px), linear-gradient(90deg, var(--sc-border) 1px, transparent 1px); background-size:46px 46px; opacity:.7;"></div>
+        <div aria-hidden="true" style="position:absolute; left:-10%; top:22%; width:130%; height:48px; background:#dbe6e8; transform:rotate(-16deg);"></div>
+
+        <button class="sc-foc" aria-label="Кафе Aroma Kava, доступно, без сходів і доступний туалет" style="position:absolute; left:24%; top:46%; transform:translate(-50%,-100%); background:none; border:none; cursor:pointer; padding:0;"><span aria-hidden="true" style="display:grid; place-items:center; width:38px; height:38px; border-radius:50%; background:var(--sc-ok); color:#fff; font-weight:800; font-size:17px; border:3px solid #fff; box-shadow:var(--sc-shadow-2);">✓</span></button>
+        <button class="sc-foc" aria-label="Трамвайна зупинка, частково доступно" style="position:absolute; left:58%; top:34%; transform:translate(-50%,-100%); background:none; border:none; cursor:pointer; padding:0;"><span aria-hidden="true" style="display:grid; place-items:center; width:36px; height:36px; border-radius:8px; background:var(--sc-warn); color:#fff; font-weight:800; font-size:15px; border:3px solid #fff; box-shadow:var(--sc-shadow-2);">◑</span></button>
+        <button class="sc-foc" aria-label="Перехід, недоступно, немає зниженого бордюру" style="position:absolute; left:44%; top:62%; transform:translate(-50%,-100%); background:none; border:none; cursor:pointer; padding:0;"><span aria-hidden="true" style="display:grid; place-items:center; width:34px; height:34px; background:var(--sc-bad); color:#fff; font-weight:800; font-size:13px; border:3px solid #fff; box-shadow:var(--sc-shadow-2); transform:rotate(45deg);"><span style="transform:rotate(-45deg);">✕</span></span></button>
+        <button class="sc-foc" aria-label="Громадський туалет, доступно" style="position:absolute; left:72%; top:58%; transform:translate(-50%,-100%); background:none; border:none; cursor:pointer; padding:0;"><span aria-hidden="true" style="display:grid; place-items:center; width:34px; height:34px; background:var(--sc-ok); color:#fff; font-weight:800; font-size:13px; border:3px solid #fff; box-shadow:var(--sc-shadow-2); clip-path:polygon(50% 0,100% 38%,82% 100%,18% 100%,0 38%);">✓</span></button>
+        <button class="sc-foc" aria-label="Паркування, доступність невідома" style="position:absolute; left:33%; top:24%; transform:translate(-50%,-100%); background:none; border:none; cursor:pointer; padding:0;"><span aria-hidden="true" style="display:grid; place-items:center; width:34px; height:34px; background:var(--sc-unk); color:#fff; font-weight:800; font-size:13px; border:3px solid #fff; box-shadow:var(--sc-shadow-2); clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);">?</span></button>
+
+        <div aria-hidden="true" style="position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:18px; height:18px; border-radius:50%; background:var(--sc-focus); border:3px solid #fff; box-shadow:0 0 0 5px rgba(10,102,255,.16);"></div>
+
+        <div style="position:absolute; right:14px; top:14px; display:flex; flex-direction:column; gap:8px;">
+          <button class="sc-foc" aria-label="Шари мапи" style="min-width:46px; height:40px; padding:0 12px; border-radius:11px; border:1px solid var(--sc-border); background:var(--sc-surface); font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; box-shadow:var(--sc-shadow-1); color:var(--sc-text);">Шари</button>
+          <button class="sc-foc" aria-label="Центрувати на мені" style="min-width:46px; height:40px; padding:0 12px; border-radius:11px; border:1px solid var(--sc-border); background:var(--sc-surface); color:var(--sc-primary); font-size:13px; font-weight:700; font-family:inherit; cursor:pointer; box-shadow:var(--sc-shadow-1);">Я тут</button>
+        </div>
+      </div>
+
+      <!-- bottom sheet -->
+      <div style="flex-shrink:0; background:var(--sc-surface); border-radius:22px 22px 0 0; box-shadow:0 -6px 20px rgba(15,30,36,.08); padding:8px 18px 10px; margin-top:-22px; position:relative; z-index:3;">
+        <div aria-hidden="true" style="width:36px; height:5px; border-radius:3px; background:var(--sc-border-strong); margin:4px auto 12px;"></div>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+          <span style="font-weight:700; font-size:15px;">12 місць поруч</span>
+          <button class="sc-foc" style="border:none; background:none; font-size:12.5px; color:var(--sc-primary); font-weight:700; font-family:inherit; cursor:pointer;">за відстанню ▾</button>
+        </div>
+        <button class="sc-foc" style="display:flex; width:100%; text-align:left; align-items:center; gap:11px; padding:10px 0; border:none; border-top:1px solid var(--sc-border); background:none; font-family:inherit; color:var(--sc-text); cursor:pointer;">
+          <span aria-hidden="true" style="width:32px; height:32px; border-radius:50%; background:var(--sc-ok); color:#fff; display:grid; place-items:center; font-weight:800; flex-shrink:0;">✓</span>
+          <span style="flex:1; min-width:0;"><span style="font-weight:700; font-size:14.5px;">Aroma Kava</span><span style="display:block; font-size:12.5px; color:var(--sc-muted);">Кафе · 40 м · без сходів, туалет</span></span>
+          <span style="font-size:12px; font-weight:700; color:var(--sc-ok);">Доступно</span>
+        </button>
+        <button class="sc-foc" style="display:flex; width:100%; text-align:left; align-items:center; gap:11px; padding:10px 0; border:none; border-top:1px solid var(--sc-border); background:none; font-family:inherit; color:var(--sc-text); cursor:pointer;">
+          <span aria-hidden="true" style="width:32px; height:32px; border-radius:50%; background:var(--sc-warn); color:#fff; display:grid; place-items:center; font-weight:800; flex-shrink:0;">◑</span>
+          <span style="flex:1; min-width:0;"><span style="font-weight:700; font-size:14.5px;">Аптека Галицька</span><span style="display:block; font-size:12.5px; color:var(--sc-muted);">Аптека · 120 м · вузькі двері</span></span>
+          <span style="font-size:12px; font-weight:700; color:var(--sc-warn);">Частково</span>
+        </button>
+      </div>
+
+      <!-- bottom nav -->
+      <div style="flex-shrink:0; display:flex; background:var(--sc-surface); border-top:1px solid var(--sc-border); padding:8px 6px 22px;">
+        <button class="sc-foc" aria-current="page" style="flex:1; background:none; border:none; color:var(--sc-primary); font-weight:700; font-size:12px; font-family:inherit; cursor:pointer; min-height:48px;">Мапа</button>
+        <button class="sc-foc" style="flex:1; background:none; border:none; color:var(--sc-muted); font-weight:600; font-size:12px; font-family:inherit; cursor:pointer; min-height:48px;">Збережене</button>
+        <button class="sc-foc" aria-label="Додати місце" style="flex:1; display:flex; align-items:center; justify-content:center; background:none; border:none; cursor:pointer; min-height:48px;"><span aria-hidden="true" style="width:44px; height:44px; border-radius:14px; background:var(--sc-accent); color:#fff; display:grid; place-items:center; font-size:24px; font-weight:400;">+</span></button>
+        <button class="sc-foc" style="flex:1; background:none; border:none; color:var(--sc-muted); font-weight:600; font-size:12px; font-family:inherit; cursor:pointer; min-height:48px;">Проблеми</button>
+        <button class="sc-foc" style="flex:1; background:none; border:none; color:var(--sc-muted); font-weight:600; font-size:12px; font-family:inherit; cursor:pointer; min-height:48px;">Ще</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== BLIND / AUDIO-FIRST ===================== -->
+  <div style="display:flex; flex-direction:column; align-items:center; gap:14px;">
+    <div class="cap">Незрячість · аудіо-перший</div>
+    <div class="phone">
+      <div class="statusbar" style="color:#14242b;"><span>9:41</span><span aria-hidden="true">5G</span></div>
+
+      <div style="flex-shrink:0; padding:6px 20px 12px;">
+        <div style="display:flex; align-items:center; justify-content:space-between;">
+          <h1 style="margin:0; font-size:30px; letter-spacing:-.02em; font-weight:800;">Поруч</h1>
+          <button class="sc-foc" aria-label="Профіль і налаштування" style="width:50px; height:50px; border-radius:50%; border:1.5px solid var(--sc-border-strong); background:var(--sc-primary-tint); color:var(--sc-primary); font-weight:700; font-size:19px; cursor:pointer; font-family:inherit;">О</button>
+        </div>
+        <div style="font-size:15px; color:var(--sc-muted); margin-top:3px;">вул. Ринок · 14 місць</div>
+      </div>
+
+      <div style="flex-shrink:0; margin:0 16px 14px; display:flex; align-items:center; gap:12px; background:var(--sc-primary); color:#fff; border-radius:15px; padding:14px 16px;">
+        <div style="flex:1;"><div style="font-weight:700; font-size:15.5px;">Торкніться місця, щоб почути</div><div style="font-size:13px; opacity:.85;">Голос і вібрація · гортайте</div></div>
+        <span aria-hidden="true" class="eq" style="color:#fff;"><span style="height:7px;"></span><span style="height:15px;"></span><span style="height:10px;"></span></span>
+      </div>
+
+      <div style="flex:1; overflow-y:auto; padding:0 16px;">
+        <button class="sc-foc" aria-label="Аптека Галицька. 40 метрів, на 2 годині. Доступно: без сходів і доступний туалет. Подвійний дотик, щоб відкрити." style="display:flex; width:100%; text-align:left; gap:14px; align-items:center; padding:18px 16px; margin-bottom:12px; background:var(--sc-surface); border:1.5px solid var(--sc-border); border-radius:16px; cursor:pointer; font-family:inherit; color:var(--sc-text);">
+          <span aria-hidden="true" style="width:50px; height:50px; border-radius:50%; background:var(--sc-ok); color:#fff; display:grid; place-items:center; font-weight:800; font-size:24px; flex-shrink:0;">✓</span>
+          <span style="flex:1; min-width:0;"><span style="display:block; font-weight:800; font-size:21px; line-height:1.1;">Аптека Галицька</span><span style="display:block; font-size:16px; margin-top:3px;">40 м · на 2 годині</span><span style="display:block; font-size:15px; color:var(--sc-ok); font-weight:700; margin-top:3px;">Доступно</span></span>
+        </button>
+        <button class="sc-foc" aria-label="Кафе Aroma Kava. 85 метрів, на 11 годині. Частково доступно: без сходів, але немає доступного туалету. Подвійний дотик, щоб відкрити." style="display:flex; width:100%; text-align:left; gap:14px; align-items:center; padding:18px 16px; margin-bottom:12px; background:var(--sc-surface); border:1.5px solid var(--sc-border); border-radius:16px; cursor:pointer; font-family:inherit; color:var(--sc-text);">
+          <span aria-hidden="true" style="width:50px; height:50px; border-radius:50%; background:var(--sc-warn); color:#fff; display:grid; place-items:center; font-weight:800; font-size:24px; flex-shrink:0;">◑</span>
+          <span style="flex:1; min-width:0;"><span style="display:block; font-weight:800; font-size:21px; line-height:1.1;">Aroma Kava</span><span style="display:block; font-size:16px; margin-top:3px;">85 м · на 11 годині</span><span style="display:block; font-size:15px; color:var(--sc-warn); font-weight:700; margin-top:3px;">Частково доступно</span></span>
+        </button>
+        <button class="sc-foc" aria-label="Трамвайна зупинка номер 3. 120 метрів, на 9 годині. Недоступно: високий бордюр, немає тактильної плитки. Подвійний дотик, щоб відкрити." style="display:flex; width:100%; text-align:left; gap:14px; align-items:center; padding:18px 16px; margin-bottom:12px; background:var(--sc-surface); border:1.5px solid var(--sc-border); border-radius:16px; cursor:pointer; font-family:inherit; color:var(--sc-text);">
+          <span aria-hidden="true" style="width:50px; height:50px; border-radius:50%; background:var(--sc-bad); color:#fff; display:grid; place-items:center; font-weight:800; font-size:24px; flex-shrink:0;">✕</span>
+          <span style="flex:1; min-width:0;"><span style="display:block; font-weight:800; font-size:21px; line-height:1.1;">Зупинка трамвая №3</span><span style="display:block; font-size:16px; margin-top:3px;">120 м · на 9 годині</span><span style="display:block; font-size:15px; color:var(--sc-bad); font-weight:700; margin-top:3px;">Недоступно</span></span>
+        </button>
+        <button class="sc-foc" aria-label="Показати візуальну мапу" style="display:flex; width:100%; align-items:center; gap:12px; padding:16px; margin-bottom:14px; background:var(--sc-surface-2); border:1px dashed var(--sc-border-strong); border-radius:14px; cursor:pointer; font-family:inherit; color:var(--sc-muted); font-weight:600; font-size:15px;">Показати мапу <span aria-hidden="true" style="margin-left:auto;">→</span></button>
+      </div>
+
+      <div style="flex-shrink:0; display:flex; background:var(--sc-surface); border-top:1.5px solid var(--sc-border); padding:10px 6px 22px;">
+        <button class="sc-foc" aria-current="page" style="flex:1; background:none; border:none; color:var(--sc-primary); font-weight:700; font-size:14px; font-family:inherit; cursor:pointer; min-height:54px;">Поруч</button>
+        <button class="sc-foc" style="flex:1; background:none; border:none; color:var(--sc-muted); font-weight:600; font-size:14px; font-family:inherit; cursor:pointer; min-height:54px;">Збережене</button>
+        <button class="sc-foc" style="flex:1; background:none; border:none; color:var(--sc-muted); font-weight:600; font-size:14px; font-family:inherit; cursor:pointer; min-height:54px;">Ходьба</button>
+        <button class="sc-foc" style="flex:1; background:none; border:none; color:var(--sc-muted); font-weight:600; font-size:14px; font-family:inherit; cursor:pointer; min-height:54px;">Ще</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:920,&quot;height&quot;:960}}"></script>
+</body>
+</html>

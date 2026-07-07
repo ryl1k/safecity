@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; }
+  body { margin: 0; }
+  .scstage {
+    font-family: "Onest", system-ui, "Segoe UI", sans-serif;
+    --sc-bg:#f7f8f9; --sc-surface:#fff; --sc-surface-2:#f1f4f5; --sc-text:#16242b; --sc-muted:#6a787f;
+    --sc-border:#e9edef; --sc-border-strong:#d2d9dc; --sc-primary:#0d5b66; --sc-primary-strong:#093f47;
+    --sc-primary-tint:#e6eff1; --sc-ok:#1f7a44; --sc-warn:#8a5a00; --sc-bad:#b3261e;
+    --sc-focus:#0a66ff; --sc-shadow-3:0 18px 44px rgba(15,30,36,.2);
+    min-height:100vh; background:radial-gradient(120% 80% at 50% 0%, #dfe7e9 0%, #cdd8db 100%);
+    display:flex; align-items:flex-start; justify-content:center; gap:36px; padding:48px 30px; flex-wrap:wrap;
+  }
+  .sc-foc:focus-visible { outline:3px solid var(--sc-focus); outline-offset:2px; border-radius:4px; }
+  .phone { width:380px; height:824px; background:var(--sc-bg); border-radius:44px; box-shadow:var(--sc-shadow-3), 0 0 0 11px #0c1417, 0 0 0 12px #2b3d44; position:relative; overflow:hidden; display:flex; flex-direction:column; flex-shrink:0; }
+  .statusbar { height:46px; flex-shrink:0; display:flex; align-items:flex-end; justify-content:space-between; padding:0 26px 5px; font-size:13px; font-weight:600; }
+  .cap { font-weight:700; color:#3a4a51; font-size:12.5px; letter-spacing:.04em; }
+  .col { display:flex; flex-direction:column; align-items:center; gap:12px; }
+  .h1 { margin:0; font-size:24px; letter-spacing:-.02em; font-weight:800; }
+  .lbl { display:block; font-weight:600; font-size:14px; margin-bottom:8px; }
+  .eyebrow { font-size:12px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--sc-muted); }
+  .field { width:100%; min-height:50px; padding:0 14px; border:1px solid var(--sc-border-strong); border-radius:12px; background:var(--sc-surface); color:var(--sc-text); font-family:inherit; font-size:15px; }
+  .chk { width:24px; height:24px; flex-shrink:0; border-radius:7px; display:grid; place-items:center; font-weight:800; font-size:13px; color:#fff; }
+</style>
+</helmet>
+
+<div class="scstage">
+
+  <!-- ===================== FILTERS ===================== -->
+  <div class="col">
+    <div class="cap">Фільтри й пошук</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span aria-hidden="true">5G</span></div>
+      <div style="flex-shrink:0; display:flex; align-items:center; gap:12px; padding:6px 20px 14px;">
+        <button class="sc-foc" aria-label="Закрити" style="width:40px; height:40px; border-radius:50%; border:none; background:transparent; font-size:20px; cursor:pointer; display:grid; place-items:center;">✕</button>
+        <h1 class="h1" style="flex:1;">Фільтри</h1>
+        <button class="sc-foc" style="background:none; border:none; color:var(--sc-primary); font-weight:700; font-size:14px; font-family:inherit; cursor:pointer;">Скинути</button>
+      </div>
+      <div style="flex:1; overflow-y:auto; padding:0 20px 16px;">
+        <div style="display:flex; align-items:center; gap:9px; background:var(--sc-surface); border:1px solid var(--sc-border-strong); border-radius:13px; padding:0 14px; min-height:48px; margin-bottom:22px;">
+          <span aria-hidden="true" style="font-size:17px; color:var(--sc-muted);">⌕</span><span style="color:var(--sc-muted); font-size:15px;">Пошук «тактильна плитка»</span>
+        </div>
+        <div class="eyebrow" style="margin-bottom:12px;">Рейтинг доступності</div>
+        <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:24px;">
+          <span style="display:inline-flex; align-items:center; gap:6px; min-height:42px; padding:0 14px; border:1px solid var(--sc-ok); border-radius:21px; background:var(--sc-ok); color:#fff; font-weight:700; font-size:14px;">✓ Доступно</span>
+          <span style="display:inline-flex; align-items:center; gap:6px; min-height:42px; padding:0 14px; border:1px solid var(--sc-border-strong); border-radius:21px; background:var(--sc-surface); font-weight:600; font-size:14px;"><span style="color:var(--sc-warn);">◑</span> Частково</span>
+          <span style="display:inline-flex; align-items:center; gap:6px; min-height:42px; padding:0 14px; border:1px solid var(--sc-border-strong); border-radius:21px; background:var(--sc-surface); font-weight:600; font-size:14px;"><span style="color:var(--sc-muted);">?</span> Невідомо</span>
+        </div>
+        <div class="eyebrow" style="margin-bottom:12px;">Потрібні зручності</div>
+        <div style="display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:center; gap:12px; padding:14px 0; border-top:1px solid var(--sc-border);"><span class="chk" style="background:var(--sc-primary);">✓</span><span style="flex:1; font-weight:600; font-size:15px;">Без сходів при вході</span></div>
+          <div style="display:flex; align-items:center; gap:12px; padding:14px 0; border-top:1px solid var(--sc-border);"><span class="chk" style="background:var(--sc-primary);">✓</span><span style="flex:1; font-weight:600; font-size:15px;">Доступний туалет</span></div>
+          <div style="display:flex; align-items:center; gap:12px; padding:14px 0; border-top:1px solid var(--sc-border);"><span class="chk" style="background:var(--sc-surface); border:2px solid var(--sc-border-strong);"></span><span style="flex:1; font-weight:600; font-size:15px;">Тактильна плитка</span></div>
+          <div style="display:flex; align-items:center; gap:12px; padding:14px 0; border-top:1px solid var(--sc-border);"><span class="chk" style="background:var(--sc-surface); border:2px solid var(--sc-border-strong);"></span><span style="flex:1; font-weight:600; font-size:15px;">Паркування для інвалідів</span></div>
+        </div>
+      </div>
+      <div style="flex-shrink:0; padding:12px 20px 24px; background:var(--sc-surface); border-top:1px solid var(--sc-border);">
+        <button class="sc-foc" style="width:100%; min-height:54px; border:none; border-radius:14px; background:var(--sc-primary); color:#fff; font-weight:700; font-size:16px; font-family:inherit; cursor:pointer;">Показати 38 місць</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== CONTRIBUTE ===================== -->
+  <div class="col">
+    <div class="cap">Додати місце</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span aria-hidden="true">5G</span></div>
+      <div style="flex-shrink:0; display:flex; align-items:center; gap:12px; padding:6px 20px 14px;">
+        <button class="sc-foc" aria-label="Назад" style="width:40px; height:40px; border-radius:50%; border:none; background:transparent; font-size:22px; cursor:pointer; display:grid; place-items:center;">‹</button>
+        <h1 class="h1" style="flex:1;">Додати місце</h1>
+        <span style="font-size:13px; color:var(--sc-muted); font-weight:600;">Крок 2/3</span>
+      </div>
+      <div style="flex:1; overflow-y:auto; padding:0 20px 16px;">
+        <label><span class="lbl">Назва</span><input class="field sc-foc" value="Книгарня «Є»" readonly></label>
+        <div style="height:16px;"></div>
+        <span class="lbl">Категорія</span>
+        <div style="display:flex; gap:8px; margin-bottom:20px;">
+          <span style="flex:1; text-align:center; min-height:54px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; border:1.5px solid var(--sc-primary); border-radius:13px; background:var(--sc-primary-tint); color:var(--sc-primary); font-weight:700; font-size:13px;"><span aria-hidden="true" style="width:14px; height:14px; border-radius:50%; background:currentColor;"></span>Заклад</span>
+          <span style="flex:1; text-align:center; min-height:54px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; border:1.5px solid var(--sc-border); border-radius:13px; background:var(--sc-surface); font-weight:600; font-size:13px;"><span aria-hidden="true" style="width:13px; height:13px; background:var(--sc-muted);"></span>Транспорт</span>
+          <span style="flex:1; text-align:center; min-height:54px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; border:1.5px solid var(--sc-border); border-radius:13px; background:var(--sc-surface); font-weight:600; font-size:13px;"><span aria-hidden="true" style="width:13px; height:13px; background:var(--sc-muted); transform:rotate(45deg);"></span>Перехід</span>
+        </div>
+        <span class="lbl">Контрольний список <span style="color:var(--sc-muted); font-weight:400;">— позначте, що знаєте</span></span>
+        <div style="display:flex; flex-direction:column; gap:14px;">
+          <div>
+            <span style="font-weight:600; font-size:14.5px; display:block; margin-bottom:9px;">Без сходів при вході?</span>
+            <div style="display:flex; gap:7px;">
+              <span style="flex:1; text-align:center; min-height:44px; line-height:44px; border-radius:11px; background:var(--sc-ok); color:#fff; font-weight:700; font-size:14px;">Так</span>
+              <span style="flex:1; text-align:center; min-height:44px; line-height:44px; border-radius:11px; background:var(--sc-surface); border:1px solid var(--sc-border-strong); font-weight:600; font-size:14px;">Ні</span>
+              <span style="flex:1; text-align:center; min-height:44px; line-height:44px; border-radius:11px; background:var(--sc-surface); border:1px solid var(--sc-border-strong); font-weight:600; font-size:14px;">Не знаю</span>
+            </div>
+          </div>
+          <div>
+            <span style="font-weight:600; font-size:14.5px; display:block; margin-bottom:9px;">Доступний туалет?</span>
+            <div style="display:flex; gap:7px;">
+              <span style="flex:1; text-align:center; min-height:44px; line-height:44px; border-radius:11px; background:var(--sc-surface); border:1px solid var(--sc-border-strong); font-weight:600; font-size:14px;">Так</span>
+              <span style="flex:1; text-align:center; min-height:44px; line-height:44px; border-radius:11px; background:var(--sc-bad); color:#fff; font-weight:700; font-size:14px;">Ні</span>
+              <span style="flex:1; text-align:center; min-height:44px; line-height:44px; border-radius:11px; background:var(--sc-surface); border:1px solid var(--sc-border-strong); font-weight:600; font-size:14px;">Не знаю</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="flex-shrink:0; padding:12px 20px 24px; background:var(--sc-surface); border-top:1px solid var(--sc-border);">
+        <button class="sc-foc" style="width:100%; min-height:54px; border:none; border-radius:14px; background:var(--sc-primary); color:#fff; font-weight:700; font-size:16px; font-family:inherit; cursor:pointer;">Далі</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== AUTH ===================== -->
+  <div class="col">
+    <div class="cap">Вхід / реєстрація</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span aria-hidden="true">5G</span></div>
+      <div style="flex:1; overflow-y:auto; padding:14px 24px; display:flex; flex-direction:column;">
+        <button class="sc-foc" aria-label="Назад" style="width:40px; height:40px; border-radius:50%; border:none; background:transparent; font-size:22px; cursor:pointer; align-self:flex-start; display:grid; place-items:center;">‹</button>
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
+          <h1 class="h1" style="font-size:27px;">Увійдіть, щоб додавати</h1>
+          <p style="margin:8px 0 24px; font-size:14.5px; color:var(--sc-muted); line-height:1.5;">Перегляд завжди безкоштовний і не потребує акаунту. Вхід — лише щоб додавати чи редагувати місця.</p>
+          <label><span class="lbl">Пошта</span><input class="field sc-foc" type="email" placeholder="you@city.ua"></label>
+          <div style="height:14px;"></div>
+          <label><span class="lbl">Пароль</span><input class="field sc-foc" type="password" placeholder="••••••••"></label>
+          <button class="sc-foc" style="width:100%; min-height:52px; margin-top:18px; border:none; border-radius:14px; background:var(--sc-primary); color:#fff; font-weight:700; font-size:16px; font-family:inherit; cursor:pointer;">Продовжити</button>
+          <div style="display:flex; align-items:center; gap:12px; margin:20px 0; color:var(--sc-muted); font-size:13px;"><span style="flex:1; height:1px; background:var(--sc-border);"></span> або <span style="flex:1; height:1px; background:var(--sc-border);"></span></div>
+          <button class="sc-foc" style="width:100%; min-height:52px; margin-bottom:10px; border:1px solid var(--sc-border-strong); border-radius:14px; background:var(--sc-surface); color:var(--sc-text); font-weight:600; font-size:15px; font-family:inherit; cursor:pointer;">Продовжити з Google</button>
+          <button class="sc-foc" style="width:100%; min-height:52px; border:1px solid var(--sc-border-strong); border-radius:14px; background:var(--sc-surface); color:var(--sc-text); font-weight:600; font-size:15px; font-family:inherit; cursor:pointer;">Продовжити з Apple</button>
+        </div>
+        <p style="text-align:center; font-size:13.5px; color:var(--sc-muted); margin:20px 0 0;">Новенькі тут? <span style="color:var(--sc-primary); font-weight:700;">Створити акаунт</span></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== SETTINGS ===================== -->
+  <div class="col">
+    <div class="cap">Профіль доступності</div>
+    <div class="phone">
+      <div class="statusbar"><span>9:41</span><span aria-hidden="true">5G</span></div>
+      <div style="flex-shrink:0; display:flex; align-items:center; gap:12px; padding:6px 20px 14px;">
+        <button class="sc-foc" aria-label="Назад" style="width:40px; height:40px; border-radius:50%; border:none; background:transparent; font-size:22px; cursor:pointer; display:grid; place-items:center;">‹</button>
+        <h1 class="h1" style="flex:1;">Ваш профіль</h1>
+      </div>
+      <div style="flex:1; overflow-y:auto; padding:0 20px 24px;">
+        <div style="display:flex; align-items:center; gap:13px; background:var(--sc-primary); color:#fff; border-radius:16px; padding:16px; margin-bottom:22px;">
+          <span style="width:50px; height:50px; border-radius:50%; background:rgba(255,255,255,.18); display:grid; place-items:center; font-weight:700; font-size:21px;">О</span>
+          <div style="flex:1;"><div style="font-weight:700; font-size:17px;">Олена К.</div><div style="font-size:13px; opacity:.85;">olena@city.ua · 24 внески</div></div>
+        </div>
+
+        <div class="eyebrow" style="margin-bottom:12px;">Головна потреба</div>
+        <div style="display:flex; align-items:center; gap:12px; padding:14px 0; border-top:1px solid var(--sc-border); margin-bottom:8px;"><div style="flex:1;"><div style="font-weight:700; font-size:15px;">Крісло колісне</div><div style="font-size:13px; color:var(--sc-muted);">Візуальна мапа</div></div><button class="sc-foc" style="border:none; background:none; color:var(--sc-primary); font-weight:700; font-size:14px; font-family:inherit; cursor:pointer;">Змінити</button></div>
+        <button class="sc-foc" style="width:100%; min-height:50px; border:1px solid var(--sc-border-strong); border-radius:13px; background:var(--sc-surface); color:var(--sc-primary); font-weight:700; font-size:14.5px; font-family:inherit; cursor:pointer; margin-bottom:24px;">Пройти онбординг ще раз</button>
+
+        <div class="eyebrow" style="margin-bottom:12px;">Тема</div>
+        <div style="display:flex; gap:8px; margin-bottom:24px;">
+          <span style="flex:1; text-align:center; min-height:62px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; border:1.5px solid var(--sc-primary); border-radius:13px; background:var(--sc-primary-tint); font-weight:700; font-size:12.5px; color:var(--sc-primary);"><span aria-hidden="true" style="width:22px; height:22px; border-radius:6px; background:#fff; border:1px solid var(--sc-border-strong);"></span>Стандарт</span>
+          <span style="flex:1; text-align:center; min-height:62px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; border:1.5px solid var(--sc-border); border-radius:13px; background:var(--sc-surface); font-weight:600; font-size:12.5px;"><span aria-hidden="true" style="width:22px; height:22px; border-radius:6px; background:#fff; border:2px solid #000;"></span>Контраст</span>
+          <span style="flex:1; text-align:center; min-height:62px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:6px; border:1.5px solid var(--sc-border); border-radius:13px; background:var(--sc-surface); font-weight:600; font-size:12.5px;"><span aria-hidden="true" style="width:22px; height:22px; border-radius:6px; background:#16242a;"></span>Темна</span>
+        </div>
+
+        <div style="display:flex; flex-direction:column;">
+          <div style="display:flex; align-items:center; gap:12px; padding:15px 0; border-top:1px solid var(--sc-border);"><span style="flex:1; font-weight:600; font-size:15px;">Великий текст</span><span aria-hidden="true" style="width:46px; height:27px; border-radius:14px; background:var(--sc-primary); position:relative;"><span style="position:absolute; top:3px; right:3px; width:21px; height:21px; border-radius:50%; background:#fff;"></span></span></div>
+          <div style="display:flex; align-items:center; gap:12px; padding:15px 0; border-top:1px solid var(--sc-border);"><span style="flex:1; font-weight:600; font-size:15px;">Голос і вібрація</span><span aria-hidden="true" style="width:46px; height:27px; border-radius:14px; background:var(--sc-primary); position:relative;"><span style="position:absolute; top:3px; right:3px; width:21px; height:21px; border-radius:50%; background:#fff;"></span></span></div>
+          <div style="display:flex; align-items:center; gap:12px; padding:15px 0; border-top:1px solid var(--sc-border); border-bottom:1px solid var(--sc-border);"><span style="flex:1; font-weight:600; font-size:15px;">Менше анімації</span><span aria-hidden="true" style="width:46px; height:27px; border-radius:14px; background:var(--sc-border-strong); position:relative;"><span style="position:absolute; top:3px; left:3px; width:21px; height:21px; border-radius:50%; background:#fff;"></span></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;$preview&quot;:{&quot;width&quot;:1680,&quot;height&quot;:920}}"></script>
+</body>
+</html>
