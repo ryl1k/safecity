@@ -25,7 +25,7 @@ services:
       #
       # Secrets — set these in the Render dashboard (sync:false keeps them out of git).
       # Required (server fail-fasts on boot without them):
-      - key: DATABASE_URL              # Supabase Postgres — use the SESSION POOLER URI
+      - key: DATABASE_URL              # Supabase Postgres — use the TRANSACTION POOLER URI (port 6543)
         sync: false
       - key: SUPABASE_URL              # https://<ref>.supabase.co
         sync: false

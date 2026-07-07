@@ -6,6 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"os"
+	"strconv"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -22,6 +25,25 @@ func New(ctx context.Context, dsn string) (*DB, error) {
 	if err != nil {
 		return nil, fmt.Errorf("parse dsn: %w", err)
 	}
+	// Run against Supabase's TRANSACTION-mode pooler (port 6543): it holds a
+	// server connection only for the duration of a transaction, so many clients
+	// multiplex over few backends — the right fit for a web API. Our RLS setup
+	// (`set local role` + jwt claims) all happens inside WithUser/inTx, so it is
+	// transaction-scoped and fully compatible. Transaction pooling cannot persist
+	// server-side prepared statements across checkouts, so disable statement
+	// caching (unnamed exec) — otherwise pgx errors with "prepared statement
+	// already exists".
+	cfg.ConnConfig.DefaultQueryExecMode = pgx.QueryExecModeExec
+	// Supabase's SESSION-mode pooler caps total clients at pool_size (15 by
+	// default). pgxpool's default MaxConns is max(4, numCPU), which on a busy
+	// page load (several concurrent authed queries) can blow past that cap and
+	// return `FATAL: max clients reached (EMAXCONNSESSION)` — surfacing as flaky
+	// 500s. Cap our pool below the pooler limit, and release idle connections so
+	// we don't hoard pooler slots. DB_MAX_CONNS overrides for other pool sizes.
+	cfg.MaxConns = int32(envInt("DB_MAX_CONNS", 8))
+	cfg.MinConns = 0
+	cfg.MaxConnIdleTime = 30 * time.Second
+	cfg.MaxConnLifetime = 30 * time.Minute
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
 		return nil, fmt.Errorf("connect pool: %w", err)
@@ -35,6 +57,16 @@ func New(ctx context.Context, dsn string) (*DB, error) {
 
 // Close releases the pool.
 func (d *DB) Close() { d.Pool.Close() }
+
+// envInt reads a non-negative int env var, falling back to def.
+func envInt(key string, def int) int {
+	if v := os.Getenv(key); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			return n
+		}
+	}
+	return def
+}
 
 // Ping checks DB connectivity (used by the readiness probe).
 func (d *DB) Ping(ctx context.Context) error { return d.Pool.Ping(ctx) }

@@ -6,6 +6,9 @@ import { createClient } from '@supabase/supabase-js';
 const USERS = [
   { email: 'test@safecity.app', password: 'Test12345!', role: 'user' },
   { email: 'admin@safecity.app', password: 'Admin12345!', role: 'moderator' },
+  // Demo business: owns points + has views/searches/reviews and an active
+  // subscription, so the /business dashboard shows real graphs out of the box.
+  { email: 'biz.demo@safecity.app', password: 'Business12345!', role: 'user', business: true },
 ];
 
 const url = process.env.SUPABASE_URL?.trim();
@@ -24,7 +27,9 @@ try {
     const existing = await sql`select id from auth.users where email = ${u.email}`;
     if (existing.length) {
       id = existing[0].id;
-      console.log(`= ${u.email} exists`);
+      // Reset the password so the documented demo credentials always work.
+      await supa.auth.admin.updateUserById(id, { password: u.password });
+      console.log(`= ${u.email} exists (password reset)`);
     } else {
       const { data, error } = await supa.auth.admin.createUser({
         email: u.email,
@@ -40,7 +45,13 @@ try {
     }
     await sql`insert into profiles (id, display_name) values (${id}, ${u.email.split('@')[0]}) on conflict (id) do nothing`;
     await sql`update profiles set role = ${u.role} where id = ${id}`;
-    console.log(`  role=${u.role}  password=${u.password}`);
+    if (u.business) {
+      await sql`
+        insert into business_accounts (user_id, active, plan, renews_at)
+        values (${id}, true, 'yearly', now() + interval '1 year')
+        on conflict (user_id) do update set active = true, plan = 'yearly', renews_at = now() + interval '1 year'`;
+    }
+    console.log(`  role=${u.role}${u.business ? ' business=active' : ''}  password=${u.password}`);
   }
 } catch (e) {
   console.error('seed-users failed:', e.message);
