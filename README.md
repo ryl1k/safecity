@@ -122,7 +122,7 @@ Server + tooling read the repo-root `.env`; the web's public client reads `apps/
 
 ```bash
 # .env  (server-side — never shipped to the browser)
-DATABASE_URL=postgresql://...             # Supabase session-pooler URI
+DATABASE_URL=postgresql://...             # Supabase transaction-pooler URI (port 6543)
 SUPABASE_URL=https://<ref>.supabase.co
 SUPABASE_PUBLISHABLE_KEY=...
 SUPABASE_SECRET_KEY=...                    # service key — server only
