@@ -1,6 +1,6 @@
 {
   "apps/web": "0.0.0",
-  "apps/api": "0.0.0",
+  "apps/api": "1.0.0",
   "apps/mobile": "0.0.0",
   "apps/ml": "0.0.0",
   "packages/shared": "0.0.0",
