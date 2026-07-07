@@ -9,6 +9,11 @@ if (!url || !key) {
   console.warn('Supabase env missing: set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY');
 }
 
-export const supabase = createClient(url ?? '', key ?? '', {
+// Fall back to a syntactically-valid placeholder when env is absent so
+// createClient never throws at module load. This keeps `next build` from
+// crashing while prerendering pages (e.g. /admin) in environments without the
+// public env (CI/Docker with empty build args). A real deploy always sets the
+// NEXT_PUBLIC_* values, which are inlined into the client bundle at build time.
+export const supabase = createClient(url || 'https://placeholder.supabase.co', key || 'placeholder-anon-key', {
   auth: { persistSession: true, autoRefreshToken: true },
 });

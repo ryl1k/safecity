@@ -3,7 +3,7 @@
   "separate-pull-requests": true,
   "packages": {
     "apps/web": { "release-type": "node" },
-    "apps/api": { "release-type": "node" },
+    "apps/api": { "release-type": "go" },
     "apps/mobile": { "release-type": "node" },
     "apps/ml": { "release-type": "node" },
     "packages/shared": { "release-type": "node" },

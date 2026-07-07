@@ -206,7 +206,8 @@ select
   ST_AsGeoJSON(ST_SimplifyPreserveTopology(ST_Buffer(geom::geography, 10, 2)::geometry, 0.00002)) as poly
 from street_segments
 where geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)
-  and segment_rating(surface_type, smoothness, sidewalk_width_m, incline_percent, is_step_free) = any($5)
+  and segment_rating(surface_type, smoothness, sidewalk_width_m, incline_percent, is_step_free,
+                     lit, has_curb_cuts, has_tactile_paving, is_obstacle_free) = any($5)
 limit $6`
 
 // SegmentAvoidsInBBox returns segments in the bbox whose rating is in `ratings`,
