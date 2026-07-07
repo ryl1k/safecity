@@ -1,0 +1,77 @@
+# Changelog
+
+## 1.0.0 (2026-07-07)
+
+
+### Features
+
+* Add route_accessible function to improve routing accuracy ([030ed76](https://github.com/ryl1k/safecity/commit/030ed7638e70d5beb35de476dd8a1c5d95f2a728))
+* add segment contribution feature with elevation analysis ([7465e72](https://github.com/ryl1k/safecity/commit/7465e72850594612c633a80cd766c52e0ec790bd))
+* **api,ml:** gRPC ML contract (packages/proto) + Go client (async orchestration) + Python server stubs ([034cd8e](https://github.com/ryl1k/safecity/commit/034cd8e31f859586311170c20372258c198abc2f))
+* **api,web:** self-serve B2B business listings (mocked payments) ([77d4b5d](https://github.com/ryl1k/safecity/commit/77d4b5dcbf9ae60714d55962d90a73b9d45a7528))
+* **api:** accept photos on POST /problems (parity with web report-problem) ([f79bf4d](https://github.com/ryl1k/safecity/commit/f79bf4d4bba777ded4eb40ce2ed54ddc503ba72e))
+* **api:** add street segments endpoint and data model for accessibility ([41ef84c](https://github.com/ryl1k/safecity/commit/41ef84c2ba711b4a233f28ade3e978e7f203669a))
+* **api:** auth middleware — verify Supabase JWT via JWKS, attach principal, role gating ([349c40f](https://github.com/ryl1k/safecity/commit/349c40fd7889e858014719dfa6a1777a1623536b))
+* **api:** CORS middleware for browser clients (configurable origins, Bearer-header auth) ([5c97298](https://github.com/ryl1k/safecity/commit/5c9729874a76251078f215c702f3f4969876cfc0))
+* **api:** db layer — pgx pool + RLS-via-claims tx helper; /readyz pings Postgres ([180c568](https://github.com/ryl1k/safecity/commit/180c5681ef6e1286946eb47ec79975ac66525abb))
+* **api:** migrate contribution + civic writes to Go (add point, review, confirm, petitions) ([8ee4d10](https://github.com/ryl1k/safecity/commit/8ee4d10aeff4f0a500dcb709846f2ae760c30a61))
+* **api:** migrate point reads to Go — GET /points/near, /points/bbox, /points/{id} ([e03d697](https://github.com/ryl1k/safecity/commit/e03d6976dee3406da9fd9dec8f202c84f6cb51ca))
+* **api:** moderation endpoints under /admin (moderator-gated) ([943c5fe](https://github.com/ryl1k/safecity/commit/943c5febaa735e10ef246738155dfb57c954a88c))
+* **api:** multi-stage Go Dockerfile → distroless static, non-root (replaces TS scaffold) ([fbcab97](https://github.com/ryl1k/safecity/commit/fbcab9792776bafe0643ca1b8a1767f544f30ab9))
+* **api:** observability — Prometheus /metrics, request observer, structured panic recoverer ([65a11be](https://github.com/ryl1k/safecity/commit/65a11bee495a5ffef72133795ebae54c1af5bff7))
+* **api:** OSM sidewalk importer seeding street_segments ([290d83a](https://github.com/ryl1k/safecity/commit/290d83a1fd6293c4b9901200471be20c526fddfd))
+* **api:** port OSM/MyMaps/dedupe importers to Go CLIs (idempotent on osm_id) ([9e41ad3](https://github.com/ryl1k/safecity/commit/9e41ad336d70563e86fb345eff545d78aa1b8d26))
+* **api:** problem viewer state endpoint (GET /problems/{id}/me) ([37a3346](https://github.com/ryl1k/safecity/commit/37a33462882d37ae50224da2ec16581a7faf6a83))
+* **api:** public read endpoints for points search, reviews, problems, catalog ([74c1a7e](https://github.com/ryl1k/safecity/commit/74c1a7e963e28251f84f37506441cb1d8d384564))
+* **api:** reverse-geocode endpoint — GET /geocode/reverse ([ac235ac](https://github.com/ryl1k/safecity/commit/ac235ac4862087c316edefca55749c12661422e3))
+* **api:** routing + geocoding proxies (ORS wheelchair/foot fallback, server-built avoid polygons, Nominatim) ([17cea8e](https://github.com/ryl1k/safecity/commit/17cea8e87c80f658c199a40193709adf9290cf8a))
+* **api:** scaffold Go service — chi router, /healthz + /readyz, structured logging, graceful shutdown; remove TS scaffold ([5279d8c](https://github.com/ryl1k/safecity/commit/5279d8c7f70434197b6a086bb9b9d0b5900e471b))
+* **api:** seed sidewalks nationwide at the same density as points ([29da04f](https://github.com/ryl1k/safecity/commit/29da04fb2a94629a79a2a3c0a5b2596615187a24))
+* **api:** server-side signup + accessibility-profile sync ([3d6075a](https://github.com/ryl1k/safecity/commit/3d6075af1d1f2aa1949705317704ac23dc3d80ba))
+* **api:** transit planning endpoint owning all accessibility logic ([3fa6649](https://github.com/ryl1k/safecity/commit/3fa6649a8b6e0e4a3abd5a297a1cbc0dfc3a0dca))
+* **api:** typed config — DATABASE_URL/SUPABASE_URL (fail-fast), derived JWKS URL, ORS + ML settings ([b23c44e](https://github.com/ryl1k/safecity/commit/b23c44e0c9b4d1d806ba57354f2ca75d7043309f))
+* **api:** validation + rate-limiting middleware; unified JSON error envelope ([d884663](https://github.com/ryl1k/safecity/commit/d884663b98c62dc40b4557cec46729577180b27e))
+* **api:** vertical slice — POST /problems (auth→validate→RLS tx→Postgres) + unit & integration tests ([c0115b6](https://github.com/ryl1k/safecity/commit/c0115b6baeaeae8b8f2623f943be16c101b5ccfa))
+* B2B business listings (mocked payments) + OSM sidewalk importer ([1676cef](https://github.com/ryl1k/safecity/commit/1676cefdda3fabd20a9068ecc4cb4a23521629c1))
+* **b2b:** account-level business + silent 10-point cap (drop the on/off toggle) ([c78c719](https://github.com/ryl1k/safecity/commit/c78c719a149cdc008062668a8171b3c676053bac))
+* **b2b:** analytics — search appearances + review stats per point ([c2eaf94](https://github.com/ryl1k/safecity/commit/c2eaf9414357d275fc75d1a9000d2362aa27f80d))
+* **b2b:** dashboard — point view analytics, owner edit/delete, richer /business ([e5501a2](https://github.com/ryl1k/safecity/commit/e5501a27f87a0ca9aeac5661d28ff8018311681a))
+* business reports inbox — problems on the owner's points ([e308dfc](https://github.com/ryl1k/safecity/commit/e308dfcc57f5721612edae91e39d7592d8007424))
+* **ci/cd:** workflows ([41e5c64](https://github.com/ryl1k/safecity/commit/41e5c64f3b5e0473295d678c821593153c8b5932))
+* **ci/cd:** workflows ([c1b0dfd](https://github.com/ryl1k/safecity/commit/c1b0dfd48e72dc46831a74ce4b38535bf777ef7f))
+* Create show-schema script for street_segments table ([030ed76](https://github.com/ryl1k/safecity/commit/030ed7638e70d5beb35de476dd8a1c5d95f2a728))
+* enhance accessibility features in street segments ([e94a4e3](https://github.com/ryl1k/safecity/commit/e94a4e38a6ab38921806891e1b63d48bc2f8fc91))
+* Enrich street_segments with government data ([030ed76](https://github.com/ryl1k/safecity/commit/030ed7638e70d5beb35de476dd8a1c5d95f2a728))
+* Re-import OSM ways split at intersection nodes ([030ed76](https://github.com/ryl1k/safecity/commit/030ed7638e70d5beb35de476dd8a1c5d95f2a728))
+* **route:** accessibility routing controls + honest avoidance ([0efd5b9](https://github.com/ryl1k/safecity/commit/0efd5b90a9f2ed21f960d85370fbcb7bc0451d24))
+* **route:** implement route alternatives feature with selection UI ([64115e2](https://github.com/ryl1k/safecity/commit/64115e2382e75121f0a3285f61da57bbb55ac4c3))
+* **route:** implement StepsForCoords function and handleRouteSteps endpoint for turn-by-turn navigation ([dc59cfd](https://github.com/ryl1k/safecity/commit/dc59cfd9a2f53e900f11191d772cac4674601634))
+* **route:** warn when route runs alongside a red sidewalk, not just on it ([74eef91](https://github.com/ryl1k/safecity/commit/74eef91ce21397a34dbfedb40fdab3517243f08d))
+* **segments:** rate streets by real surface/smoothness criteria, not "unknown" ([bb0ab82](https://github.com/ryl1k/safecity/commit/bb0ab820d09d4034883c6fe0f2b9fb5fb0460ab6))
+* **segments:** tiered confidence fill — gov «Мапа безбарʼєрності» + DEM + provenance ([c9f6c2d](https://github.com/ryl1k/safecity/commit/c9f6c2dd4fbf4dac88085382e8fcce0a6f867c96))
+* **tests:** enhance fakeStore with RouteAlternatives support in tests ([097c58f](https://github.com/ryl1k/safecity/commit/097c58f0b05d113901f50bef6951a8005dff6f9b))
+* **web,api:** accessibility level system + gov point fields + diya importer ([f1e09f5](https://github.com/ryl1k/safecity/commit/f1e09f508cc2e21b05c900fc46562f168ee0b3a0))
+* **web,api:** B2B business dashboard — geocoding, gating, verification, analytics ([e699c9b](https://github.com/ryl1k/safecity/commit/e699c9b95d77541a1034aea04ae6d8d263f371f9))
+* **web,api:** per-point scope selector on analytics (default: all points) ([85ef3a6](https://github.com/ryl1k/safecity/commit/85ef3a61caed1fb1d4cc0e0829e57e04607aed0b))
+* **web+api:** Ukrainian turn-by-turn, short addresses, 2-column filters ([39bc71b](https://github.com/ryl1k/safecity/commit/39bc71be0664b8ea4df23bdc886f4f8c734a7afc))
+
+
+### Bug Fixes
+
+* **api:** accept via waypoints on POST /route (intermediate stops) ([a106502](https://github.com/ryl1k/safecity/commit/a106502fff7b2dae331ea4104c80a903d2163f07))
+* **api:** allow PATCH in CORS so editing a point works ([8164f1f](https://github.com/ryl1k/safecity/commit/8164f1f550916620ff031b2b2f0cc34cd2243ee2))
+* **api:** nil-check pgRouting result before dereferencing in /route ([d4e0d45](https://github.com/ryl1k/safecity/commit/d4e0d456bfb5b606045cbd805e74eb81ca31fc9a))
+* **api:** retry transient Overpass errors + resilient national import ([ca2a816](https://github.com/ryl1k/safecity/commit/ca2a81646ed931600e777cefd5c60419df85af77))
+* **api:** set a descriptive User-Agent on Overpass requests ([3c70115](https://github.com/ryl1k/safecity/commit/3c701152bfb557b69f42a628e311b56640f7165f))
+* **api:** use Supabase transaction pooler + cap pgx pool ([cf81f28](https://github.com/ryl1k/safecity/commit/cf81f28bd9552c35b544157688fd458aba15407b))
+* **ci:** grant pull-requests:read so the reusable changes.yml passes … ([6f1e556](https://github.com/ryl1k/safecity/commit/6f1e5560599b238d6563a2ccac986ddf22ebdde3))
+* **ci:** pnpm version via packageManager, golangci-lint v2 for go1.25; drop deprecated chi RealIP + lint fix ([df1e730](https://github.com/ryl1k/safecity/commit/df1e7300cafc4712893801fa2aa224183a45e053))
+* **db,ci:** make merged street-segment migrations apply on a fresh schema ([19bcb15](https://github.com/ryl1k/safecity/commit/19bcb15df921bfa3f99476d484026d414fa9ea66))
+* **route:** map clickable after a route + real red-segment avoidance ([17584a0](https://github.com/ryl1k/safecity/commit/17584a0df618442c61261e83537030497a1b731a))
+* **route:** reject pgRouting routes that cross red segments ([e5d01a9](https://github.com/ryl1k/safecity/commit/e5d01a91915811a75def1540884765978e8eb97f))
+* **segments:** call canonical 9-arg segment_rating (lit/curb-cuts/tactile/obstacle-free) ([b98b915](https://github.com/ryl1k/safecity/commit/b98b91574a456e48f1ad91fb9ac3ba85d4b1a791))
+
+
+### Performance Improvements
+
+* **web+api:** stable map markers, always-on labels, request caching ([8d7f5ca](https://github.com/ryl1k/safecity/commit/8d7f5cad54e21481852433fcbd08da58cce84260))
