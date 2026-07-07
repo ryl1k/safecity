@@ -10,9 +10,6 @@ import (
 	"github.com/safecity/api/internal/store"
 )
 
-// walkingSpeedMps is used to estimate duration from pgRouting distance.
-const walkingSpeedMps = 1.1 // ~4 km/h
-
 // routeRequest is the body for POST /route. from/to are [lng,lat]. The avoid
 // polygons are built server-side from confirmed problems, so the client only
 // sends endpoints + profile.
