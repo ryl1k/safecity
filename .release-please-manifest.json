@@ -4,5 +4,5 @@
   "apps/mobile": "0.0.0",
   "apps/ml": "1.0.0",
   "packages/shared": "0.0.0",
-  "packages/design-tokens": "0.0.0"
+  "packages/design-tokens": "1.0.0"
 }
