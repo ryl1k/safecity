@@ -1,7 +1,7 @@
 {
+  "apps/mobile": "1.0.0",
   "apps/web": "1.0.0",
   "apps/api": "1.0.0",
-  "apps/mobile": "0.0.0",
   "packages/shared": "1.0.0",
   "apps/ml": "1.0.0",
   "packages/design-tokens": "1.0.0"
