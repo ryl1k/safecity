@@ -157,7 +157,11 @@ func (s *Server) handleRoute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	alts, err := s.store.RouteAlternatives(r.Context(), from[0], from[1], to[0], to[1])
+	var maxIncline *float64
+	if req.Params != nil {
+		maxIncline = req.Params.MaxIncline
+	}
+	alts, err := s.store.RouteAlternatives(r.Context(), from[0], from[1], to[0], to[1], maxIncline)
 	if err != nil {
 		httpx.Error(w, http.StatusInternalServerError, "routing_error", "помилка маршрутизації")
 		return
