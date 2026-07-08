@@ -277,7 +277,7 @@ func (f *fakeStore) RouteAccessible(_ context.Context, _, _, _, _ float64) (*sto
 	return nil, nil
 }
 
-func (f *fakeStore) RouteAlternatives(_ context.Context, _, _, _, _ float64) ([]store.RouteAlternative, error) {
+func (f *fakeStore) RouteAlternatives(_ context.Context, _, _, _, _ float64, _ *float64) ([]store.RouteAlternative, error) {
 	return f.altRoutes, f.altRoutesErr
 }
 

@@ -54,8 +54,9 @@ type RouteAlternative struct {
 
 // RouteAlternatives runs strict / moderate / flat routing concurrently and
 // returns all three options. At least one is guaranteed to have Available=true
-// if any path exists between the two points.
-func (s *Store) RouteAlternatives(ctx context.Context, startLng, startLat, endLng, endLat float64) ([]RouteAlternative, error) {
+// if any path exists between the two points. maxIncline, when non-nil, applies
+// a 10× cost penalty to segments steeper than that value (in percent).
+func (s *Store) RouteAlternatives(ctx context.Context, startLng, startLat, endLng, endLat float64, maxIncline *float64) ([]RouteAlternative, error) {
 	type modeSpec struct {
 		mode        string
 		label       string
@@ -79,8 +80,8 @@ func (s *Store) RouteAlternatives(ctx context.Context, startLng, startLat, endLn
 			var raw []byte
 			err := s.db.WithAnon(ctx, func(tx pgx.Tx) error {
 				return tx.QueryRow(ctx,
-					`select route_accessible_v($1, $2, $3, $4, $5)`,
-					startLng, startLat, endLng, endLat, mode,
+					`select route_accessible_v($1, $2, $3, $4, $5, $6)`,
+					startLng, startLat, endLng, endLat, mode, maxIncline,
 				).Scan(&raw)
 			})
 			if err != nil {
