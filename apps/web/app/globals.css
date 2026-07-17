@@ -147,21 +147,64 @@ html.sc-snap-page { scroll-snap-type: y proximity; scroll-padding-top: 4.6em; }
    (and tappable — the route flow needs the user to tap the map to pick points). */
 .sc-map-panel {
   position: absolute; top: 0; left: 0; height: 100%; width: min(420px, 100vw);
-  z-index: 60; background: var(--sc-bg); overflow-y: auto;
+  z-index: 60; background: var(--sc-bg);
   box-shadow: 4px 0 24px rgba(0, 0, 0, 0.18);
   border-right: var(--sc-bw) solid var(--sc-border);
   display: flex; flex-direction: column;
 }
+/* The shell must not scroll — otherwise the sheet's grab handle scrolls away
+   with the content. The body is the scroll container instead (and so remains
+   the containing block for the sticky tab bar inside PointDetailModal). */
+.sc-map-panel__body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+/* Opt-in padding for panels whose content sits flush (PointDetailModal pads
+   around its own sticky tab bar instead). */
+.sc-map-panel__body--pad { padding: 1.2em 1.4em 2.5em; }
+/* Handle is a phones-only affordance; the desktop side panel is not resizable. */
+.sc-map-panel__grab { display: none; }
+
 @media (max-width: 760px) {
   .sc-map-panel {
-    top: auto; bottom: 0; left: 0; right: 0; width: auto; height: auto;
-    max-height: 72vh;
+    top: auto; bottom: 0; left: 0; right: 0; width: auto;
+    /* Height is driven by <BottomSheet/>'s snap points; this is the pre-measure
+       fallback (and what shows if JS never runs). */
+    height: 50%;
     border-right: none; border-top: var(--sc-bw) solid var(--sc-border);
     border-radius: 1em 1em 0 0;
     box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.18);
+    transition: height 0.28s cubic-bezier(0.22, 1, 0.36, 1);
   }
-  /* While the user is picking a point on the map, get the sheet out of the way. */
-  .sc-map-panel--hidden { display: none; }
+  /* Follow the finger 1:1 while dragging; animate only when settling to a snap. */
+  .sc-map-panel--dragging { transition: none; }
+  .sc-map-panel__grab {
+    display: grid; place-items: center;
+    flex-shrink: 0; width: 100%; height: 1.9em; padding: 0;
+    border: none; border-radius: 1em 1em 0 0; background: none;
+    cursor: grab; touch-action: none; /* the handle drags; the body still scrolls */
+  }
+  .sc-map-panel--dragging .sc-map-panel__grab { cursor: grabbing; }
+  .sc-map-panel__grabline {
+    width: 2.4em; height: 0.3em; border-radius: 1em;
+    background: var(--sc-border-strong);
+  }
+  /* The grab handle already supplies the top gap the side panel needs padding for. */
+  .sc-map-panel__body--pad { padding-top: 0.3em; }
+}
+/* Dismissed: while the user taps the map to pick a point, or after closing a
+   panel whose route is still drawn. Not scoped to phones — closing the desktop
+   side panel has to hide it too. */
+.sc-map-panel--hidden { display: none; }
+@media (prefers-reduced-motion: reduce) {
+  .sc-map-panel { transition: none; }
+}
+
+/* Floating pill shown when the sheet is dismissed but its route is still drawn —
+   the way back to the panel without recomputing the route. */
+.sc-route-restore {
+  position: absolute; left: 50%; bottom: 0.8em; transform: translateX(-50%); z-index: 58;
+  display: flex; align-items: center; gap: 0.15em;
+  max-width: calc(100vw - 1.6em);
+  background: var(--sc-surface); border: var(--sc-bw) solid var(--sc-border);
+  border-radius: 2em; box-shadow: var(--sc-shadow-2); padding: 0.25em;
 }
 
 /* Centered hint pill shown at the top of the map while picking a route point. */
