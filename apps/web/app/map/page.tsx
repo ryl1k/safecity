@@ -6,6 +6,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { SlidersHorizontal, Check, MapPin as MapPinIcon, Search, X } from 'lucide-react';
 import type { AccessibilityFeature, AccessLevel, Category, PointSummary } from '@safecity/shared';
 import { AppHeader } from '@/components/AppHeader';
+import { BottomSheet, type SheetSnap } from '@/components/BottomSheet';
 import { PointDetailModal, RouteTabContent } from '@/components/PointDetailModal';
 import type { RouteDisplay } from '@/components/ExploreMap';
 import { LoadingState } from '@/components/ui';
@@ -51,6 +52,10 @@ export default function MapPage() {
   const [routeDir, setRouteDir] = useState<'to' | 'from' | null>(null);
   const [pickFromCb, setPickFromCb] = useState<((lng: number, lat: number) => void) | null>(null);
   const [routeDisplay, setRouteDisplay] = useState<RouteDisplay | null>(null);
+  // Sheet size + dismissal are separate from `dropped`: closing the panel must
+  // not unmount RouteTabContent, or the computed route dies with it.
+  const [sheetSnap, setSheetSnap] = useState<SheetSnap>('half');
+  const [sheetOpen, setSheetOpen] = useState(true);
   const [segments, setSegments] = useState<StreetSegment[]>([]);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string | null>(null);
   const [focus, setFocus] = useState<{ lng: number; lat: number; nonce: number; zoom?: number; bounds?: [[number, number], [number, number]] } | null>(null);
@@ -241,6 +246,8 @@ export default function MapPage() {
     setRouteDisplay(null); // clear any route line from a previous marker
     setPickFromCb(null);
     setModalId(null);
+    setSheetOpen(true);
+    setSheetSnap('half'); // the action list is short — leave the map visible
     setDropped({ lng, lat, address: null });
     void reverseGeocode(lng, lat).then((addr) =>
       setDropped((d) => (d && d.lng === lng && d.lat === lat ? { ...d, address: addr } : d)),
@@ -248,10 +255,27 @@ export default function MapPage() {
   }
   function clearDropped() { setDropped(null); setRouteDir(null); setRouteDisplay(null); setPickFromCb(null); }
 
+  // Closing the panel discards the marker, but never a route the user waited for:
+  // the sheet is dismissed while its route stays drawn and RouteTabContent stays
+  // mounted (so its alternatives/selection survive), reachable via the pill below.
+  function closeSheet() {
+    if (routeDisplay) setSheetOpen(false);
+    else clearDropped();
+  }
+
+  // Once a route is actually drawn, drop to half so the map is visible — seeing
+  // the route is the point of having asked for it.
+  const hadRoute = useRef(false);
+  useEffect(() => {
+    if (routeDisplay && !hadRoute.current) setSheetSnap('half');
+    hadRoute.current = routeDisplay !== null;
+  }, [routeDisplay]);
+
   // Picking a search result drops a marker there with its known address (no reverse lookup needed).
   function pickPlace(place: GeoPlace) {
     setOpen(false); setQuery(place.label.split(',')[0] ?? '');
     setRouteDir(null); setModalId(null);
+    setSheetOpen(true); setSheetSnap('half');
     setDropped({ lng: place.lng, lat: place.lat, address: place.label });
     flyTo(place.lng, place.lat);
   }
@@ -470,24 +494,25 @@ export default function MapPage() {
 
         {/* Dropped-marker panel: address + route actions */}
         {dropped && !modalId && (
-          <div
-            role="dialog"
-            aria-label="Мітка на мапі"
-            className={`sc-map-panel${pickFromCb && !isDesktop ? ' sc-map-panel--hidden' : ''}`}
-            style={{ padding: '1.2em 1.4em 2.5em' }}
+          <BottomSheet
+            ariaLabel="Мітка на мапі"
+            hidden={(Boolean(pickFromCb) && !isDesktop) || !sheetOpen}
+            snap={sheetSnap}
+            onSnapChange={setSheetSnap}
+            padded
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5em', marginBottom: '0.7em' }}>
               <MapPinIcon size={18} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0 }} />
               <strong style={{ flex: 1, minWidth: 0, fontSize: '1.05em' }}>Мітка на мапі</strong>
-              <button type="button" className="sc-foc" aria-label="Закрити" onClick={clearDropped} style={panelClose}><X size={16} aria-hidden /></button>
+              <button type="button" className="sc-foc" aria-label="Закрити" onClick={closeSheet} style={panelClose}><X size={16} aria-hidden /></button>
             </div>
             <p style={{ margin: '0 0 1em', fontSize: '0.92em', lineHeight: 1.45, color: 'var(--sc-text)' }}>
               {dropped.address ?? 'Визначення адреси…'}
             </p>
             {routeDir === null ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.6em' }}>
-                <button type="button" className="sc-foc" onClick={() => setRouteDir('to')} style={panelPrimary}>Маршрут сюди</button>
-                <button type="button" className="sc-foc" onClick={() => setRouteDir('from')} style={panelSecondary}>Маршрут звідси</button>
+                <button type="button" className="sc-foc" onClick={() => { setRouteDir('to'); setSheetSnap('full'); }} style={panelPrimary}>Маршрут сюди</button>
+                <button type="button" className="sc-foc" onClick={() => { setRouteDir('from'); setSheetSnap('full'); }} style={panelSecondary}>Маршрут звідси</button>
                 <button
                   type="button" className="sc-foc"
                   onClick={() => router.push(`/contribute?lng=${dropped.lng}&lat=${dropped.lat}&address=${encodeURIComponent(dropped.address ?? '')}`)}
@@ -508,7 +533,7 @@ export default function MapPage() {
               </div>
             ) : (
               <>
-                <button type="button" className="sc-foc" onClick={() => { setRouteDir(null); setRouteDisplay(null); setPickFromCb(null); }} style={panelBack}>← Змінити напрямок</button>
+                <button type="button" className="sc-foc" onClick={() => { setRouteDir(null); setRouteDisplay(null); setPickFromCb(null); setSheetSnap('half'); }} style={panelBack}>← Змінити напрямок</button>
                 <RouteTabContent
                   seedFrom={routeDir === 'from' ? markerSeed ?? undefined : undefined}
                   seedTo={routeDir === 'to' ? markerSeed ?? undefined : undefined}
@@ -518,6 +543,18 @@ export default function MapPage() {
                 />
               </>
             )}
+          </BottomSheet>
+        )}
+
+        {/* Route kept alive behind a dismissed sheet — reopen it or clear it. */}
+        {dropped && !modalId && !sheetOpen && routeDisplay && !pickFromCb && (
+          <div className="sc-route-restore">
+            <button type="button" className="sc-foc" onClick={() => setSheetOpen(true)} style={restoreOpen}>
+              Показати маршрут
+            </button>
+            <button type="button" className="sc-foc" aria-label="Очистити маршрут" onClick={clearDropped} style={restoreClear}>
+              <X size={16} aria-hidden />
+            </button>
           </div>
         )}
 
@@ -568,3 +605,5 @@ const panelPrimary = { display: 'inline-grid', placeItems: 'center', minHeight: 
 const panelSecondary = { display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em', borderRadius: '0.7em', fontWeight: 800, background: 'var(--sc-surface)', color: 'var(--sc-primary)', border: 'var(--sc-bw) solid var(--sc-primary)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95em' } as const;
 const panelReport = { display: 'inline-grid', placeItems: 'center', minHeight: '2.9em', padding: '0 1.2em', borderRadius: '0.7em', fontWeight: 800, background: 'var(--sc-surface)', color: 'var(--sc-bad)', border: 'var(--sc-bw) solid var(--sc-bad)', cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.95em', width: '100%' } as const;
 const panelBack = { background: 'none', border: 'none', color: 'var(--sc-primary)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', fontSize: '0.9em', padding: 0, marginBottom: '0.8em' } as const;
+const restoreOpen = { display: 'inline-flex', alignItems: 'center', minHeight: '2.4em', padding: '0 0.9em', borderRadius: '2em', border: 'none', background: 'none', color: 'var(--sc-primary)', fontFamily: 'inherit', fontWeight: 800, fontSize: '0.9em', cursor: 'pointer', whiteSpace: 'nowrap' } as const;
+const restoreClear = { flexShrink: 0, width: '2.4em', height: '2.4em', borderRadius: '50%', border: 'none', background: 'none', color: 'var(--sc-muted)', display: 'grid', placeItems: 'center', cursor: 'pointer' } as const;

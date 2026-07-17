@@ -17,9 +17,10 @@ type NewPoint struct {
 	Description string            // "" → NULL
 	Features    map[string]string // feature_key → yes|no|unknown
 	Photos      []string          // Storage URLs (uploaded client-side)
+	AIReason    string            // Groq validation summary; "" when validation skipped
 }
 
-const addPointSQL = `select add_point($1, $2::point_category, $3, $4, $5, $6, $7::jsonb, $8::text[])`
+const addPointSQL = `select add_point($1, $2::point_category, $3, $4, $5, $6, $7::jsonb, $8::text[], $9)`
 
 // AddPoint inserts a point (+ its feature values) via the add_point RPC, which
 // forces created_by = auth.uid() and filters feature values to yes/no/unknown.
@@ -39,7 +40,7 @@ func (s *Store) AddPoint(ctx context.Context, userID string, in NewPoint) (strin
 		return tx.QueryRow(ctx, addPointSQL,
 			in.Name, in.Category, in.Lng, in.Lat,
 			nullable(in.Address), nullable(in.Description),
-			string(featuresJSON), in.Photos,
+			string(featuresJSON), in.Photos, in.AIReason,
 		).Scan(&id)
 	})
 	return id, classify(err)

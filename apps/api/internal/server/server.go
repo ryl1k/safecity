@@ -17,6 +17,7 @@ import (
 
 	"github.com/safecity/api/internal/auth"
 	"github.com/safecity/api/internal/geo"
+	"github.com/safecity/api/internal/groq"
 	"github.com/safecity/api/internal/httpx"
 	"github.com/safecity/api/internal/metrics"
 	"github.com/safecity/api/internal/ratelimit"
@@ -110,6 +111,7 @@ type Deps struct {
 	Geo         GeoService                  // routing/geocoding proxy; nil disables proxy routes
 	Transit     TransitService              // public-transport planning; nil disables /transit
 	Accounts    AccountService              // server-side signup; nil disables /auth/signup
+	Groq        *groq.Client               // photo validation; nil or empty key = skip validation
 	Metrics     *metrics.Metrics            // Prometheus hook; nil disables /metrics
 	CORSOrigins []string                    // allowed browser origins; empty disables CORS
 }
@@ -126,6 +128,7 @@ type Server struct {
 	geo      GeoService
 	transit  TransitService
 	accounts AccountService
+	groq     *groq.Client
 	metrics  *metrics.Metrics
 }
 
@@ -155,7 +158,7 @@ func New(d Deps) *Server {
 		r.Use(auth.Authenticate(d.Verifier))
 	}
 
-	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles, limiter: d.Limiter, store: d.Store, geo: d.Geo, transit: d.Transit, accounts: d.Accounts, metrics: d.Metrics}
+	s := &Server{router: r, log: d.Log, ready: d.Ready, verifier: d.Verifier, roles: d.Roles, limiter: d.Limiter, store: d.Store, geo: d.Geo, transit: d.Transit, accounts: d.Accounts, groq: d.Groq, metrics: d.Metrics}
 	s.routes()
 	return s
 }

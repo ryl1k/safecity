@@ -1,8 +1,11 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
+	"strings"
 
+	"github.com/safecity/api/internal/groq"
 	"github.com/safecity/api/internal/httpx"
 	"github.com/safecity/api/internal/store"
 )
@@ -18,6 +21,7 @@ type addSegmentRequest struct {
 	HasCurbCuts      *bool        `json:"hasCurbCuts"`
 	HasRamp          *bool        `json:"hasRamp"`
 	Lit              *bool        `json:"lit"`
+	Photos           []string     `json:"photos"`
 }
 
 // handleAddSegment: POST /segments — authenticated.
@@ -38,6 +42,24 @@ func (s *Server) handleAddSegment(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusBadRequest, "invalid_body", "at least 2 coordinate pairs are required")
 		return
 	}
+	if len(req.Photos) == 0 {
+		httpx.Error(w, http.StatusBadRequest, "invalid_body", "at least one photo is required")
+		return
+	}
+	var aiReason string
+	if s.groq != nil {
+		claim := segmentClaim(req)
+		verdict, err := s.groq.ValidatePhoto(r.Context(), req.Photos[0], claim)
+		if err != nil {
+			s.log.Warn("groq validation error", "err", err)
+		} else if verdict.Verdict == groq.VerdictReject {
+			httpx.Error(w, http.StatusUnprocessableEntity, "photo_rejected", verdict.Reason)
+			return
+		} else {
+			aiReason = verdict.Reason
+		}
+	}
+
 	in := store.NewSegment{
 		StreetName:       req.StreetName,
 		Coords:           req.Coords,
@@ -49,6 +71,8 @@ func (s *Server) handleAddSegment(w http.ResponseWriter, r *http.Request) {
 		HasCurbCuts:      req.HasCurbCuts,
 		HasRamp:          req.HasRamp,
 		Lit:              req.Lit,
+		Photos:           req.Photos,
+		AIReason:         aiReason,
 	}
 	id, err := s.store.AddSegment(r.Context(), p.UserID, in)
 	if err != nil {
@@ -56,7 +80,7 @@ func (s *Server) handleAddSegment(w http.ResponseWriter, r *http.Request) {
 		httpx.Error(w, http.StatusInternalServerError, "internal", "could not save segment")
 		return
 	}
-	httpx.JSON(w, http.StatusCreated, map[string]string{"id": id})
+	httpx.JSON(w, http.StatusCreated, map[string]string{"id": id, "ai_reason": aiReason})
 }
 
 // handleSegmentsBBox: GET /segments/bbox?min_lng=&min_lat=&max_lng=&max_lat= — public.
@@ -83,4 +107,35 @@ func (s *Server) handleSegmentsBBox(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Cache-Control", readCacheControl)
 	httpx.JSON(w, http.StatusOK, res)
+}
+
+// segmentClaim builds a natural-language description of a pathway submission.
+func segmentClaim(req addSegmentRequest) string {
+	parts := []string{"Type: pedestrian sidewalk or pathway"}
+	if req.StreetName != "" {
+		parts = append(parts, fmt.Sprintf("Street: %s", req.StreetName))
+	}
+	if req.SurfaceType != "" {
+		parts = append(parts, fmt.Sprintf("Surface: %s", req.SurfaceType))
+	}
+	var feats []string
+	if req.IsStepFree != nil && *req.IsStepFree {
+		feats = append(feats, "step-free")
+	}
+	if req.HasTactilePaving != nil && *req.HasTactilePaving {
+		feats = append(feats, "tactile paving")
+	}
+	if req.HasCurbCuts != nil && *req.HasCurbCuts {
+		feats = append(feats, "curb cuts")
+	}
+	if req.HasRamp != nil && *req.HasRamp {
+		feats = append(feats, "ramp")
+	}
+	if req.Lit != nil && *req.Lit {
+		feats = append(feats, "lit")
+	}
+	if len(feats) > 0 {
+		parts = append(parts, "Features: "+strings.Join(feats, ", "))
+	}
+	return strings.Join(parts, ". ")
 }

@@ -156,6 +156,8 @@ type NewSegment struct {
 	HasCurbCuts      *bool
 	HasRamp          *bool
 	Lit              *bool
+	Photos           []string // Storage URLs uploaded client-side
+	AIReason         string   // Groq validation summary; "" when validation skipped
 }
 
 func coordsToWKT(coords [][2]float64) string {
@@ -169,20 +171,24 @@ func coordsToWKT(coords [][2]float64) string {
 const addSegmentSQL = `
 insert into street_segments
   (street_name, geom, sidewalk_width_m, surface_type, incline_percent,
-   has_tactile_paving, is_step_free, has_curb_cuts, has_ramp, lit, created_by)
+   has_tactile_paving, is_step_free, has_curb_cuts, has_ramp, lit, photos, ai_reason, created_by)
 values
-  ($1, ST_GeomFromText($2, 4326), $3, $4, $5, $6, $7, $8, $9, $10, auth.uid())
+  ($1, ST_GeomFromText($2, 4326), $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, auth.uid())
 returning id::text`
 
 // AddSegment inserts a street segment owned by userID. created_by is forced to
 // auth.uid() in SQL so RLS rejects any attempt to forge ownership.
 func (s *Store) AddSegment(ctx context.Context, userID string, in NewSegment) (string, error) {
+	photos := in.Photos
+	if photos == nil {
+		photos = []string{}
+	}
 	var id string
 	err := s.db.WithUser(ctx, userID, func(tx pgx.Tx) error {
 		return tx.QueryRow(ctx, addSegmentSQL,
 			in.StreetName, coordsToWKT(in.Coords),
 			in.SidewalkWidthM, nullable(in.SurfaceType), in.InclinePercent,
-			in.HasTactilePaving, in.IsStepFree, in.HasCurbCuts, in.HasRamp, in.Lit,
+			in.HasTactilePaving, in.IsStepFree, in.HasCurbCuts, in.HasRamp, in.Lit, photos, in.AIReason,
 		).Scan(&id)
 	})
 	return id, classify(err)

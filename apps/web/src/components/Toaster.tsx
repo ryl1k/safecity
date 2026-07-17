@@ -26,8 +26,10 @@ export function Toaster() {
       const detail = (e as CustomEvent<{ message: string; kind?: ToastKind }>).detail;
       if (!detail?.message) return;
       const id = ++seq;
-      setToasts((t) => [...t, { id, message: detail.message, kind: detail.kind ?? 'info' }]);
-      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5000);
+      const kind = detail.kind ?? 'info';
+      setToasts((t) => [...t, { id, message: detail.message, kind }]);
+      const ttl = kind === 'info' ? 8000 : 5000;
+      setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), ttl);
     };
     window.addEventListener('sc-toast', onToast);
     return () => window.removeEventListener('sc-toast', onToast);

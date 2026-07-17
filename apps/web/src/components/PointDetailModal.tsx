@@ -12,6 +12,7 @@ import { geocodePlaces, reverseGeocode } from '@/lib/geocode';
 import type { GeoPlace } from '@/lib/geocode';
 import { planTransit, fmtTime, type TransitItinerary } from '@/lib/transit';
 import type { RouteDisplay } from './ExploreMap';
+import { BottomSheet, type SheetSnap } from './BottomSheet';
 import { PointDetailContent } from './PointDetailContent';
 import { RoutePrefsControl } from './RoutePrefsControl';
 import { loadRoutePrefs, saveRoutePrefs, routePrefsPayload, type RoutePrefs } from '@/lib/routePrefs';
@@ -842,6 +843,7 @@ export function PointDetailModal({
   const panelRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const [tab, setTab] = useState<'info' | 'route'>('info');
+  const [snap, setSnap] = useState<SheetSnap>('half');
 
   useEffect(() => {
     const prevActive = document.activeElement as HTMLElement | null;
@@ -863,17 +865,19 @@ export function PointDetailModal({
   }, [onClose]);
 
   return (
-    <div
-      ref={panelRef}
-      role="dialog"
-      aria-modal="true"
-      aria-label="Деталі місця"
-      className={`sc-map-panel${hidden ? ' sc-map-panel--hidden' : ''}`}
+    <BottomSheet
+      ariaLabel="Деталі місця"
+      ariaModal
+      hidden={hidden}
+      snap={snap}
+      onSnapChange={setSnap}
+      panelRef={panelRef}
     >
       {/* Tab bar + close */}
       <div style={{ position: 'sticky', top: 0, zIndex: 1, background: 'var(--sc-bg)', borderBottom: 'var(--sc-bw) solid var(--sc-border)', display: 'flex', alignItems: 'center' }}>
         {(['info', 'route'] as const).map((t) => (
-          <button key={t} type="button" className="sc-foc" onClick={() => setTab(t)}
+          // The route tab is a form — give it the whole sheet; info is browsable at half.
+          <button key={t} type="button" className="sc-foc" onClick={() => { setTab(t); if (t === 'route') setSnap('full'); }}
             style={{ flex: 1, minHeight: '2.8em', border: 'none', borderBottom: `3px solid ${tab === t ? 'var(--sc-primary)' : 'transparent'}`, background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: '0.92em', color: tab === t ? 'var(--sc-primary)' : 'var(--sc-muted)' }}>
             {t === 'info' ? 'Інформація' : 'Маршрут'}
           </button>
@@ -886,9 +890,9 @@ export function PointDetailModal({
 
       {/* Tab content */}
       <div style={{ padding: '1.2em 1.4em 2.5em' }}>
-        {tab === 'info' && <PointDetailContent id={id} onRouteClick={() => setTab('route')} />}
+        {tab === 'info' && <PointDetailContent id={id} onRouteClick={() => { setTab('route'); setSnap('full'); }} />}
         {tab === 'route' && <RouteTabContent pointId={id} onRequestMapPick={onRequestMapPick} onCancelMapPick={onCancelMapPick} onRouteDisplay={onRouteDisplay} />}
       </div>
-    </div>
+    </BottomSheet>
   );
 }
