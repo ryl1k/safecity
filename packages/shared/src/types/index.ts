@@ -46,6 +46,7 @@ export interface PointSummary {
   kind?: string | null; // specific gov subtype (Аптеки, Медицина, Вокзали, …)
   sourceUrl?: string | null;
   checkedOn?: string | null; // ISO date
+  aiReason?: string | null; // Groq photo-validation summary stored at submission
 }
 
 /** Per-profile ratings computed for a point. */

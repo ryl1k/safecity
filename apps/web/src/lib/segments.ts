@@ -23,6 +23,7 @@ export interface StreetSegment {
 export interface NewSegment {
   streetName: string;
   coords: [number, number][];
+  photos: string[];
   sidewalkWidthM?: number | null;
   surfaceType?: string;
   inclinePercent?: number | null;

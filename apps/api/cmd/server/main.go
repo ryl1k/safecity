@@ -18,6 +18,7 @@ import (
 	"github.com/safecity/api/internal/config"
 	"github.com/safecity/api/internal/db"
 	"github.com/safecity/api/internal/geo"
+	"github.com/safecity/api/internal/groq"
 	"github.com/safecity/api/internal/metrics"
 	"github.com/safecity/api/internal/ml"
 	"github.com/safecity/api/internal/ratelimit"
@@ -96,6 +97,13 @@ func main() {
 		_ = mlClient
 	}
 
+	groqClient := groq.New(cfg.GroqAPIKey)
+	if cfg.GroqAPIKey != "" {
+		logger.Info("groq photo validation enabled")
+	} else {
+		logger.Warn("GROQ_API_KEY not set — photo validation disabled")
+	}
+
 	srv := server.New(server.Deps{
 		Log:         logger,
 		Ready:       database.Ping,
@@ -106,6 +114,7 @@ func main() {
 		Geo:         geoClient,
 		Transit:     transitClient,
 		Accounts:    accountsClient,
+		Groq:        groqClient,
 		Metrics:     metrics.New(),
 		CORSOrigins: cfg.CORSOrigins,
 	})

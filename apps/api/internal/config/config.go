@@ -26,6 +26,7 @@ type Config struct {
 	NominatimURL  string // geocoding base (self-host door)
 	TransitousURL string // public-transport planning base (MOTIS API)
 	MLGRPCAddr    string // Python ML gRPC service address
+	GroqAPIKey    string // Groq API key for photo validation (optional)
 
 	RateRPS   float64 // per-key sustained requests/second on throttled routes
 	RateBurst int     // per-key burst allowance
@@ -48,6 +49,7 @@ func Load() (Config, error) {
 		NominatimURL:      env("NOMINATIM_URL", "https://nominatim.openstreetmap.org"),
 		TransitousURL:     env("TRANSITOUS_URL", "https://api.transitous.org/api/v3"),
 		MLGRPCAddr:        os.Getenv("ML_GRPC_URL"),
+		GroqAPIKey:        os.Getenv("GROQ_API_KEY"),
 		RateRPS:           envFloat("RATE_LIMIT_RPS", 10),
 		RateBurst:         envInt("RATE_LIMIT_BURST", 20),
 		CORSOrigins:       csv(env("CORS_ORIGINS", "http://localhost:3000")),

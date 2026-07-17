@@ -45,6 +45,8 @@ type PointDetail struct {
 	Kind            *string  `json:"kind"`
 	SourceURL       *string  `json:"sourceUrl"`
 	CheckedOn       *string  `json:"checkedOn"`
+	// Groq photo validation result stored at submission time (migration 0031).
+	AIReason string `json:"aiReason"`
 }
 
 // Reads are public (guest-first; RLS read_all). They reuse the existing PostGIS
@@ -63,7 +65,7 @@ from points_in_bbox($1, $2, $3, $4)`
 const pointDetailSQL = `
 select id::text, name, category::text, address, description, photos, lng, lat, verify_status::text, features,
        is_business, verified_paid, subscription_active,
-       gov_rating, rating_authority, kind, source_url, checked_on::text
+       gov_rating, rating_authority, kind, source_url, checked_on::text, ai_reason
 from point_detail($1)`
 
 // PointsNear returns points within radiusM metres of (lng,lat), nearest first.
@@ -117,7 +119,7 @@ func (s *Store) PointDetail(ctx context.Context, id string) (*PointDetail, error
 		&p.ID, &p.Name, &p.Category, &p.Address, &p.Description, &p.Photos,
 		&p.Lng, &p.Lat, &p.VerifyStatus, &p.Features,
 		&p.IsBusiness, &p.VerifiedPaid, &p.SubscriptionActive,
-		&p.GovRating, &p.RatingAuthority, &p.Kind, &p.SourceURL, &p.CheckedOn)
+		&p.GovRating, &p.RatingAuthority, &p.Kind, &p.SourceURL, &p.CheckedOn, &p.AIReason)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, nil
 	}
