@@ -198,9 +198,10 @@ html.sc-snap-page { scroll-snap-type: y proximity; scroll-padding-top: 4.6em; }
 }
 
 /* Floating pill shown when the sheet is dismissed but its route is still drawn —
-   the way back to the panel without recomputing the route. */
+   the way back to the panel without recomputing the route. Sits above the
+   MapLibre attribution strip, which must stay legible (OSM ODbL / CC-BY). */
 .sc-route-restore {
-  position: absolute; left: 50%; bottom: 0.8em; transform: translateX(-50%); z-index: 58;
+  position: absolute; left: 50%; bottom: 2.4em; transform: translateX(-50%); z-index: 58;
   display: flex; align-items: center; gap: 0.15em;
   max-width: calc(100vw - 1.6em);
   background: var(--sc-surface); border: var(--sc-bw) solid var(--sc-border);
