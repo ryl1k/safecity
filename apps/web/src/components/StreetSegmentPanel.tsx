@@ -1,6 +1,8 @@
 'use client';
 
+import { useState } from 'react';
 import { X, Route } from 'lucide-react';
+import { BottomSheet, type SheetSnap } from '@/components/BottomSheet';
 import type { StreetSegment } from '@/lib/segments';
 
 const UNKNOWN_RATING = { label: 'Невідомо', color: '#374151', bg: '#f3f4f6' };
@@ -83,9 +85,10 @@ export function StreetSegmentPanel({
   onClose: () => void;
 }) {
   const rating = RATING_META[segment.rating] ?? UNKNOWN_RATING;
+  const [snap, setSnap] = useState<SheetSnap>('half');
 
   return (
-    <div role="dialog" aria-label={`Деталі вулиці: ${segment.streetName}`} className="sc-map-panel" style={panel}>
+    <BottomSheet ariaLabel={`Деталі вулиці: ${segment.streetName}`} snap={snap} onSnapChange={setSnap} padded>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5em', marginBottom: '0.75em' }}>
         <Route size={18} aria-hidden style={{ color: 'var(--sc-primary)', flexShrink: 0, marginTop: '0.15em' }} />
@@ -143,13 +146,9 @@ export function StreetSegmentPanel({
         <Pill ok={segment.hasRamp}          label="Пандус" />
         <Pill ok={segment.lit}              label="Освітлення" />
       </div>
-    </div>
+    </BottomSheet>
   );
 }
-
-// Positioning/shell comes from the shared .sc-map-panel class (side panel on
-// desktop, bottom sheet on phones); only padding is panel-specific here.
-const panel = { padding: '1.2em 1.4em 2.5em' } as const;
 
 const closeBtn = {
   flexShrink: 0, width: '2.2em', height: '2.2em', borderRadius: '50%', cursor: 'pointer',
