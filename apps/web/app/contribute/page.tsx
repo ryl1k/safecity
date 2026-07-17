@@ -8,7 +8,7 @@ import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { LocationPicker } from '@/components/LocationPicker';
 import { SegmentPicker } from '@/components/SegmentPicker';
-import { PhotoInput } from '@/components/PhotoInput';
+import { PhotoInput, type PhotoWithMeta } from '@/components/PhotoInput';
 import { Button, Field } from '@/components/ui';
 import { getCatalog } from '@/lib/catalog';
 import { api } from '@/lib/api';
@@ -107,7 +107,8 @@ export default function ContributePage() {
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<Category>('venue');
   const [loc, setLoc] = useState<[number, number] | null>(null);
-  const [photos, setPhotos] = useState<File[]>([]);
+  const [photos, setPhotos] = useState<PhotoWithMeta[]>([]);
+  const [pathwayPhotos, setPathwayPhotos] = useState<PhotoWithMeta[]>([]);
   const [values, setValues] = useState<Record<string, FeatureValue>>({});
 
   // ── pathway ─────────────────────────────────────────────────────────────────
@@ -184,7 +185,10 @@ export default function ContributePage() {
 
   function canProceed(): boolean {
     if (step === 1) return kind !== null;
-    if (step === 2) return kind === 'point' ? name.trim().length > 0 : streetName.trim().length > 0;
+    if (step === 2) {
+      if (kind === 'point') return name.trim().length > 0 && photos.length > 0;
+      return streetName.trim().length > 0 && pathwayPhotos.length > 0;
+    }
     if (step === 3) return kind === 'point' ? loc !== null : waypoints.length >= 2 && elevStatus !== 'loading';
     return true;
   }
@@ -197,8 +201,8 @@ export default function ContributePage() {
         const p = loc ?? ([loadCity().lng, loadCity().lat] as [number, number]);
         const cleaned: Record<string, FeatureValue> = {};
         for (const [k, v] of Object.entries(values)) if (v === 'yes' || v === 'no') cleaned[k] = v;
-        const photoUrls = await uploadPhotos(photos, 'points');
-        const res = await api.post<{ id: string }>('/points', {
+        const photoUrls = await uploadPhotos(photos.map((p) => p.file), 'points');
+        const res = await api.post<{ id: string; ai_reason: string }>('/points', {
           name, category, lat: p[1], lng: p[0], address, description, features: cleaned, photos: photoUrls,
         });
         toast('Місце додано. Дякуємо за внесок!', 'success');
@@ -206,14 +210,18 @@ export default function ContributePage() {
         return;
       }
       // pathway → one row per elevation-split sub-segment (or the whole path)
+      const pathwayPhotoUrls = await uploadPhotos(pathwayPhotos.map((p) => p.file), 'segments');
       const common = {
         streetName,
+        photos: pathwayPhotoUrls,
         surfaceType: surfaceType || undefined,
         sidewalkWidthM: sidewalkWidthM ? parseFloat(sidewalkWidthM) : null,
         hasTactilePaving, isStepFree, hasCurbCuts, hasRamp, lit,
       };
       if (elevSegments.length > 0) {
-        for (const seg of elevSegments) await submitSegment({ ...common, coords: seg.coords, inclinePercent: seg.inclinePercent });
+        for (const seg of elevSegments) {
+          await submitSegment({ ...common, coords: seg.coords, inclinePercent: seg.inclinePercent });
+        }
       } else {
         const coords = routedCoords.length >= 2 ? routedCoords : waypoints;
         await submitSegment({ ...common, coords, inclinePercent: null });
@@ -321,8 +329,10 @@ export default function ContributePage() {
                 </div>
               </div>
               <div>
-                <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Фото (необов’язково)</div>
-                <PhotoInput files={photos} onChange={setPhotos} />
+                <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>
+                  Фото <span style={{ color: 'var(--sc-bad)' }}>*</span>
+                </div>
+                <PhotoInput photos={photos} onChange={setPhotos} required />
               </div>
             </>
           )}
@@ -337,6 +347,12 @@ export default function ContributePage() {
                 >
                   {SURFACE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
                 </select>
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>
+                  Фото <span style={{ color: 'var(--sc-bad)' }}>*</span>
+                </div>
+                <PhotoInput photos={pathwayPhotos} onChange={setPathwayPhotos} required />
               </div>
             </>
           )}

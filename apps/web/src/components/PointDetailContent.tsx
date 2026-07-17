@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import type { AccessibilityFeature, AccessLevel, FeatureValue, Profile, PointSummary } from '@safecity/shared';
 import { ChecklistRow, ReviewItem, Button, LoadingState, ErrorState } from '@/components/ui';
-import { PhotoInput } from '@/components/PhotoInput';
+import { PhotoInput, type PhotoWithMeta } from '@/components/PhotoInput';
 import { PhotoGallery } from '@/components/PhotoGallery';
 import { getCatalog } from '@/lib/catalog';
 import { pointById } from '@/lib/points';
@@ -33,7 +33,7 @@ export function PointDetailContent({ id, onRouteClick }: { id: string; onRouteCl
   const [formOpen, setFormOpen] = useState(false);
   const [stars, setStars] = useState(5);
   const [text, setText] = useState('');
-  const [reviewPhotos, setReviewPhotos] = useState<File[]>([]);
+  const [reviewPhotos, setReviewPhotos] = useState<PhotoWithMeta[]>([]);
   const [busy, setBusy] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
 
@@ -87,7 +87,7 @@ export function PointDetailContent({ id, onRouteClick }: { id: string; onRouteCl
     setReviewError(null);
     setBusy(true);
     try {
-      const urls = await uploadPhotos(reviewPhotos, 'reviews');
+      const urls = await uploadPhotos(reviewPhotos.map((p) => p.file), 'reviews');
       await addReview(id, 'wheelchair', stars, text, urls);
       setReviews(await reviewsFor(id));
       setFormOpen(false);
@@ -135,6 +135,12 @@ export function PointDetailContent({ id, onRouteClick }: { id: string; onRouteCl
         <div style={{ marginTop: '1em' }}><PhotoGallery photos={point.photos} alt={point.name} /></div>
       ) : null}
       {point.description ? <p style={{ margin: '0.9em 0 0', lineHeight: 1.55 }}>{point.description}</p> : null}
+      {point.aiReason ? (
+        <p style={{ margin: '0.75em 0 0', fontSize: '0.82em', color: 'var(--sc-muted)', lineHeight: 1.5, display: 'flex', gap: '0.4em', alignItems: 'flex-start' }}>
+          <span aria-hidden style={{ flexShrink: 0 }}>AI:</span>
+          <span>{point.aiReason}</span>
+        </p>
+      ) : null}
 
       {/* Actions up top */}
       <div style={{ display: 'flex', gap: '0.8em', flexWrap: 'wrap', marginTop: '1.2em' }}>
@@ -212,7 +218,7 @@ export function PointDetailContent({ id, onRouteClick }: { id: string; onRouteCl
               rows={3}
               style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box', padding: '0.7em 0.9em', borderRadius: '0.7em', background: 'var(--sc-surface)', color: 'var(--sc-text)', fontFamily: 'inherit', fontSize: '1em', border: 'var(--sc-bw) solid var(--sc-border-strong)', resize: 'vertical' }}
             />
-            <PhotoInput files={reviewPhotos} onChange={setReviewPhotos} />
+            <PhotoInput photos={reviewPhotos} onChange={setReviewPhotos} />
             {reviewError ? <div role="alert" style={{ color: 'var(--sc-bad)', fontWeight: 700, fontSize: '0.85em' }}>{reviewError}</div> : null}
             <div style={{ display: 'flex', gap: '0.6em', flexWrap: 'wrap' }}>
               <Button type="submit" disabled={busy}>{busy ? 'Публікація…' : 'Опублікувати'}</Button>
