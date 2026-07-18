@@ -147,6 +147,52 @@ func (s *Store) DeleteReview(ctx context.Context, userID, reviewID string) error
 	return s.modExec(ctx, userID, "delete from reviews where id = $1::uuid", reviewID)
 }
 
+// AdminSegment is a segment row in the moderation queue.
+type AdminSegment struct {
+	ID          string  `json:"id"`
+	StreetName  *string `json:"street_name"`
+	SurfaceType *string `json:"surface_type"`
+	Rating      string  `json:"rating"`
+	CreatedAt   string  `json:"created_at"`
+}
+
+const listSegmentsSQL = `
+select
+  s.id::text,
+  s.street_name,
+  s.surface_type,
+  segment_rating(s.surface_type, s.smoothness, s.sidewalk_width_m, s.incline_percent,
+    s.is_step_free, s.lit, s.has_curb_cuts, s.has_tactile_paving, s.is_obstacle_free) as rating,
+  s.created_at::text
+from street_segments s
+where s.created_by is not null
+order by s.created_at desc
+limit $1`
+
+// ListUserSegments lists user-submitted segments (excludes OSM imports), newest first.
+func (s *Store) ListUserSegments(ctx context.Context, limit int) ([]AdminSegment, error) {
+	rows, err := s.db.Pool.Query(ctx, listSegmentsSQL, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := []AdminSegment{}
+	for rows.Next() {
+		var seg AdminSegment
+		if err := rows.Scan(&seg.ID, &seg.StreetName, &seg.SurfaceType, &seg.Rating, &seg.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, seg)
+	}
+	return out, rows.Err()
+}
+
+// DeleteSegment removes a user-submitted segment.
+func (s *Store) DeleteSegment(ctx context.Context, userID, segmentID string) error {
+	return s.modExec(ctx, userID, "delete from street_segments where id = $1::uuid and created_by is not null", segmentID)
+}
+
 // AdminUser is a profile row for role management.
 type AdminUser struct {
 	ID          string  `json:"id"`

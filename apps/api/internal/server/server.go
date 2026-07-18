@@ -69,6 +69,8 @@ type DataStore interface {
 	DeleteProblem(ctx context.Context, userID, problemID string) error
 	RecentReviews(ctx context.Context, limit int) ([]store.AdminReview, error)
 	DeleteReview(ctx context.Context, userID, reviewID string) error
+	ListUserSegments(ctx context.Context, limit int) ([]store.AdminSegment, error)
+	DeleteSegment(ctx context.Context, userID, segmentID string) error
 	ListUsers(ctx context.Context, limit int) ([]store.AdminUser, error)
 	SetUserRole(ctx context.Context, userID, targetID, role string) error
 	// routing support
@@ -248,6 +250,8 @@ func (s *Server) routes() {
 			r.Delete("/problems/{id}", s.handleAdminDeleteProblem)
 			r.Get("/reviews", s.handleAdminRecentReviews)
 			r.Delete("/reviews/{id}", s.handleAdminDeleteReview)
+			r.Get("/segments", s.handleAdminListSegments)
+			r.Delete("/segments/{id}", s.handleAdminDeleteSegment)
 			r.Get("/users", s.handleAdminListUsers)
 			r.Post("/users/{id}/role", s.handleAdminSetUserRole)
 		})

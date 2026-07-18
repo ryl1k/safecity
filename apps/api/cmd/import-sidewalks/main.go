@@ -5,9 +5,10 @@
 // points showcase, capped at PER_CITY (default 35) segments each — matching
 // the points density so streets and points look comparably populated.
 //
-//	go run ./cmd/import-sidewalks                     # national, 35/city
-//	PER_CITY=50 go run ./cmd/import-sidewalks         # national, 50/city
-//	SIDEWALK_BBOX="S,W,N,E" go run ./cmd/import-sidewalks   # single custom bbox, uncapped
+//	go run ./cmd/import-sidewalks                                          # national, 35/city
+//	PER_CITY=50 go run ./cmd/import-sidewalks                             # national, 50/city
+//	SIDEWALK_BBOX="S,W,N,E" go run ./cmd/import-sidewalks                 # single bbox, uncapped
+//	SIDEWALK_AROUND="2200,49.8419,24.0318" go run ./cmd/import-sidewalks  # circle radius_m,lat,lng
 package main
 
 import (
@@ -48,6 +49,18 @@ func main() {
 	endpoint := os.Getenv("OVERPASS_URL")
 	httpClient := &http.Client{Timeout: 120 * time.Second}
 
+	if around := os.Getenv("SIDEWALK_AROUND"); around != "" {
+		area := "around:" + around
+		fmt.Printf("Querying Overpass (circle %s) …\n", area)
+		st, err := importer.ImportSidewalks(ctx, database.Pool, httpClient, endpoint, area)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "sidewalk import failed: %v\n", err)
+			os.Exit(1)
+		}
+		fmt.Printf("Sidewalk import: %d segments upserted, %d skipped.\n", st.Upserts, st.Skipped)
+		return
+	}
+
 	if bbox := os.Getenv("SIDEWALK_BBOX"); bbox != "" {
 		fmt.Printf("Querying Overpass (custom bbox %s) …\n", bbox)
 		st, err := importer.ImportSidewalks(ctx, database.Pool, httpClient, endpoint, bbox)
@@ -56,7 +69,6 @@ func main() {
 			os.Exit(1)
 		}
 		fmt.Printf("Sidewalk import: %d segments upserted, %d skipped.\n", st.Upserts, st.Skipped)
-		prune(ctx, database.Pool)
 		return
 	}
 

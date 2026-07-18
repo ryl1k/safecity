@@ -88,6 +88,23 @@ export async function deleteReview(id: string): Promise<void> {
   await api.del(`/admin/reviews/${id}`);
 }
 
+// ── Segment moderation ───────────────────────────────────────────────────────
+export interface AdminSegment {
+  id: string;
+  street_name: string | null;
+  surface_type: string | null;
+  rating: string;
+  created_at: string;
+}
+
+export async function listUserSegments(limit = 200): Promise<AdminSegment[]> {
+  return api.get<AdminSegment[]>(`/admin/segments${qs({ limit })}`, { auth: true });
+}
+
+export async function deleteSegment(id: string): Promise<void> {
+  await api.del(`/admin/segments/${id}`);
+}
+
 // ── User / role management ───────────────────────────────────────────────────
 export interface AdminUser {
   id: string;
