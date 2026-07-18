@@ -37,7 +37,8 @@ const SURFACE_OPTIONS = [
   { value: 'concrete', label: 'Бетон' },
   { value: 'gravel', label: 'Гравій' },
 ];
-const STEPS = ['Тип', 'Деталі', 'Локація', 'Доступність'];
+const POINT_STEPS = ['Тип', 'Локація', 'Деталі', 'Доступність'];
+const PATHWAY_STEPS = ['Тип', 'Локація', 'Деталі', 'Доступність'];
 
 // yes / no / unknown selector (points) and true / false / null (pathways).
 function TriToggle<T>({ value, options, onChange }: { value: T; options: { value: T; label: string }[]; onChange: (v: T) => void }) {
@@ -154,8 +155,14 @@ export default function ContributePage() {
     const lng = parseFloat(params.get('lng') ?? '');
     const lat = parseFloat(params.get('lat') ?? '');
     const addr = params.get('address') ?? '';
+    const type = params.get('type') as Kind | null;
     if (!isNaN(lng) && !isNaN(lat)) { setLoc([lng, lat]); setInitialCenter([lng, lat]); }
     if (addr) setAddress(addr);
+    if (type === 'point' || type === 'pathway') {
+      setKind(type);
+      // For a point with coords already provided, location is known — skip to details (step 3).
+      setStep(type === 'point' && !isNaN(lng) && !isNaN(lat) ? 3 : 2);
+    }
 
     (async () => {
       const { data } = await supabase.auth.getUser();
@@ -165,6 +172,16 @@ export default function ContributePage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Auto-fill street name from first waypoint when user draws the segment.
+  const firstWaypoint = waypoints[0];
+  useEffect(() => {
+    if (!firstWaypoint || streetName.trim()) return;
+    void reverseGeocode(firstWaypoint[0], firstWaypoint[1]).then((label) => {
+      if (label && !streetName.trim()) setStreetName(label);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [firstWaypoint]);
 
   // Wheelchair-only product: the score counts wheelchair-profile criteria, so only
   // collect those (blind-profile features like Braille / guide dog aren't counted).
@@ -186,10 +203,15 @@ export default function ContributePage() {
   function canProceed(): boolean {
     if (step === 1) return kind !== null;
     if (step === 2) {
+      // both point and pathway: step 2 = location
+      if (kind === 'point') return loc !== null;
+      return waypoints.length >= 2 && elevStatus !== 'loading';
+    }
+    if (step === 3) {
+      // both point and pathway: step 3 = details
       if (kind === 'point') return name.trim().length > 0 && photos.length > 0;
       return streetName.trim().length > 0 && pathwayPhotos.length > 0;
     }
-    if (step === 3) return kind === 'point' ? loc !== null : waypoints.length >= 2 && elevStatus !== 'loading';
     return true;
   }
 
@@ -258,16 +280,21 @@ export default function ContributePage() {
         </p>
 
         {/* Stepper — segmented progress with only the current step's title */}
-        <div style={{ marginBottom: '1.6em' }}>
-          <div style={{ display: 'flex', gap: '0.4em' }}>
-            {STEPS.map((label, i) => (
-              <div key={label} style={{ flex: 1, height: '0.4em', borderRadius: '1em', background: i + 1 <= step ? 'var(--sc-primary)' : 'var(--sc-surface-2)', transition: 'background .3s' }} />
-            ))}
-          </div>
-          <div style={{ marginTop: '0.55em', fontWeight: 800, fontSize: '1.05em', color: 'var(--sc-primary)' }}>
-            {STEPS[step - 1]}
-          </div>
-        </div>
+        {(() => {
+          const steps = kind === 'pathway' ? PATHWAY_STEPS : POINT_STEPS;
+          return (
+            <div style={{ marginBottom: '1.6em' }}>
+              <div style={{ display: 'flex', gap: '0.4em' }}>
+                {steps.map((label, i) => (
+                  <div key={label} style={{ flex: 1, height: '0.4em', borderRadius: '1em', background: i + 1 <= step ? 'var(--sc-primary)' : 'var(--sc-surface-2)', transition: 'background .3s' }} />
+                ))}
+              </div>
+              <div style={{ marginTop: '0.55em', fontWeight: 800, fontSize: '1.05em', color: 'var(--sc-primary)' }}>
+                {steps[step - 1]}
+              </div>
+            </div>
+          );
+        })()}
 
         <div key={`step-${step}-${kind}`} className="sc-animate-in" style={{ display: 'flex', flexDirection: 'column', gap: '1.1em' }}>
           {/* ── Step 1: type ── */}
@@ -298,8 +325,56 @@ export default function ContributePage() {
             </div>
           )}
 
-          {/* ── Step 2: details ── */}
+          {/* ── Step 2: location ── */}
           {step === 2 && kind === 'point' && (
+            <>
+              <div>
+                <Field label="Адреса" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="вул. Прикладна, 1" />
+                <p style={{ margin: '0.35em 0 0', fontSize: '0.78em', color: 'var(--sc-muted)' }}>
+                  {addrBusy ? 'Визначаємо адресу за міткою…' : 'Підставляється автоматично з мітки на мапі — можна змінити.'}
+                </p>
+              </div>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Місцезнаходження <span style={{ color: 'var(--sc-bad)' }}>*</span></div>
+                <LocationPicker value={loc} onChange={(lng, lat) => { setLoc([lng, lat]); void fillAddressFromPin(lng, lat); }} />
+              </div>
+            </>
+          )}
+          {step === 2 && kind === 'pathway' && (
+            <>
+              <p style={{ margin: 0, color: 'var(--sc-muted)', fontSize: '0.9em' }}>
+                Натисніть на карті, щоб позначити початок і кінець шляху. Можна додати кілька точок.
+              </p>
+              <SegmentPicker value={waypoints} onChange={setWaypoints} onRouteChange={handleRouteChange} elevSegments={elevSegments} initialCenter={initialCenter} />
+              {elevStatus === 'loading' && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6em', color: 'var(--sc-primary)', fontSize: '0.88em', fontWeight: 700 }}>
+                  <span aria-hidden style={{ display: 'inline-block', width: '1em', height: '1em', border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  Аналізуємо профіль висот…
+                </div>
+              )}
+              {elevStatus === 'done' && elevSegments.length > 0 && (
+                <div style={{ background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '0.9em', padding: '0.8em 1em' }}>
+                  <div style={{ fontSize: '0.8em', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--sc-muted)', marginBottom: '0.6em' }}>
+                    Ділянки за нахилом ({elevSegments.length})
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35em' }}>
+                    {elevSegments.map((seg, i) => (
+                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5em' }}>
+                        <span style={{ fontSize: '0.82em', color: 'var(--sc-muted)' }}>Ділянка {i + 1}</span>
+                        <span style={{ fontSize: '0.85em', fontWeight: 700, color: gradeColor(seg.inclinePercent) }}>{gradeLabel(seg.inclinePercent)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {elevStatus === 'failed' && (
+                <p style={{ fontSize: '0.82em', color: 'var(--sc-muted)', margin: 0 }}>Не вдалося отримати дані висот — шлях буде збережено без нахилу.</p>
+              )}
+            </>
+          )}
+
+          {/* ── Step 3: details ── */}
+          {step === 3 && kind === 'point' && (
             <>
               <Field label="Назва" required value={name} onChange={(e) => setName(e.target.value)} placeholder="напр. Кав'ярня «Кава»" />
               <div>
@@ -336,7 +411,7 @@ export default function ContributePage() {
               </div>
             </>
           )}
-          {step === 2 && kind === 'pathway' && (
+          {step === 3 && kind === 'pathway' && (
             <>
               <Field label="Назва вулиці" required value={streetName} onChange={(e) => setStreetName(e.target.value)} placeholder="напр. Вулиця Городоцька" />
               <div>
@@ -354,54 +429,6 @@ export default function ContributePage() {
                 </div>
                 <PhotoInput photos={pathwayPhotos} onChange={setPathwayPhotos} required />
               </div>
-            </>
-          )}
-
-          {/* ── Step 3: location ── */}
-          {step === 3 && kind === 'point' && (
-            <>
-              <div>
-                <Field label="Адреса" value={address} onChange={(e) => setAddress(e.target.value)} placeholder="вул. Прикладна, 1" />
-                <p style={{ margin: '0.35em 0 0', fontSize: '0.78em', color: 'var(--sc-muted)' }}>
-                  {addrBusy ? 'Визначаємо адресу за міткою…' : 'Підставляється автоматично з мітки на мапі — можна змінити.'}
-                </p>
-              </div>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: '0.9em', marginBottom: '0.5em' }}>Місцезнаходження <span style={{ color: 'var(--sc-bad)' }}>*</span></div>
-                <LocationPicker value={loc} onChange={(lng, lat) => { setLoc([lng, lat]); void fillAddressFromPin(lng, lat); }} />
-              </div>
-            </>
-          )}
-          {step === 3 && kind === 'pathway' && (
-            <>
-              <p style={{ margin: 0, color: 'var(--sc-muted)', fontSize: '0.9em' }}>
-                Натисніть на карті, щоб позначити початок і кінець шляху. Можна додати кілька точок.
-              </p>
-              <SegmentPicker value={waypoints} onChange={setWaypoints} onRouteChange={handleRouteChange} elevSegments={elevSegments} initialCenter={initialCenter} />
-              {elevStatus === 'loading' && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.6em', color: 'var(--sc-primary)', fontSize: '0.88em', fontWeight: 700 }}>
-                  <span aria-hidden style={{ display: 'inline-block', width: '1em', height: '1em', border: '2px solid currentColor', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
-                  Аналізуємо профіль висот…
-                </div>
-              )}
-              {elevStatus === 'done' && elevSegments.length > 0 && (
-                <div style={{ background: 'var(--sc-surface)', border: 'var(--sc-bw) solid var(--sc-border)', borderRadius: '0.9em', padding: '0.8em 1em' }}>
-                  <div style={{ fontSize: '0.8em', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.05em', color: 'var(--sc-muted)', marginBottom: '0.6em' }}>
-                    Ділянки за нахилом ({elevSegments.length})
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35em' }}>
-                    {elevSegments.map((seg, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5em' }}>
-                        <span style={{ fontSize: '0.82em', color: 'var(--sc-muted)' }}>Ділянка {i + 1}</span>
-                        <span style={{ fontSize: '0.85em', fontWeight: 700, color: gradeColor(seg.inclinePercent) }}>{gradeLabel(seg.inclinePercent)}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {elevStatus === 'failed' && (
-                <p style={{ fontSize: '0.82em', color: 'var(--sc-muted)', margin: 0 }}>Не вдалося отримати дані висот — шлях буде збережено без нахилу.</p>
-              )}
             </>
           )}
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { LayoutDashboard, BadgeCheck, MessageSquareWarning, Star, Users, type LucideIcon } from 'lucide-react';
+import { LayoutDashboard, BadgeCheck, MessageSquareWarning, Star, Users, Footprints, type LucideIcon } from 'lucide-react';
 import { AppHeader } from '@/components/AppHeader';
 import { Footer } from '@/components/Footer';
 import { Button, LoadingState, ErrorState } from '@/components/ui';
@@ -15,6 +15,7 @@ const NAV: { href: string; label: string; icon: LucideIcon; exact?: boolean }[] 
   { href: '/admin/unverified', label: 'Непідтверджені', icon: BadgeCheck },
   { href: '/admin/problems', label: 'Проблеми', icon: MessageSquareWarning },
   { href: '/admin/reviews', label: 'Відгуки', icon: Star },
+  { href: '/admin/segments', label: 'Сегменти', icon: Footprints },
   { href: '/admin/users', label: 'Користувачі', icon: Users },
 ];
 

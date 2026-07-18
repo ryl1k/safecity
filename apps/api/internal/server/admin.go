@@ -113,6 +113,28 @@ func (s *Server) handleAdminDeleteReview(w http.ResponseWriter, r *http.Request)
 	s.adminDelete(w, r, "review", s.store.DeleteReview)
 }
 
+// handleAdminListSegments: GET /admin/segments?limit=.
+func (s *Server) handleAdminListSegments(w http.ResponseWriter, r *http.Request) {
+	limit := 200
+	if v := r.URL.Query().Get("limit"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 && n <= 1000 {
+			limit = n
+		}
+	}
+	res, err := s.store.ListUserSegments(r.Context(), limit)
+	if err != nil {
+		s.log.Error("admin list segments", "err", err)
+		httpx.Error(w, http.StatusInternalServerError, "internal", "could not load segments")
+		return
+	}
+	httpx.JSON(w, http.StatusOK, res)
+}
+
+// handleAdminDeleteSegment: DELETE /admin/segments/{id}.
+func (s *Server) handleAdminDeleteSegment(w http.ResponseWriter, r *http.Request) {
+	s.adminDelete(w, r, "segment", s.store.DeleteSegment)
+}
+
 // handleAdminListUsers: GET /admin/users?limit=.
 func (s *Server) handleAdminListUsers(w http.ResponseWriter, r *http.Request) {
 	limit := 100

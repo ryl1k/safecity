@@ -515,14 +515,14 @@ export default function MapPage() {
                 <button type="button" className="sc-foc" onClick={() => { setRouteDir('from'); setSheetSnap('full'); }} style={panelSecondary}>Маршрут звідси</button>
                 <button
                   type="button" className="sc-foc"
-                  onClick={() => router.push(`/contribute?lng=${dropped.lng}&lat=${dropped.lat}&address=${encodeURIComponent(dropped.address ?? '')}`)}
+                  onClick={() => router.push(`/contribute?type=point&lng=${dropped.lng}&lat=${dropped.lat}&address=${encodeURIComponent(dropped.address ?? '')}`)}
                   style={panelSecondary}
                 >
                   Додати місце тут
                 </button>
                 <button
                   type="button" className="sc-foc"
-                  onClick={() => router.push(`/contribute/segment?lng=${dropped.lng}&lat=${dropped.lat}`)}
+                  onClick={() => router.push(`/contribute?type=pathway&lng=${dropped.lng}&lat=${dropped.lat}`)}
                   style={panelSecondary}
                 >
                   Додати шлях тут
