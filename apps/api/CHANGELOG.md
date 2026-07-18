@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.1.0](https://github.com/ryl1k/safecity/compare/v1.0.0...v1.1.0) (2026-07-18)
+
+
+### Features
+
+* add admin segments management page with filtering and deletion … ([fe84412](https://github.com/ryl1k/safecity/commit/fe8441210782904efdd48c2977399c85e073bd8f))
+* add admin segments management page with filtering and deletion functionality ([80b07a2](https://github.com/ryl1k/safecity/commit/80b07a2d729e1b89500d7475c8067230bd25b56f))
+* allow moderators to delete any street segments with new policy ([80b07a2](https://github.com/ryl1k/safecity/commit/80b07a2d729e1b89500d7475c8067230bd25b56f))
+* create importer to fill incline_percent for street segments using DEM tiles ([80b07a2](https://github.com/ryl1k/safecity/commit/80b07a2d729e1b89500d7475c8067230bd25b56f))
+* enhance segment rating function to v6, adjusting criteria for 'full' ratings ([80b07a2](https://github.com/ryl1k/safecity/commit/80b07a2d729e1b89500d7475c8067230bd25b56f))
+* implement segment rating function v5 to improve accessibility ratings based on new criteria ([80b07a2](https://github.com/ryl1k/safecity/commit/80b07a2d729e1b89500d7475c8067230bd25b56f))
+* integrate Groq photo validation for segment submissions ([63b5342](https://github.com/ryl1k/safecity/commit/63b534237031854d3acc9dfeec70d6b1b07167b3))
+* integrate Groq photo validation for segment submissions ([90e3e46](https://github.com/ryl1k/safecity/commit/90e3e46b5ec733d537be560158c31c9a4acd6a41))
+* **routes:** add maxIncline parameter to RouteAlternatives and relat… ([9ce2a4b](https://github.com/ryl1k/safecity/commit/9ce2a4ba43c6748c20c31a164f42c9c3917dea37))
+* **routes:** add maxIncline parameter to RouteAlternatives and related functions ([a6f6897](https://github.com/ryl1k/safecity/commit/a6f6897aace090d1f78bf159576a4db04cd1c9e5))
+
+
+### Bug Fixes
+
+* revert segment rating function to v7, enforcing stricter criteria for 'full' ratings ([80b07a2](https://github.com/ryl1k/safecity/commit/80b07a2d729e1b89500d7475c8067230bd25b56f))
+
 ## 1.0.0 (2026-07-07)
 
 
