@@ -24,24 +24,99 @@ const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/
 const BASE = 'https://data.gov.ua/dataset/546b7215-44f3-42eb-bf16-f74c9883a0b8/resource';
 const RESOURCES = {
   'pathways.geojson': '64ce1c8a-fe22-4db8-931d-09e8cfaf11c6',
-  'criteria.json': '94fc1df9-46ff-4967-84ca-f2818a176239',
 };
 
-const norm = (s) => (s || '').toLowerCase().replace(/[ʼ’]/g, "'").replace(/\s+/g, ' ').trim();
-const VAL = { 'так': 'yes', 'ні': 'no' };
+// Direct criterion ID → entity field mapping.
+// IDs derived from criteria.json; only sidewalk-relevant ones are listed.
+const ID_TO_FIELD = new Map([
+  // width ≥ 1.8 m
+  ['0500284', 'width'],
+  ['0600159', 'width'],
+  ['6500802', 'width'],
+  ['6900861', 'width'],
+  ['7300890', 'width'],
+  // curb cuts / dropped kerbs
+  ['0500295', 'curb_cuts'],
+  ['0600141', 'curb_cuts'],
+  ['0600384', 'curb_cuts'],
+  ['1100040', 'curb_cuts'],
+  ['6500804', 'curb_cuts'],
+  ['6900862', 'curb_cuts'],
+  ['7000873', 'curb_cuts'],
+  ['7300891', 'curb_cuts'],
+  ['7300897', 'curb_cuts'],
+  // obstacle-free path
+  ['0600286', 'obstacle_free'],
+  ['6600823', 'obstacle_free'],
+  ['6900860', 'obstacle_free'],
+  ['7300898', 'obstacle_free'],
+  // step-free / ramp present
+  ['6500806', 'step_free'],
+  ['6600812', 'step_free'],
+  ['6700825', 'step_free'],
+  ['6900867', 'step_free'],
+  // even / hard surface (smoothness)
+  ['0600023', 'smoothness'],
+  ['0600030', 'smoothness'],
+  ['0600160', 'smoothness'],
+  ['0600285', 'smoothness'],
+  ['1500177', 'smoothness'],
+  ['6500803', 'smoothness'],
+  ['6900863', 'smoothness'],
+  ['7300892', 'smoothness'],
+  ['7300893', 'smoothness'],
+  ['7600916', 'smoothness'],
+  // tactile paving
+  ['0100008', 'tactile'],
+  ['0500296', 'tactile'],
+  ['0500308', 'tactile'],
+  ['0600143', 'tactile'],
+  ['0600405', 'tactile'],
+  ['0600474', 'tactile'],
+  ['1100164', 'tactile'],
+  ['6500809', 'tactile'],
+  ['6600815', 'tactile'],
+  ['6700828', 'tactile'],
+  ['6700841', 'tactile'],
+  ['6800851', 'tactile'],
+  ['6900865', 'tactile'],
+  ['6900866', 'tactile'],
+  ['6900871', 'tactile'],
+  ['7000874', 'tactile'],
+  ['7300894', 'tactile'],
+  ['7300895', 'tactile'],
+  ['7300918', 'tactile'],
+  ['7400903', 'tactile'],
+  // ramp present
+  ['0100043', 'ramp'],  // ramp start/end marked → ramp exists
+  ['0500059', 'ramp'],
+  ['0500185', 'ramp'],  // ramp start/end marked → ramp exists
+  ['0500375', 'ramp'],
+  ['0500509', 'ramp'],
+  ['0600241', 'ramp'],
+  ['0600476', 'ramp'],  // ramp start/end marked → ramp exists
+  ['3700395', 'ramp'],
+  ['3700399', 'ramp'],
+  ['6500807', 'ramp'],
+  ['6600813', 'ramp'],
+  ['6700826', 'ramp'],
+  ['6900864', 'ramp'],  // ramp provided when slope > 5%
+  ['6900868', 'ramp'],  // single steps replaced by ramps
+  ['6900869', 'ramp'],  // ramp slope spec → ramp exists
+  ['7100877', 'ramp'],  // equipped with ramps/lifts
+  ['7100878', 'ramp'],
+  ['7400899', 'ramp'],
+  ['7400901', 'ramp'],  // single steps replaced by ramps
+  ['7400919', 'ramp'],  // ramp slope spec → ramp exists
+  // lit
+  ['0500166', 'lit'],
+  ['0700053', 'lit'],
+  ['6500805', 'lit'],
+  ['7000876', 'lit'],
+]);
 
-// Criterion-title → entity field (first match wins per criterion). Patterns cover
-// both the modern ДБН wording (n≈2097 rows) and the older short LUN wording.
-const FIELD_MATCHERS = [
-  ['width',          /ширин[аи].{0,40}не менше ніж 1,?8|ширина тротуару не менше 1[.,]8/],
-  ['curb_cuts',      /пониження борд|пониження борт|поєднані на одному (спільному )?рівні|пологі з.їзди/],
-  ['obstacle_free',  /немає перепон|відсутні перешкоди|вільний (від|для).{0,40}перешкод|без будь-яких перешкод для пішохідного|транзитній.{0,30}зоні тротуару немає/],
-  ['step_free',      /відсутні сходи або наявні сходи і пандус/],
-  ['smoothness',     /рівн[еий].{0,40}без вибоїн|тверде, ?несипуче/],
-  ['tactile',        /тактильн.{0,30}(смуг|направляюч|маркуванн)|попереджувальн.{0,25}тактильн/],
-  ['ramp',           /уклон пандуса|пандус на маршруті|сходинки замінені пандус|сходи.{0,25}продубльовано пандус|^пандус$/],
-  ['lit',            /^освітленн|штучне освітлення|вуличне.{0,20}освітленн/],
-];
+const norm = (s) => (s || '').toLowerCase().replace(/[ʼ']/g, "'").replace(/\s+/g, ' ').trim();
+const VAL = { 'так': 'yes', 'ні': 'no' };
 
 // entity field → { column, sourceKey }
 const FIELD_COL = {
@@ -68,27 +143,27 @@ async function ensureFile(name) {
   return dest;
 }
 
-// Decode one pathway feature's criteria → { column: value } for fields it asserts.
-function decodeFields(props, idTitle) {
+// Decode one pathway feature's criteria → { db_column: value }.
+function decodeFields(props) {
   const acc = {}; // field -> ['yes'|'no', ...]
   for (const cat of props.categories || []) {
     for (const cr of cat.criteria || []) {
       const val = VAL[norm(cr.value)];
-      if (!val) continue; // skip N/A / blank
-      const title = norm(idTitle.get(cr.id));
-      if (!title) continue;
-      for (const [field, re] of FIELD_MATCHERS) { if (re.test(title)) { (acc[field] ||= []).push(val); break; } }
+      if (!val) continue;
+      const field = ID_TO_FIELD.get(String(cr.id));
+      if (!field) continue;
+      (acc[field] ||= []).push(val);
     }
   }
-  const out = {}; // column -> value
-  if (acc.width && acc.width.includes('yes')) out.sidewalk_width_m = 1.8; // gov gives a ≥1.8m threshold, store the floor
-  if (acc.smoothness) out.smoothness = acc.smoothness.includes('no') ? 'intermediate' : 'good'; // a reported defect dominates
-  if (acc.step_free) out.is_step_free = !acc.step_free.includes('no'); // a reported step/barrier dominates
-  if (acc.obstacle_free) out.is_obstacle_free = !acc.obstacle_free.includes('no');
-  if (acc.curb_cuts) out.has_curb_cuts = acc.curb_cuts.includes('yes');
-  if (acc.tactile) out.has_tactile_paving = acc.tactile.includes('yes');
-  if (acc.ramp) out.has_ramp = acc.ramp.includes('yes');
-  if (acc.lit) out.lit = acc.lit.includes('yes');
+  const out = {};
+  if (acc.width        && acc.width.includes('yes'))          out.sidewalk_width_m   = 1.8;
+  if (acc.smoothness)                                          out.smoothness         = acc.smoothness.includes('no') ? 'intermediate' : 'good';
+  if (acc.step_free)                                           out.is_step_free       = !acc.step_free.includes('no');
+  if (acc.obstacle_free)                                       out.is_obstacle_free   = !acc.obstacle_free.includes('no');
+  if (acc.curb_cuts)                                           out.has_curb_cuts      = acc.curb_cuts.includes('yes');
+  if (acc.tactile)                                             out.has_tactile_paving = acc.tactile.includes('yes');
+  if (acc.ramp)                                                out.has_ramp           = acc.ramp.includes('yes');
+  if (acc.lit)                                                 out.lit                = acc.lit.includes('yes');
   return out;
 }
 
@@ -98,8 +173,6 @@ async function main() {
   await mkdir(DATA_DIR, { recursive: true });
   console.log(`Mode: ${APPLY ? 'APPLY (writing to DB)' : 'DRY-RUN'} · snap radius ${RADIUS} m · data ${DATA_DIR}\n`);
 
-  const crit = JSON.parse(await readFile(await ensureFile('criteria.json'), 'utf8'));
-  const idTitle = new Map(crit.map((c) => [c.id, c.title]));
   const fc = JSON.parse(await readFile(await ensureFile('pathways.geojson'), 'utf8'));
   const feats = fc.features || [];
   console.log(`Pathway points: ${feats.length}`);
@@ -114,32 +187,57 @@ async function main() {
   const stat = { decoded: 0, snapped: 0, noSegment: 0, nothingNew: 0, fieldsWritten: {}, samples: [] };
   const bump = (k) => (stat.fieldsWritten[k] = (stat.fieldsWritten[k] || 0) + 1);
 
+  const decoded = [];
   for (const f of feats) {
     const p = f.properties || {};
     const lng = Number(p.lon), lat = Number(p.lat);
     if (!Number.isFinite(lng) || !Number.isFinite(lat)) continue;
-    const fields = decodeFields(p, idTitle);
+    const fields = decodeFields(p);
     if (Object.keys(fields).length === 0) continue;
     stat.decoded++;
     if (stat.samples.length < 8) stat.samples.push({ street: p.addressThoroughfare || p.title || '?', fields });
+    decoded.push({ lng, lat, fields });
+  }
 
-    if (!APPLY) continue;
+  if (APPLY) {
+    const CHUNK = 200;
+    const total = Math.ceil(decoded.length / CHUNK);
+    for (let ci = 0; ci < decoded.length; ci += CHUNK) {
+      const chunk = decoded.slice(ci, ci + CHUNK);
+      const idxs = chunk.map((_, j) => j);
+      const lngs = chunk.map((p) => p.lng);
+      const lats = chunk.map((p) => p.lat);
 
-    const [seg] = await sql`
-      select id, smoothness, sidewalk_width_m, is_step_free, has_curb_cuts, has_tactile_paving, has_ramp, lit
-      from street_segments
-      where ST_DWithin(geom::geography, ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography, ${RADIUS})
-      order by geom::geography <-> ST_SetSRID(ST_MakePoint(${lng}, ${lat}), 4326)::geography
-      limit 1`;
-    if (!seg) { stat.noSegment++; continue; }
+      const rows = await sql`
+        select pts.i, s.id, s.smoothness, s.sidewalk_width_m, s.is_step_free,
+               s.has_curb_cuts, s.has_tactile_paving, s.has_ramp, s.lit, s.is_obstacle_free
+        from unnest(${idxs}::int[], ${lngs}::float8[], ${lats}::float8[]) as pts(i, lng, lat)
+        cross join lateral (
+          select id, smoothness, sidewalk_width_m, is_step_free, has_curb_cuts,
+                 has_tactile_paving, has_ramp, lit, is_obstacle_free
+          from street_segments
+          where ST_DWithin(geom::geography, ST_SetSRID(ST_MakePoint(pts.lng, pts.lat), 4326)::geography, ${RADIUS})
+          order by geom::geography <-> ST_SetSRID(ST_MakePoint(pts.lng, pts.lat), 4326)::geography
+          limit 1
+        ) s`;
 
-    const set = {}, src = {};
-    for (const [col, val] of Object.entries(fields)) {
-      if (seg[col] === null || seg[col] === undefined) { set[col] = val; src[COL_KEY[col]] = 'gov'; bump(COL_KEY[col]); }
+      stat.noSegment += chunk.length - rows.length;
+
+      for (const row of rows) {
+        const { i, id, ...seg } = row;
+        const { fields } = chunk[i];
+        const set = {}, src = {};
+        for (const [col, val] of Object.entries(fields)) {
+          if (seg[col] === null || seg[col] === undefined) { set[col] = val; src[COL_KEY[col]] = 'gov'; bump(COL_KEY[col]); }
+        }
+        if (Object.keys(set).length === 0) { stat.nothingNew++; continue; }
+        await sql`update street_segments set ${sql(set)}, field_sources = field_sources || ${sql.json(src)}, updated_at = now() where id = ${id}`;
+        stat.snapped++;
+      }
+
+      process.stdout.write(`\r  chunk ${Math.ceil((ci + chunk.length) / CHUNK)}/${total} · snapped ${stat.snapped}   `);
     }
-    if (Object.keys(set).length === 0) { stat.nothingNew++; continue; }
-    await sql`update street_segments set ${sql(set)}, field_sources = field_sources || ${sql.json(src)}, updated_at = now() where id = ${seg.id}`;
-    stat.snapped++;
+    process.stdout.write('\n');
   }
 
   console.log('\n=== Sample decoded pathway points ===');
