@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.1.0](https://github.com/ryl1k/safecity/compare/shared-v1.0.0...shared-v1.1.0) (2026-07-18)
+
+
+### Features
+
+* integrate Groq photo validation for segment submissions ([63b5342](https://github.com/ryl1k/safecity/commit/63b534237031854d3acc9dfeec70d6b1b07167b3))
+* integrate Groq photo validation for segment submissions ([90e3e46](https://github.com/ryl1k/safecity/commit/90e3e46b5ec733d537be560158c31c9a4acd6a41))
+
 ## 1.0.0 (2026-07-07)
 
 
